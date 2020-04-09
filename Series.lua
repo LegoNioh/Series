@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 0.02
+    local Version = 0.03
     
     local Files = {
         Lua = {
@@ -164,10 +164,6 @@ function Manager:LoadPyke()
 	--GetEnemyHeroes()
 	Callback.Add("Tick", function() Pyke:Tick() end)
 	Callback.Add("Draw", function() Pyke:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) Pyke:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Pyke:OnPostAttackTick(...) end)
-	end
 end
 
 function Manager:LoadAphelios()
