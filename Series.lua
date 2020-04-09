@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 0.03
+    local Version = 0.05
     
     local Files = {
         Lua = {
@@ -126,6 +126,14 @@ function EnableMovement()
 	SetMovement(true)
 end
 
+local function IsValid(unit)
+    if (unit and unit.valid and unit.isTargetable and unit.alive and unit.visible and unit.networkID and unit.pathing and unit.health > 0) then
+        return true;
+    end
+    return false;
+end
+
+
 local function ValidTarget(unit, range)
     if (unit and unit.valid and unit.isTargetable and unit.alive and unit.visible and unit.networkID and unit.pathing and unit.health > 0) and GetDistance(unit.pos) <= range then
         return true;
@@ -213,6 +221,8 @@ function Lucian:Menu()
 	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
 	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
 	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = true})
 end
 
 function Lucian:Spells()
@@ -268,6 +278,7 @@ function Lucian:Tick()
 end
 
 function Lucian:Draw()
+	if self.Menu.Draw.UseDraws:Value() then
 	--Draw.Circle(myHero.pos, 55, 1, Draw.Color(255, 0, 191, 255))
 	if target then
 		--PrintChat("drawing R spot")
@@ -283,6 +294,7 @@ function Lucian:Draw()
 		Location = target.pos + Direction * clicker
 		--PrintChat(dotp)
 		--Draw.Circle(Location, 55, 1, Draw.Color(255, 0, 191, 255))
+	end
 	end
 end
 
@@ -340,6 +352,9 @@ function Lucian:Logic()
 			Control.CastSpell(HK_Q, target)
 			DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
 			Casted = 1
+		end
+		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and Mode() == "Combo" then
+			self:GetQMinion(target)
 		end
 		if Casted == 1 then
 			--PrintChat("Casted")
@@ -410,9 +425,31 @@ function Lucian:Logic()
     end		
 end
 
-function Lucian:GetRDmg(target, hits)
+function Lucian:GetQMinion(unit)
+	for i = 1, Game.MinionCount() do
+    local minion = Game.Minion(i)
+    	--PrintChat(minion.team)
+		if minion.team == 300 - myHero.team and IsValid(minion) then
+			--PrintChat("minion")
+			if GetDistance(minion.pos, myHero.pos) < 500 then
+				if GetDistance(unit.pos, minion.pos) < GetDistance(unit.pos, myHero.pos) then
+					CastDirection = Vector((minion.pos-myHero.pos):Normalized())
+					enemydist = GetDistance(unit.pos, myHero.pos)
+					EnemySpot = myHero.pos:Extended(minion.pos, enemydist)
+					Location = EnemySpot
+					--Draw.Circle(Location, 55, 1, Draw.Color(255, 0, 191, 255))
+					if GetDistance(Location, unit.pos) < 50 then
+						Control.CastSpell(HK_Q, minion)
+					end
+				end
+			end
+		end
+	end
+end
+
+function Lucian:GetRDmg(unit, hits)
 	local level = myHero:GetSpellData(_R).level
-	local RDmg = getdmg("R", target, myHero, myHero:GetSpellData(_R).level)
+	local RDmg = getdmg("R", unit, myHero, myHero:GetSpellData(_R).level)
 	if hits then
 		return RDmg * hits
 	else
@@ -474,6 +511,8 @@ function Aphelios:Menu()
 	self.Menu.KSMode:MenuElement({id = "UseQPassive", name = "Killsteal Calibrum Marked Targets", value = true})
 	self.Menu.KSMode:MenuElement({id = "UseW", name = "Switch Weapons to KS", value = true})
 	self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R to KS", value = true})
+	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = true})
 end
 
 
@@ -527,51 +566,18 @@ function Aphelios:Tick()
 end
 
 function Aphelios:Draw()
-	Draw.Circle(myHero.pos, 225, 1, Draw.Color(255, 0, 191, 255))
-	local endtime = Game.Timer()
-	if myHero.activeSpell.valid then
-		local attacktargetpos = myHero.activeSpell.placementPos
-		local vectargetpos = Vector(attacktargetpos.x,attacktargetpos.y,attacktargetpos.z);
-		Draw.Circle(vectargetpos, 225, 1, Draw.Color(255, 0, 191, 255))
-	end
-	Draw.Text(MainHand, 25, 770, 900, Draw.Color(0xFF32CD32))
-	Draw.Text(OffHand, 25, 870, 900, Draw.Color(0xFF0000FF))
-	--[[if target then
-		for i = 0, target.buffCount do
-			local buff = target:GetBuff(i)
-			if buff and buff.count > 0 then
-				if buff.name == "aphelioscalibrumbonusrangedebuff" then
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-				elseif buff.name == "ApheliosGravitumDebuff" then
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-				else
-					Draw.Text("found this instead", 15, 1040, 650-(i*20), Draw.Color(0xFF32CD32))
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-				end
-			end
+	if self.Menu.Draw.UseDraws:Value() then
+		Draw.Circle(myHero.pos, 225, 1, Draw.Color(255, 0, 191, 255))
+		local endtime = Game.Timer()
+		if myHero.activeSpell.valid then
+			local attacktargetpos = myHero.activeSpell.placementPos
+			local vectargetpos = Vector(attacktargetpos.x,attacktargetpos.y,attacktargetpos.z);
+			Draw.Circle(vectargetpos, 225, 1, Draw.Color(255, 0, 191, 255))
 		end
-	end 
-		for i = 0, myHero.buffCount do
-			local buff = myHero:GetBuff(i)
-			if buff and buff.count > 0 then
-				if buff.name == "aphelioscalibrumbonusrangebuff" then
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-				elseif buff.name == "ApheliosGravitumDebuff" then
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-				elseif buff.name == "aphelioscrescendumorbitmanager" then
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-					Draw.Text(buff.sourceName, 15, 1150, 650-(i*20), Draw.Color(0xFF32CD32))
-				elseif buff.name == "ApheliosCrescendumManager" then
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-					Draw.Text(buff.sourceName, 15, 1150, 650-(i*20), Draw.Color(0xFF32CD32))
-				else
-					Draw.Text("found this instead", 15, 1040, 650-(i*20), Draw.Color(0xFF32CD32))
-					Draw.Text(buff.name, 15, 1170, 650-(i*20), Draw.Color(0xFF32CD32))
-				end
-			end
-		end--]]
+		Draw.Text(MainHand, 25, 770, 900, Draw.Color(0xFF32CD32))
+		Draw.Text(OffHand, 25, 870, 900, Draw.Color(0xFF0000FF))
+	end
 	return 0
-
 end
 
 function SetMovement(bool)
