@@ -7,18 +7,18 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 0.05
+    local Version = 0.01
     
     local Files = {
         Lua = {
             Path = SCRIPT_PATH,
-            Name = "Jinx.lua",
-            Url = "https://raw.githubusercontent.com/ShadowFusion/MJGA/master/Jinx.lua"
+            Name = "Series.lua",
+            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/Series.lua"
         },
         Version = {
             Path = SCRIPT_PATH,
-            Name = "Jinx.version",
-            Url = "https://raw.githubusercontent.com/ShadowFusion/MJGA/master/Jinx.version"    -- check if Raw Adress correct pls.. after you have create the version file on Github
+            Name = "Series.version",
+            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/Series.version"    -- check if Raw Adress correct pls.. after you have create the version file on Github
         }
     }
     
@@ -41,7 +41,7 @@ do
         local NewVersion = tonumber(ReadFile(Files.Version.Path, Files.Version.Name))
         if NewVersion > Version then
             DownloadFile(Files.Lua.Url, Files.Lua.Path, Files.Lua.Name)
-            print("New ShadowAIO Vers. Press 2x F6")     -- <-- you can change the massage for users here !!!!
+            print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
         end
