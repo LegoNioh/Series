@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 0.05
+    local Version = 0.06
     
     local Files = {
         Lua = {
@@ -213,7 +213,7 @@ function Lucian:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
-	self.Menu.ComboMode:MenuElement({id = "UseRMagnet", name = "Magnet when R is active", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseRMagnet", name = "Magnet when R is active", value = false})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetMouseRange", name = "Magnet Mouse Range", value = 700, min = 100, max = 1200, step = 100})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetHeroRange", name = "Magnet Hero Range", value = 500, min = 100, max = 1200, step = 100})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetSmooth", name = "Smooth Magnet Mode", value = true})
