@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1.10
+    local Version = 1.20
     
     local Files = {
         Lua = {
@@ -202,6 +202,7 @@ local EnemyLoaded = false
 local QCastTime = Game:Timer()
 local RCastTime = Game:Timer()
 local Casted = 0
+local attackedfirst = 0
 local WasInRange = false
 local DoubleShot = false
 local Direction = myHero.pos
@@ -349,12 +350,27 @@ function Lucian:Logic()
 		if GetDistance(target.pos) < 500 then
 			WasInRange = true
 		end
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, 495) and not DoubleShot then
+		--[[if self:CanUse(_Q, Mode()) and ValidTarget(target, 500 + target.boundingRadius) and not DoubleShot then
 			if _G.SDK.Orbwalker:CanAttack() then
+					PrintChat("can attack")
 					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
+			else
+				Control.CastSpell(HK_Q, target)
 			end
-			Control.CastSpell(HK_Q, target)
+			PrintChat(myHero.attackSpeed)
+			if myHero.attackSpeed < 1.40 then
+				PrintChat("cat")
+				DelayAction(function() Control.Move(mousePos) end, 0.75)
+			end
 			Casted = 1
+		end]]--
+		if Casted == 1 then
+			--PrintChat("Casted")
+			--_G.SDK.Orbwalker:__OnAutoAttackReset()
+			if _G.SDK.Orbwalker:CanAttack() then
+				--PrintChat("Attacking")
+				Control.Attack(enemy)
+			end
 		end
 		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
 			self:GetQMinion(target)
@@ -387,9 +403,11 @@ function Lucian:Logic()
 		end
 		if myHero.activeSpell.name == "LucianQ" then
 			--PrintChat(myHero.activeSpell.name)
-		elseif self:CanUse(_W, Mode()) and ValidTarget(target, 890) and not DoubleShot and Casted == 0 then
-			self:UseW(target)
-			_G.SDK.Orbwalker:SetMovement(true)
+		elseif self:CanUse(_W, Mode()) and ValidTarget(target, 900) and not DoubleShot and Casted == 0 then
+			if GetDistance(target.pos, myHero.pos) > 500 or not self:CanUse(_Q, Mode()) then
+				self:UseW(target)
+				_G.SDK.Orbwalker:SetMovement(true)
+			end
 		end
 		--PrintChat(self:GetRDmg(target))
 		--PrintChat(target.health)
@@ -458,8 +476,23 @@ function Lucian:OnPreAttack(args)
 end
 
 function Lucian:OnPostAttackTick(args)
-					Casted = 0
-					--PrintChat("Casted 0")
+	attackedfirst = 1
+	if target and Mode() == "Combo" then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, 500 + target.boundingRadius) and not DoubleShot then
+			if _G.SDK.Orbwalker:CanAttack() then
+					PrintChat("can attack")
+					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
+			else
+				Control.CastSpell(HK_Q, target)
+			end
+			PrintChat(myHero.attackSpeed)
+			if myHero.attackSpeed < 1.40 then
+				PrintChat("cat")
+				DelayAction(function() Control.Move(mousePos) end, 0.75)
+			end
+			Casted = 1
+		end
+	end
 end
 
 function Lucian:UseW(unit)
