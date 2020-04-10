@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1.20
+    local Version = 1.30
     
     local Files = {
         Lua = {
@@ -439,21 +439,23 @@ function Lucian:Logic()
 end
 
 function Lucian:GetQMinion(unit)
-	local minions = _G.SDK.ObjectManager:GetEnemyMinions(500)
- 	for i = 1, #minions do
-        local minion = minions[i]
-    	--PrintChat(minion.team)
-		if minion.team == 300 - myHero.team and IsValid(minion) then
-			--PrintChat("minion")
-			if GetDistance(minion.pos, myHero.pos) < 500 then
-				if GetDistance(unit.pos, minion.pos) < GetDistance(unit.pos, myHero.pos) then
-					CastDirection = Vector((minion.pos-myHero.pos):Normalized())
-					enemydist = GetDistance(unit.pos, myHero.pos)
-					EnemySpot = myHero.pos:Extended(minion.pos, enemydist)
-					Location = EnemySpot
-					--Draw.Circle(Location, 55, 1, Draw.Color(255, 0, 191, 255))
-					if GetDistance(Location, unit.pos) < 50 then
-						Control.CastSpell(HK_Q, minion)
+	if Mode() == "Combo" then
+		local minions = _G.SDK.ObjectManager:GetEnemyMinions(500)
+ 		for i = 1, #minions do
+        	local minion = minions[i]
+    		--PrintChat(minion.team)
+			if minion.team == 300 - myHero.team and IsValid(minion) then
+				--PrintChat("minion")
+				if GetDistance(minion.pos, myHero.pos) < 500 then
+					if GetDistance(unit.pos, minion.pos) < GetDistance(unit.pos, myHero.pos) then
+						CastDirection = Vector((minion.pos-myHero.pos):Normalized())
+						enemydist = GetDistance(unit.pos, myHero.pos)
+						EnemySpot = myHero.pos:Extended(minion.pos, enemydist)
+						Location = EnemySpot
+						--Draw.Circle(Location, 55, 1, Draw.Color(255, 0, 191, 255))
+						if GetDistance(Location, unit.pos) < 50 then
+							Control.CastSpell(HK_Q, minion)
+						end
 					end
 				end
 			end
