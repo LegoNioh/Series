@@ -486,7 +486,8 @@ end
 function Lucian:OnPostAttackTick(args)
 	attackedfirst = 1
 	if target and Mode() == "Combo" then
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, 500 + target.boundingRadius) and not DoubleShot then
+		local rangeReal = 500 + target.boundingRadius + myHero.boundingRadius
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, rangeReal) and not DoubleShot then
 			if _G.SDK.Orbwalker:CanAttack() then
 					--PrintChat("can attack")
 					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
