@@ -300,10 +300,10 @@ function Lucian:Draw()
 end
 
 function Lucian:KS()
-	local UltDamge = 300
 	for i, enemy in pairs(EnemyHeroes) do
-		if enemy and not enemy.dead and ValidTarget(enemy, 1100) then
-			if Mode() == "Combo" then
+		if enemy and not enemy.dead and ValidTarget(enemy, 900) then
+			if self:CanUse(_Q, Mode()) and GetDistance(enemy.pos, myHero.pos) > 500 and GetDistance(enemy.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
+				self:GetQMinion(enemy)
 			end
 		end
 	end
@@ -350,20 +350,14 @@ function Lucian:Logic()
 			WasInRange = true
 		end
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, 495) and not DoubleShot then
+			if _G.SDK.Orbwalker:CanAttack() then
+					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
+			end
 			Control.CastSpell(HK_Q, target)
-			DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
 			Casted = 1
 		end
-		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and Mode() == "Combo" and self.Menu.ComboMode.UseQMinion:Value() then
+		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
 			self:GetQMinion(target)
-		end
-		if Casted == 1 then
-			--PrintChat("Casted")
-			--_G.SDK.Orbwalker:__OnAutoAttackReset()
-			if _G.SDK.Orbwalker:CanAttack() then
-				--PrintChat("Attacking")
-				Control.Attack(enemy)
-			end
 		end
 		if self:CanUse(_E, Mode()) and myHero:GetSpellData(_R).toggleState == 1 then
 			if GetDistance(target.pos) > 520 then
@@ -427,8 +421,9 @@ function Lucian:Logic()
 end
 
 function Lucian:GetQMinion(unit)
-	for i = 1, Game.MinionCount() do
-    local minion = Game.Minion(i)
+	local minions = _G.SDK.ObjectManager:GetEnemyMinions(500)
+ 	for i = 1, #minions do
+        local minion = minions[i]
     	--PrintChat(minion.team)
 		if minion.team == 300 - myHero.team and IsValid(minion) then
 			--PrintChat("minion")
