@@ -45,6 +45,7 @@ do
             print("Version Changes: Added Lucian Auto Q On Minions") 
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
+	    print("Version Changes 1.40: Added Lucian Auto Q On Minions") 
         end
     
     end
