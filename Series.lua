@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1.30
+    local Version = 1.40
     
     local Files = {
         Lua = {
@@ -42,6 +42,7 @@ do
         if NewVersion > Version then
             DownloadFile(Files.Lua.Url, Files.Lua.Path, Files.Lua.Name)
             print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
+            print("Version Changes: Added Lucian Auto Q On Minions") 
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
         end
@@ -214,7 +215,8 @@ function Lucian:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
-	self.Menu.ComboMode:MenuElement({id = "UseQMinion", name = "Calc Q on Minions (May Drop FPS)", value = false})
+	self.Menu.ComboMode:MenuElement({id = "UseQMinionCombo", name = "Q on minions in Combo (No FPS Drops)", value = false})
+	self.Menu.ComboMode:MenuElement({id = "UseQMinion", name = "Auto Q on minions (May Cause FPS Drops)", value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseRMagnet", name = "Magnet when R is active", value = false})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetMouseRange", name = "Magnet Mouse Range", value = 700, min = 100, max = 1200, step = 100})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetHeroRange", name = "Magnet Hero Range", value = 500, min = 100, max = 1200, step = 100})
@@ -301,9 +303,11 @@ function Lucian:Draw()
 end
 
 function Lucian:KS()
+	--PrintChat("ksing")
 	for i, enemy in pairs(EnemyHeroes) do
 		if enemy and not enemy.dead and ValidTarget(enemy, 900) then
-			if self:CanUse(_Q, Mode()) and GetDistance(enemy.pos, myHero.pos) > 500 and GetDistance(enemy.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > 500 and GetDistance(enemy.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
+				--PrintChat("ksing 2")
 				self:GetQMinion(enemy)
 			end
 		end
@@ -320,6 +324,9 @@ function Lucian:CanUse(spell, mode)
 			return true
 		end
 		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.ComboMode.UseQMinion:Value() then
 			return true
 		end
 	elseif spell == _W then
@@ -372,7 +379,7 @@ function Lucian:Logic()
 				Control.Attack(enemy)
 			end
 		end
-		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
+		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinionCombo:Value() then
 			self:GetQMinion(target)
 		end
 		if self:CanUse(_E, Mode()) and myHero:GetSpellData(_R).toggleState == 1 then
@@ -439,7 +446,7 @@ function Lucian:Logic()
 end
 
 function Lucian:GetQMinion(unit)
-	if Mode() == "Combo" then
+		--PrintChat("Getting Q minion")
 		local minions = _G.SDK.ObjectManager:GetEnemyMinions(500)
  		for i = 1, #minions do
         	local minion = minions[i]
@@ -460,7 +467,6 @@ function Lucian:GetQMinion(unit)
 				end
 			end
 		end
-	end
 end
 
 function Lucian:GetRDmg(unit, hits)
@@ -482,14 +488,14 @@ function Lucian:OnPostAttackTick(args)
 	if target and Mode() == "Combo" then
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, 500 + target.boundingRadius) and not DoubleShot then
 			if _G.SDK.Orbwalker:CanAttack() then
-					PrintChat("can attack")
+					--PrintChat("can attack")
 					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
 			else
 				Control.CastSpell(HK_Q, target)
 			end
-			PrintChat(myHero.attackSpeed)
+			--PrintChat(myHero.attackSpeed)
 			if myHero.attackSpeed < 1.40 then
-				PrintChat("cat")
+				--PrintChat("cat")
 				DelayAction(function() Control.Move(mousePos) end, 0.75)
 			end
 			Casted = 1
