@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 0.06
+    local Version = 1.00
     
     local Files = {
         Lua = {
@@ -213,16 +213,17 @@ function Lucian:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseQMinion", name = "Calc Q on Minions (May Drop FPS)", value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseRMagnet", name = "Magnet when R is active", value = false})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetMouseRange", name = "Magnet Mouse Range", value = 700, min = 100, max = 1200, step = 100})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetHeroRange", name = "Magnet Hero Range", value = 500, min = 100, max = 1200, step = 100})
-	self.Menu.ComboMode:MenuElement({id = "rMagnetSmooth", name = "Smooth Magnet Mode", value = true})
+	self.Menu.ComboMode:MenuElement({id = "rMagnetSmooth", name = "Smooth Magnet Mode", value = false})
 	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
 	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
 	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
 	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
 	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = true})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
 
 function Lucian:Spells()
@@ -279,7 +280,7 @@ end
 
 function Lucian:Draw()
 	if self.Menu.Draw.UseDraws:Value() then
-	--Draw.Circle(myHero.pos, 55, 1, Draw.Color(255, 0, 191, 255))
+	Draw.Circle(myHero.pos, 55, 1, Draw.Color(255, 0, 191, 255))
 	if target then
 		--PrintChat("drawing R spot")
 		if myHero:GetSpellData(_R).toggleState == 1 then
@@ -353,7 +354,7 @@ function Lucian:Logic()
 			DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
 			Casted = 1
 		end
-		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and Mode() == "Combo" then
+		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and Mode() == "Combo" and self.Menu.ComboMode.UseQMinion:Value() then
 			self:GetQMinion(target)
 		end
 		if Casted == 1 then
