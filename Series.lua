@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1.40
+    local Version = 1.50
     
     local Files = {
         Lua = {
