@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 2.22
+    local Version = 2.30
     
     local Files = {
         Lua = {
@@ -45,7 +45,9 @@ do
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
             print("Version Changes: Added Lucian Auto Q On Minions") 
-            print("Version Changes: Added Fizz") 
+            print("Version Changes: Added Fizz")
+		print("Version Changes: Added Fizz Last Hit") 
+		print("Version Changes: Fixed FPS drops on Lucian Auto Q") 
         end
     
     end
@@ -468,6 +470,8 @@ end
 function Lucian:GetQMinion(unit)
 		--PrintChat("Getting Q minion")
 		local minions = _G.SDK.ObjectManager:GetEnemyMinions(500)
+		local mtarget = nil
+		local mlocation = nil
  		for i = 1, #minions do
         	local minion = minions[i]
     		--PrintChat(minion.team)
@@ -481,11 +485,17 @@ function Lucian:GetQMinion(unit)
 						Location = EnemySpot
 						--Draw.Circle(Location, 55, 1, Draw.Color(255, 0, 191, 255))
 						if GetDistance(Location, unit.pos) < 50 then
-							Control.CastSpell(HK_Q, minion)
+							if mtarget == nil or GetDistance(Location, unit.pos) < GetDistance(mlocation, unit.pos) then 
+								mtarget = minion
+								mlocation = Location
+							end
 						end
 					end
 				end
 			end
+		end
+		if ValidTarget(mtarget, 500) then
+			Control.CastSpell(HK_Q, mtarget)
 		end
 end
 
