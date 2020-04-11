@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 2.30
+    local Version = 3.00
     
     local Files = {
         Lua = {
@@ -46,8 +46,9 @@ do
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
             print("Version Changes: Added Lucian Auto Q On Minions") 
             print("Version Changes: Added Fizz")
-		print("Version Changes: Added Fizz Last Hit") 
-		print("Version Changes: Fixed FPS drops on Lucian Auto Q") 
+			print("Version Changes: Added Fizz Last Hit") 
+			print("Version Changes: Fixed FPS drops on Lucian Auto Q")
+			print("Version Changes: Added Quinn")  
         end
     
     end
@@ -173,6 +174,8 @@ function Manager:__init()
 		DelayAction(function() self:LoadLucian() end, 1.05)
 	elseif myHero.charName == "Pyke" then
 		DelayAction(function() self:LoadPyke() end, 1.05)
+	elseif myHero.charName == "Quinn" then
+		DelayAction(function() self:LoadQuinn() end, 1.05)
 	elseif myHero.charName == "Fizz" then
 		DelayAction(function() self:LoadFizz() end, 1.05)
 	end
@@ -213,7 +216,6 @@ function Manager:LoadAphelios()
 	end
 end
 
-
 function Manager:LoadFizz()
 	Fizz:Spells()
 	Fizz:Menu()
@@ -227,6 +229,18 @@ function Manager:LoadFizz()
 	end
 end
 
+function Manager:LoadQuinn()
+	Quinn:Spells()
+	Quinn:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() Quinn:Tick() end)
+	Callback.Add("Draw", function() Quinn:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) Quinn:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Quinn:OnPostAttackTick(...) end)
+	end
+end
 
 class "Lucian"
 
@@ -725,7 +739,8 @@ function Fizz:KS()
 	for i, enemy in pairs(EnemyHeroes) do
 		if enemy and not enemy.dead and ValidTarget(enemy, 550) then
 			local Qrange = 550 + enemy.boundingRadius + myHero.boundingRadius
-			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > Qrange and self.Menu.KSMode.UseQ:Value() then
+			local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level) + getdmg("AA", enemy, myHero)
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > Qrange and self.Menu.KSMode.UseQ:Value() and enemy.health < Qdamage then
 				Control.CastSpell(HK_Q, enemy)
 			end
 		end
@@ -925,6 +940,234 @@ function Fizz:UseR(unit)
 		end 
 end
 
+class "Quinn"
+
+local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
+local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
+local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
+local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
+local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
+local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
+local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
+local IS = {}
+local EnemyLoaded = false
+local LastDist = 0
+local ECastTime = Game:Timer()
+local RCastTime = Game:Timer()
+local casted = 0
+local LockedTarget = nil
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local attackedfirst = 0
+local WasInRange = false
+local UltMode = false
+local LastHitSpot = myHero.pos
+local Direction = myHero.pos
+
+function Quinn:Menu()
+	self.Menu = MenuElement({type = MENU, id = "Quinn", name = "Quinn"})
+	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
+	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+	self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseW", name = "Use W in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseE", name = "Use E in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
+	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Quinn:Spells()
+	QSpellData = {speed = 1300, range = 1025, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+end
+
+function Quinn:__init()
+	DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Quinn:LoadScript()
+	self:Spells()
+	self:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() self:Tick() end)
+	Callback.Add("Draw", function() self:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+	end
+end
+
+function Quinn:GotBuff(unit)
+	for i = 0, unit.buffCount do
+		local buff = unit:GetBuff(i)
+		if buff and buff.count > 0 then 
+			PrintChat(buff.name)
+		end
+	end
+end
+
+function Quinn:Tick()
+	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+	--PrintChat(myHero:GetSpellData(_E).name)
+	--PrintChat(myHero:GetSpellData(_R).toggleState)
+	target = GetTarget(1400)
+	--PrintChat(myHero:GetSpellData(_R).name)
+	if myHero:GetSpellData(_R).name == "QuinnR" then
+		UltMode = false
+	else
+		UltMode = true
+	end
+	self:KS()
+	self:Logic()
+	if EnemyLoaded == false then
+		local CountEnemy = 0
+		for i, enemy in pairs(EnemyHeroes) do
+			CountEnemy = CountEnemy + 1
+		end
+		if CountEnemy < 1 then
+			GetEnemyHeroes()
+		else
+			EnemyLoaded = true
+			PrintChat("Enemy Loaded")
+		end
+	end
+end
+
+function Quinn:Draw()
+	if self.Menu.Draw.UseDraws:Value() then
+		Draw.Circle(myHero.pos, 500, 1, Draw.Color(255, 0, 191, 255))
+		--Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+		--Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
+		if target then
+		end
+	end
+end
+
+
+function Quinn:KS()
+	--PrintChat("ksing")
+	for i, enemy in pairs(EnemyHeroes) do
+		if enemy and not enemy.dead and ValidTarget(enemy, 1025) then
+			local Qrange = 550 + enemy.boundingRadius + myHero.boundingRadius
+			local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level)
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > Qrange and self.Menu.KSMode.UseQ:Value() and enemy.health < Qdamage then
+				self:UseQ(enemy)
+			end
+		end
+	end
+end	
+
+function Quinn:CanUse(spell, mode)
+	if mode == nil then
+		mode = Mode()
+	end
+	--PrintChat(Mode())
+	if spell == _Q then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+			return true
+		end
+	elseif spell == _W then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+			return true
+		end
+	elseif spell == _E then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+			return true
+		end
+	elseif spell == _R then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+			return true
+		end
+	end
+	return false
+end
+
+function Quinn:Logic()
+	if target and (LockedTarget == target or LockedTarget == nil) then
+		LastDist = GetDistance(target.pos, myHero.pos)
+		--PrintChat(LastDist)
+	else
+		if Mode() == "Combo" and LastDist < 1025 then
+			--PrintChat("What")
+			if self:CanUse(_W, "Combo") then
+				--PrintChat("What?!")
+				Control.CastSpell(HK_W)
+			end
+		end
+		WasInRange = false
+		LockedTarget = nil 
+		return 
+	end
+	if Mode() == "Combo" or Mode() == "Harass" and target then
+		local hasPassive = _G.SDK.BuffManager:HasBuff(target, "QuinnW")
+		local AARange = 525 + target.boundingRadius + myHero.boundingRadius
+		local QRange = 1025 + target.boundingRadius + myHero.boundingRadius
+		local ERange = 675 + target.boundingRadius + myHero.boundingRadius
+		local RRange = 700 + target.boundingRadius + myHero.boundingRadius
+		--PrintChat(ERange)
+		if hasPassive then
+			--PrintChat("Got the Mark")
+		end
+		if GetDistance(target.pos, myHero.pos) < AARange then
+			LockedTarget = target
+		end
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not hasPassive and not UltMode then
+			self:UseQ(target)
+		end
+		if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not hasPassive then
+			if GetDistance(target.pos, myHero.pos) < 175 then
+				Control.CastSpell(HK_E, target)
+			elseif GetDistance(target.pos, myHero.pos) > AARange and WasInRange then
+				Control.CastSpell(HK_E, target)
+			end
+		end
+		if self:CanUse(_R, Mode()) and ValidTarget(target, AARange) and UltMode then
+			Control.CastSpell(HK_R)
+		end
+	else
+		WasInRange = false
+		LockedTarget = nil
+    end		
+end
+
+function Quinn:OnPreAttack(args)
+end
+
+function Quinn:OnPostAttackTick(args)
+	local ERange = 675 + myHero.boundingRadius
+	if ValidTarget(target, ERange) and self:CanUse(_E, Mode()) and not hasPassive then
+		Control.CastSpell(HK_E, target)
+	end
+end
+
+function Quinn:UseQ(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+		    	Control.CastSpell(HK_Q, pred.CastPos)
+		end 
+end
 
 class "Aphelios"
 
