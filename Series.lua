@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 3.00
+    local Version = 3.50
     
     local Files = {
         Lua = {
@@ -48,7 +48,8 @@ do
             print("Version Changes: Added Fizz")
 			print("Version Changes: Added Fizz Last Hit") 
 			print("Version Changes: Fixed FPS drops on Lucian Auto Q")
-			print("Version Changes: Added Quinn")  
+			print("Version Changes: Added Quinn")
+			print("Version Changes: Lots of Quinn changes...")  
         end
     
     end
@@ -960,21 +961,27 @@ local LastESpot = myHero.pos
 local LastE2Spot = myHero.pos
 local attackedfirst = 0
 local WasInRange = false
+local hasHarrier = false
 local UltMode = false
+local CastingQ = false
+local UltChan = false
+local PassiveAuto = false
+local passiveenemy = nil
+local mtarget = nil
 local LastHitSpot = myHero.pos
 local Direction = myHero.pos
 
 function Quinn:Menu()
 	self.Menu = MenuElement({type = MENU, id = "Quinn", name = "Quinn"})
-	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
 	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseMinionPassive", name = "AA Nearby Minions to proc passive", value = false})
+	self.Menu.ComboMode:MenuElement({id = "UseChampionPassive", name = "AA Nearby Champs to proc passive", value = false})
 	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
 	self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
-	self.Menu.KSMode:MenuElement({id = "UseW", name = "Use W in KS", value = true})
 	self.Menu.KSMode:MenuElement({id = "UseE", name = "Use E in KS", value = true})
 	self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
 	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
@@ -1016,19 +1023,44 @@ function Quinn:GotBuff(unit)
 	end
 end
 
+function Quinn:CanEnableAttack() 
+	if mtarget or passiveenemy then
+		return false
+	end
+	return true   
+end
+
 function Quinn:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	--PrintChat(myHero:GetSpellData(_E).name)
 	--PrintChat(myHero:GetSpellData(_R).toggleState)
 	target = GetTarget(1400)
+	--PrintChat(myHero.activeSpell.name)
+	--PrintChat(myHero.attackData.state)
 	--PrintChat(myHero:GetSpellData(_R).name)
-	if myHero:GetSpellData(_R).name == "QuinnR" then
+	CastingQ = myHero.activeSpell.name == "QuinnQ"
+	PassiveAuto = myHero.activeSpell.name == "QuinnWEnchanced"
+	hasHarrier = _G.SDK.BuffManager:HasBuff(myHero, "quinnpassiveammo")
+	--PrintChat(myHero:GetSpellData(_R).name)
+	if myHero:GetSpellData(_R).name == "QuinnR" or myHero:GetSpellData(_R).name == "QuinnRReturnToQuinn" then
 		UltMode = false
 	else
 		UltMode = true
 	end
+	if myHero:GetSpellData(_R).name == "QuinnRReturnToQuinn" then
+		SetMovement(false)
+		UltChan = true
+	else
+		UltChan = false
+		if self:CanEnableAttack() then
+			SetMovement(true)
+		end
+		if self.Menu.ComboMode.UseMinionPassive:Value() and not hasHarrier then
+			self:MinionPassive()
+		end
+		self:Logic()
+	end
 	self:KS()
-	self:Logic()
 	if EnemyLoaded == false then
 		local CountEnemy = 0
 		for i, enemy in pairs(EnemyHeroes) do
@@ -1058,12 +1090,48 @@ function Quinn:KS()
 	--PrintChat("ksing")
 	for i, enemy in pairs(EnemyHeroes) do
 		if enemy and not enemy.dead and ValidTarget(enemy, 1025) then
-			local Qrange = 550 + enemy.boundingRadius + myHero.boundingRadius
+			local AARange = 525 + enemy.boundingRadius + myHero.boundingRadius
+			if ValidTarget(enemy, AARange) and self.Menu.ComboMode.UseChampionPassive:Value() and _G.SDK.BuffManager:HasBuff(enemy, "QuinnW") and not hasHarrier then
+				--if _G.SDK.Orbwalker:CanAttack() and not UltChan then
+				if not UltChan then
+					if passiveenemy == nil then
+						--PrintChat("Found new enemy")
+						passiveenemy = enemy
+					end
+				end
+			end
+			local Qrange = 1025 + enemy.boundingRadius
 			local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level)
-			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > Qrange and self.Menu.KSMode.UseQ:Value() and enemy.health < Qdamage then
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) < Qrange and self.Menu.KSMode.UseQ:Value() and enemy.health < Qdamage then
 				self:UseQ(enemy)
 			end
+			local Erange = 675 + enemy.boundingRadius
+			local Edamage = getdmg("E", enemy, myHero, myHero:GetSpellData(_E).level)
+			if self:CanUse(_E, "KS") and GetDistance(enemy.pos, myHero.pos) < Erange and self.Menu.KSMode.UseE:Value() and enemy.health < Edamage then
+				Control.CastSpell(HK_E, enemy)
+			end
+			local Rrange = 700
+			local Rdamage = getdmg("R", enemy, myHero, myHero:GetSpellData(_R).level)
+			if self:CanUse(_R, "KS") and GetDistance(enemy.pos, myHero.pos) < Rrange and self.Menu.KSMode.UseR:Value() and enemy.health < Rdamage and UltMode then
+				Control.CastSpell(HK_R)
+			end
 		end
+	end
+	if passiveenemy and _G.SDK.BuffManager:HasBuff(passiveenemy, "QuinnW") and not PassiveAuto then
+		--PrintChat("should work")
+		--_G.SDK.Orbwalker:Attack(passiveenemy)
+		_G.SDK.Orbwalker:SetAttack(false)
+		PrintChat("enemy disabled attack")
+		if myHero.attackData.state == 1 then
+			Control.Attack(passiveenemy)
+		end
+	else
+		--PrintChat("cleaning passive")
+		PrintChat("enemy enable attack")
+		if self:CanEnableAttack() then 
+			_G.SDK.Orbwalker:SetAttack(true)
+		end
+		passiveenemy = nil
 	end
 end	
 
@@ -1096,8 +1164,14 @@ function Quinn:CanUse(spell, mode)
 		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
 			return true
 		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+			return true
+		end
 	elseif spell == _R then
 		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
 			return true
 		end
 	end
@@ -1118,14 +1192,18 @@ function Quinn:Logic()
 		end
 		WasInRange = false
 		LockedTarget = nil 
+		LastDist = 10000
 		return 
 	end
 	if Mode() == "Combo" or Mode() == "Harass" and target then
+		if Mode() == "Combo" and self.Menu.ComboMode.UseMinionPassive:Value() and not hasHarrier then
+			self:MinionPassive()
+		end
 		local hasPassive = _G.SDK.BuffManager:HasBuff(target, "QuinnW")
 		local AARange = 525 + target.boundingRadius + myHero.boundingRadius
 		local QRange = 1025 + target.boundingRadius + myHero.boundingRadius
 		local ERange = 675 + target.boundingRadius + myHero.boundingRadius
-		local RRange = 700 + target.boundingRadius + myHero.boundingRadius
+		local RRange = 700
 		--PrintChat(ERange)
 		if hasPassive then
 			--PrintChat("Got the Mark")
@@ -1141,6 +1219,8 @@ function Quinn:Logic()
 				Control.CastSpell(HK_E, target)
 			elseif GetDistance(target.pos, myHero.pos) > AARange and WasInRange then
 				Control.CastSpell(HK_E, target)
+			elseif UltMode then
+				Control.CastSpell(HK_E, target)
 			end
 		end
 		if self:CanUse(_R, Mode()) and ValidTarget(target, AARange) and UltMode then
@@ -1149,7 +1229,36 @@ function Quinn:Logic()
 	else
 		WasInRange = false
 		LockedTarget = nil
+		LastDist = 10000
     end		
+end
+
+function Quinn:MinionPassive()
+	local dmg = 0
+	local Minions = _G.SDK.ObjectManager:GetEnemyMinions(AARange)
+	for i = 1, #Minions do
+		local minion = Minions[i]
+		local AARange = 525 + minion.boundingRadius + myHero.boundingRadius
+		if GetDistance(minion.pos, myHero.pos) < AARange and _G.SDK.BuffManager:HasBuff(minion, "QuinnW") then
+			if mtarget == nil then
+				mtarget = minion
+				PrintChat("Allocated Mtarget")
+			end	
+		end		
+	end
+	if mtarget and _G.SDK.BuffManager:HasBuff(mtarget, "QuinnW") and not PassiveAuto then
+		_G.SDK.Orbwalker:SetAttack(false)
+		PrintChat("minion disabled attack")
+		if myHero.attackData.state == 1 then
+			Control.Attack(mtarget)
+		end
+	else
+		if self:CanEnableAttack() then
+			_G.SDK.Orbwalker:SetAttack(true)
+		end
+		PrintChat("minion enabled attack")
+		mtarget = nil
+	end
 end
 
 function Quinn:OnPreAttack(args)
@@ -1164,7 +1273,7 @@ end
 
 function Quinn:UseQ(unit)
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 and not CastingQ then
 		    	Control.CastSpell(HK_Q, pred.CastPos)
 		end 
 end
