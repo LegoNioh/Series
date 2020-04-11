@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 2.00
+    local Version = 2.10
     
     local Files = {
         Lua = {
@@ -42,9 +42,10 @@ do
         if NewVersion > Version then
             DownloadFile(Files.Lua.Url, Files.Lua.Path, Files.Lua.Name)
             print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
-            print("Version Changes: Added Lucian Auto Q On Minions") 
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
+            print("Version Changes: Added Lucian Auto Q On Minions") 
+            print("Version Changes: Added Fizz") 
         end
     
     end
