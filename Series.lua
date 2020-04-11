@@ -558,10 +558,12 @@ local LastE2Spot = myHero.pos
 local attackedfirst = 0
 local WasInRange = false
 local BuffOnStick = false
+local LastHitSpot = myHero.pos
 local Direction = myHero.pos
 
 function Fizz:Menu()
 	self.Menu = MenuElement({type = MENU, id = "Fizz", name = "Fizz"})
+	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
 	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
@@ -585,7 +587,7 @@ end
 function Fizz:Spells()
 	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
 	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
-	E2SpellData = {speed = 3000, range = 470, delay = 0.75, radius = 200, collision = {}, type = "circular"}
+	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
 end
 
 function Fizz:__init()
@@ -607,6 +609,37 @@ function Fizz:LoadScript()
 end
 
 
+function Fizz:LastHit()
+	local AARange = 175 + myHero.boundingRadius
+	local mtarget = nil
+	local dmg = getdmg("AA", minion, myHero)
+	local Minions = _G.SDK.ObjectManager:GetEnemyMinions(AARange)
+	for i = 1, #Minions do
+		local minion = Minions[i]
+		if IsReady(_W) then
+			dmg = getdmg("W", minion, myHero, myHero:GetSpellData(_W).level) + getdmg("AA", minion, myHero)
+			AARange = 225 + myHero.boundingRadius
+		end
+		if minion.health < dmg then
+			if mtarget == nil or minion.health < mtarget.health then
+				mtarget = minion
+			end			
+		end
+	end
+	if mtarget and ValidTarget(mtarget, AARange) then
+			wtfattack(mtarget)
+	else
+		_G.SDK.Orbwalker:Move()
+	end
+end
+
+function wtfattack(unit)
+	if IsReady(_W) then
+		Control.CastSpell(HK_W)
+	end
+	DelayAction(function() Control.Attack(unit) end, 0.05)
+end
+
 function Fizz:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	--PrintChat(myHero:GetSpellData(_E).name)
@@ -619,6 +652,10 @@ function Fizz:Tick()
 	end
 	self:ManualRCast()
 	self:KS()
+	if self.Menu.FarmKey:Value() then
+		self:LastHit()
+
+	end
 	self:Logic()
 	if BuffOnStick then
 		_G.SDK.Orbwalker:SetMovement(false)
