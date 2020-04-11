@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 3.51
+    local Version = 3.60
     
     local Files = {
         Lua = {
@@ -994,7 +994,7 @@ function Quinn:Menu()
 end
 
 function Quinn:Spells()
-	QSpellData = {speed = 1300, range = 1025, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+	QSpellData = {speed = 1300, range = 1025, delay = 0.25, radius = 70, collision = {"minion"}, type = "linear"}
 end
 
 function Quinn:__init()
@@ -1036,7 +1036,7 @@ function Quinn:Tick()
 	--PrintChat(myHero:GetSpellData(_E).name)
 	--PrintChat(myHero:GetSpellData(_R).toggleState)
 	target = GetTarget(1400)
-	PrintChat(myHero.activeSpell.name)
+	--PrintChat(myHero.activeSpell.name)
 	--PrintChat(myHero.attackData.state)
 	--PrintChat(myHero:GetSpellData(_R).name)
 	CastingQ = myHero.activeSpell.name == "QuinnQ"
@@ -1055,9 +1055,6 @@ function Quinn:Tick()
 		UltChan = false
 		if self:CanEnableAttack() then
 			SetMovement(true)
-		end
-		if self.Menu.ComboMode.UseMinionPassive:Value() and not hasHarrier then
-			self:MinionPassive()
 		end
 		self:Logic()
 	end
@@ -1180,6 +1177,11 @@ function Quinn:CanUse(spell, mode)
 end
 
 function Quinn:Logic()
+	if LockedTarget  and LockedTarget .dead then
+		WasInRange = false
+		LockedTarget = nil 
+		LastDist = 10000
+	end
 	if target and (LockedTarget == target or LockedTarget == nil) then
 		LastDist = GetDistance(target.pos, myHero.pos)
 		--PrintChat(LastDist)
