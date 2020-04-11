@@ -642,9 +642,9 @@ end
 
 function Fizz:Draw()
 	if self.Menu.Draw.UseDraws:Value() then
-		Draw.Circle(myHero.pos, 630, 1, Draw.Color(255, 0, 191, 255))
-		Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
-		Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
+		Draw.Circle(myHero.pos, 500, 1, Draw.Color(255, 0, 191, 255))
+		--Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+		--Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
 		if target then
 		end
 	end
@@ -778,8 +778,7 @@ function Fizz:Logic()
 				end
 			end
 		end
-		--PrintChat(self:GetTotalDamage(target))
-		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) and target.health < self:GetRDmg(target) then
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) and target.health < self:GetTotalDamage(target, true) and target.health > self:GetTotalDamage(target, false) then
 			self:UseR(target)
 		end
 	else
@@ -797,27 +796,36 @@ function Fizz:GetRDmg(unit)
 	return getdmg("R", unit, myHero, stage, myHero:GetSpellData(_R).level)
 end
 
-function Fizz:GetTotalDamage(unit)
+function Fizz:GetTotalDamage(unit, ult)
 	local QD = 0
 	local WD = 0
 	local ED = 0
 	local RD = 0
 	local Crange = 550
+	local CRrange = 750
 	local TD = 0
-	if IsReady(_E) and GetDistance(unit.pos, myHero.pos) < 700 then
+	if IsReady(_R) and GetDistance(unit.pos, myHero.pos) < 1300 then
+		RD = self:GetRDmg(unit)
+		Crange = 1300
+		CRrange = 1300
+	end
+	if IsReady(_E) or BuffOnStick and GetDistance(unit.pos, myHero.pos) < CRrange then
 		ED = getdmg("E", unit, myHero, myHero:GetSpellData(_E).level)
-		Crange = 700
+		if not IsReady(_R) then
+			Crange = 700
+		end
 	end
 	if IsReady(_Q) and GetDistance(unit.pos, myHero.pos) < Crange then
 		QD = getdmg("Q", unit, myHero, myHero:GetSpellData(_Q).level) + getdmg("AA", unit, myHero)
 	end
 	if IsReady(_W) and GetDistance(unit.pos, myHero.pos) < Crange then
-		WD = getdmg("W", unit, myHero, myHero:GetSpellData(_W).level)
+		WD = getdmg("W", unit, myHero, myHero:GetSpellData(_W).level) * 2 + getdmg("AA", unit, myHero)
 	end
-	if IsReady(_R) and GetDistance(unit.pos, myHero.pos) < 1300 then
-		RD = self:GetRDmg(unit)
+	if ult then
+		TD = QD + WD + ED + RD
+	else
+		TD = QD + WD + ED
 	end
-	TD = QD + WD + ED + RD
 	return TD
 end
 
