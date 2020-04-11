@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 2.10
+    local Version = 2.20
     
     local Files = {
         Lua = {
@@ -45,7 +45,8 @@ do
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
             print("Version Changes: Added Lucian Auto Q On Minions") 
-            print("Version Changes: Added Fizz") 
+            print("Version Changes: Added Fizz")
+	    print("Version Changes: Added Fizz Last Hit") 
         end
     
     end
