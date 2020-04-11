@@ -42,9 +42,9 @@ do
         if NewVersion > Version then
             DownloadFile(Files.Lua.Url, Files.Lua.Path, Files.Lua.Name)
             print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
+            print("Version Changes: Added Lucian Auto Q On Minions") 
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
-	    print("Version Changes 1.40: Added Lucian Auto Q On Minions") 
         end
     
     end
@@ -136,8 +136,11 @@ end
 
 
 local function ValidTarget(unit, range)
-    if (unit and unit.valid and unit.isTargetable and unit.alive and unit.visible and unit.networkID and unit.pathing and unit.health > 0) and GetDistance(unit.pos) <= range then
-        return true;
+    if (unit and unit.valid and unit.isTargetable and unit.alive and unit.visible and unit.networkID and unit.pathing and unit.health > 0) then
+    	local FinalRange = range
+    	if GetDistance(unit.pos) <= FinalRange then
+        	return true;
+        end
     end
     return false;
 end
@@ -148,8 +151,10 @@ function Manager:__init()
 		DelayAction(function() self:LoadAphelios() end, 1.05)
 	elseif myHero.charName == "Lucian" then
 		DelayAction(function() self:LoadLucian() end, 1.05)
-		elseif myHero.charName == "Pyke" then
+	elseif myHero.charName == "Pyke" then
 		DelayAction(function() self:LoadPyke() end, 1.05)
+	elseif myHero.charName == "Fizz" then
+		DelayAction(function() self:LoadFizz() end, 1.05)
 	end
 end
 
@@ -185,6 +190,20 @@ function Manager:LoadAphelios()
 	if _G.SDK then
 		_G.SDK.Orbwalker:OnPreAttack(function(...) Aphelios:OnPreAttack(...) end)
 		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Aphelios:OnPostAttackTick(...) end)
+	end
+end
+
+
+function Manager:LoadFizz()
+	Fizz:Spells()
+	Fizz:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() Fizz:Tick() end)
+	Callback.Add("Draw", function() Fizz:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) Fizz:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Fizz:OnPostAttackTick(...) end)
 	end
 end
 
@@ -283,7 +302,7 @@ end
 
 function Lucian:Draw()
 	if self.Menu.Draw.UseDraws:Value() then
-	Draw.Circle(myHero.pos, 55, 1, Draw.Color(255, 0, 191, 255))
+	Draw.Circle(myHero.pos, 630, 1, Draw.Color(255, 0, 191, 255))
 	if target then
 		--PrintChat("drawing R spot")
 		if myHero:GetSpellData(_R).toggleState == 1 then
@@ -306,7 +325,7 @@ function Lucian:KS()
 	--PrintChat("ksing")
 	for i, enemy in pairs(EnemyHeroes) do
 		if enemy and not enemy.dead and ValidTarget(enemy, 900) then
-			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > 500 and GetDistance(enemy.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > 600 and GetDistance(enemy.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
 				--PrintChat("ksing 2")
 				self:GetQMinion(enemy)
 			end
@@ -357,29 +376,12 @@ function Lucian:Logic()
 		if GetDistance(target.pos) < 500 then
 			WasInRange = true
 		end
-		--[[if self:CanUse(_Q, Mode()) and ValidTarget(target, 500 + target.boundingRadius) and not DoubleShot then
-			if _G.SDK.Orbwalker:CanAttack() then
-					PrintChat("can attack")
-					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
-			else
-				Control.CastSpell(HK_Q, target)
-			end
-			PrintChat(myHero.attackSpeed)
-			if myHero.attackSpeed < 1.40 then
-				PrintChat("cat")
-				DelayAction(function() Control.Move(mousePos) end, 0.75)
-			end
-			Casted = 1
-		end]]--
 		if Casted == 1 then
-			--PrintChat("Casted")
-			--_G.SDK.Orbwalker:__OnAutoAttackReset()
 			if _G.SDK.Orbwalker:CanAttack() then
-				--PrintChat("Attacking")
-				Control.Attack(enemy)
+				--Control.Attack(enemy)
 			end
 		end
-		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 500 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinionCombo:Value() then
+		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 630 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinionCombo:Value() then
 			self:GetQMinion(target)
 		end
 		if self:CanUse(_E, Mode()) and myHero:GetSpellData(_R).toggleState == 1 then
@@ -486,8 +488,10 @@ end
 function Lucian:OnPostAttackTick(args)
 	attackedfirst = 1
 	if target and Mode() == "Combo" then
-		local rangeReal = 500 + target.boundingRadius + myHero.boundingRadius
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, rangeReal) and not DoubleShot then
+		--PrintChat(target.boundingRadius)
+		local range = 500 + myHero.boundingRadius + target.boundingRadius
+		--PrintChat(range)
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, range) and not DoubleShot then
 			if _G.SDK.Orbwalker:CanAttack() then
 					--PrintChat("can attack")
 					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
@@ -518,6 +522,263 @@ function Lucian:UseR(unit)
 		    	Control.CastSpell(HK_R, pred.CastPos)
 		end 
 end
+
+class "Fizz"
+
+local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
+local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
+local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
+local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
+local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
+local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
+local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
+local IS = {}
+local EnemyLoaded = false
+local ECastTime = Game:Timer()
+local RCastTime = Game:Timer()
+local casted = 0
+local attackedfirst = 0
+local WasInRange = false
+local BuffOnStick = false
+local Direction = myHero.pos
+
+function Fizz:Menu()
+	self.Menu = MenuElement({type = MENU, id = "Fizz", name = "Fizz"})
+	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
+	self.Menu.ComboMode:MenuElement({id = "UseRMan", name = "Use R When pressing Manual R key", value = true})
+	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+	self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseW", name = "Use W in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseE", name = "Use smart E in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
+	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Fizz:Spells()
+	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+	ESpellData = {speed = 1300, range = 470, delay = 0.25, radius = 200, collision = {}, type = "circular"}
+end
+
+function Fizz:__init()
+	DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Fizz:LoadScript()
+	self:Spells()
+	self:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() self:Tick() end)
+	Callback.Add("Draw", function() self:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+	end
+end
+
+
+function Fizz:Tick()
+	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+	--PrintChat(myHero:GetSpellData(_E).name)
+	--PrintChat(myHero:GetSpellData(_R).toggleState)
+	target = GetTarget(1400)
+	if myHero:GetSpellData(_E).name == "FizzETwo" or myHero:GetSpellData(_E).name == "FizzEBuffer"  then
+		BuffOnStick = true
+	elseif myHero:GetSpellData(_E).name == "FizzE" then
+		BuffOnStick = false
+	end
+	self:ManualRCast()
+	self:KS()
+	self:Logic()
+	if BuffOnStick then
+		_G.SDK.Orbwalker:SetMovement(false)
+		_G.SDK.Orbwalker:SetAttack(false)
+	else
+		_G.SDK.Orbwalker:SetMovement(true)
+		_G.SDK.Orbwalker:SetAttack(true)
+	end
+	if EnemyLoaded == false then
+		local CountEnemy = 0
+		for i, enemy in pairs(EnemyHeroes) do
+			CountEnemy = CountEnemy + 1
+		end
+		if CountEnemy < 1 then
+			GetEnemyHeroes()
+		else
+			EnemyLoaded = true
+			PrintChat("Enemy Loaded")
+		end
+	end
+end
+
+function Fizz:Draw()
+	if self.Menu.Draw.UseDraws:Value() then
+		Draw.Circle(myHero.pos, 630, 1, Draw.Color(255, 0, 191, 255))
+		if target then
+		end
+	end
+end
+
+function Fizz:ManualRCast()
+	if target then
+		if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
+			self:UseR(target)
+		end
+	else
+		for i, enemy in pairs(EnemyHeroes) do
+			if enemy and not enemy.dead and ValidTarget(enemy, 550) then
+				if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
+					self:UseR(target)
+				end
+			end
+		end
+	end
+end
+
+function Fizz:KS()
+	--PrintChat("ksing")
+	for i, enemy in pairs(EnemyHeroes) do
+		if enemy and not enemy.dead and ValidTarget(enemy, 550) then
+			local Qrange = 550 + enemy.boundingRadius + myHero.boundingRadius
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > Qrange and self.Menu.KSMode.UseQ:Value() then
+				Control.CastSpell(HK_Q, enemy)
+			end
+		end
+	end
+end	
+
+function Fizz:CanUse(spell, mode)
+	if mode == nil then
+		mode = Mode()
+	end
+	--PrintChat(Mode())
+	if spell == _Q then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+			return true
+		end
+	elseif spell == _W then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+			return true
+		end
+	elseif spell == _E then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+			return true
+		end
+	elseif spell == _R then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+			return true
+		end
+		if mode == "Manual" and IsReady(spell) and self.Menu.ComboMode.UseRMan:Value() and self.Menu.ComboMode.UseRManKey:Value() then
+			return true
+		end
+	end
+	return false
+end
+
+function Fizz:Logic()
+	if target == nil then return end
+	if Mode() == "Combo" or Mode() == "Harass" and target then
+		local AARange = 175 + target.boundingRadius + myHero.boundingRadius
+		if GetDistance(target.pos) < AARange then
+			WasInRange = true
+		elseif GetDistance(target.pos) < AARange+50 and not self:CanUse(_Q, Mode()) and not self:CanUse(_E, Mode()) then
+			Control.CastSpell(HK_W)
+		end
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, 550) then
+			if GetDistance(target.pos, myHero.pos) < AARange then
+				if casted == 0 and not self:CanUse(_W, Mode()) and not self:CanUse(_E, Mode()) then
+					Control.CastSpell(HK_Q, target)
+				end
+			else
+				if self:CanUse(_W, Mode()) then
+					Control.CastSpell(HK_W)
+				end
+				Control.CastSpell(HK_Q, target)
+			end
+		end
+		if self:CanUse(_E, Mode()) and ValidTarget(target, 600) then
+			if BuffOnStick and myHero:GetSpellData(_E).name == "FizzETwo" then
+				if ValidTarget(target, 470) then
+					--PrintChat("EEE")
+					self:UseE2(target)
+				end
+			elseif myHero:GetSpellData(_E).name == "FizzE" then
+				--PrintChat("AAA")
+				if GetDistance(target.pos, myHero.pos) < AARange then
+					if casted == 0 and not self:CanUse(_W, Mode()) then
+						Control.CastSpell(HK_E, target)
+					end
+				elseif GetDistance(target.pos, myHero.pos) < 550 then
+					if not self:CanUse(_Q, Mode()) then
+						Control.CastSpell(HK_E, target)
+					end
+				else
+					Control.CastSpell(HK_E, target)		
+				end
+			end
+		end
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) then
+			self:UseR(target)
+		end
+	else
+		WasInRange = false
+    end		
+end
+
+function Fizz:OnPreAttack(args)
+end
+
+function Fizz:OnPostAttackTick(args)
+	attackedfirst = 1
+	if target then
+		if self:CanUse(_W, Mode()) and ValidTarget(target, 225) then
+			Control.CastSpell(HK_W)
+			casted = 1
+			_G.SDK.Orbwalker:__OnAutoAttackReset()
+		else
+			--PrintChat("casted")
+			casted = 0
+		end
+	end
+end
+
+function Fizz:UseE2(unit)
+		local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, ESpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 470 then
+		    	Control.CastSpell(HK_E, pred.CastPos)
+		end 
+end
+
+function Fizz:UseR(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300  then
+		    	Control.CastSpell(HK_R, pred.CastPos)
+		end 
+end
+
 
 class "Aphelios"
 
@@ -1454,7 +1715,11 @@ end
 function Pyke:UseE(unit)
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, spellDataE)
 		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < 550 then
-		    	Control.CastSpell(HK_E, pred.CastPos)
+				local UnitDist = GetDistance(myHero.pos, unit.pos)
+				local SpotDist = GetDistance(myHero.pos, pred.CastPos)
+				local CastDist = SpotDist - UnitDist
+				local CastSpot = myHero:Extended(pred.CastPos, CastDist)
+		    	Control.CastSpell(HK_E, CastSpot)
 		end 
 end
 
