@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 2.20
+    local Version = 2.21
     
     local Files = {
         Lua = {
@@ -45,8 +45,7 @@ do
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
             print("Version Changes: Added Lucian Auto Q On Minions") 
-            print("Version Changes: Added Fizz")
-	    print("Version Changes: Added Fizz Last Hit") 
+            print("Version Changes: Added Fizz") 
         end
     
     end
@@ -613,24 +612,28 @@ end
 function Fizz:LastHit()
 	local AARange = 175 + myHero.boundingRadius
 	local mtarget = nil
-	local dmg = getdmg("AA", minion, myHero)
+	local dmg = 0
 	local Minions = _G.SDK.ObjectManager:GetEnemyMinions(AARange)
-	for i = 1, #Minions do
-		local minion = Minions[i]
-		if IsReady(_W) then
-			dmg = getdmg("W", minion, myHero, myHero:GetSpellData(_W).level) + getdmg("AA", minion, myHero)
-			AARange = 225 + myHero.boundingRadius
+	if IsReady(_W) or not (Mode() == "Harass" or Mode() == "LaneClear") then
+		for i = 1, #Minions do
+			local minion = Minions[i]
+			if IsReady(_W) then
+				dmg = getdmg("W", minion, myHero, myHero:GetSpellData(_W).level) + getdmg("AA", minion, myHero)
+				AARange = 225 + myHero.boundingRadius
+			else
+				dmg = getdmg("AA", minion, myHero)
+			end
+			if minion.health < dmg then
+				if mtarget == nil or minion.health < mtarget.health then
+					mtarget = minion
+				end			
+			end
 		end
-		if minion.health < dmg then
-			if mtarget == nil or minion.health < mtarget.health then
-				mtarget = minion
-			end			
+		if mtarget and ValidTarget(mtarget, AARange) then
+				wtfattack(mtarget)
+		elseif not Mode() == "Harass" and not Mode() == "LaneClear" and not more() == "Combo" then
+			_G.SDK.Orbwalker:Move()
 		end
-	end
-	if mtarget and ValidTarget(mtarget, AARange) then
-			wtfattack(mtarget)
-	else
-		_G.SDK.Orbwalker:Move()
 	end
 end
 
