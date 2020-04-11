@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 2.21
+    local Version = 2.22
     
     local Files = {
         Lua = {
@@ -121,6 +121,8 @@ function Mode()
 			return "Harass"
 		elseif _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_LANECLEAR] then
 			return "LaneClear"
+		elseif _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_LASTHIT] then
+			return "LastHit"
 		elseif _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_FLEE] then
 			return "Flee"
 		end
@@ -614,7 +616,7 @@ function Fizz:LastHit()
 	local mtarget = nil
 	local dmg = 0
 	local Minions = _G.SDK.ObjectManager:GetEnemyMinions(AARange)
-	if IsReady(_W) or not (Mode() == "Harass" or Mode() == "LaneClear") then
+	if IsReady(_W) or not (Mode() == "Harass" or Mode() == "LaneClear" or Mode() == "LastHit") then
 		for i = 1, #Minions do
 			local minion = Minions[i]
 			if IsReady(_W) then
@@ -631,7 +633,7 @@ function Fizz:LastHit()
 		end
 		if mtarget and ValidTarget(mtarget, AARange) then
 				wtfattack(mtarget)
-		elseif not Mode() == "Harass" and not Mode() == "LaneClear" and not more() == "Combo" then
+		elseif not Mode() == "Harass" and not Mode() == "LaneClear" and not Mode() == "Combo" then
 			_G.SDK.Orbwalker:Move()
 		end
 	end
