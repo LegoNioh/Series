@@ -722,6 +722,7 @@ function Fizz:Logic()
 	if target == nil then return end
 	if Mode() == "Combo" or Mode() == "Harass" and target then
 		local AARange = 175 + target.boundingRadius + myHero.boundingRadius
+		local TotalDamage = self:GetTotalDamage(target)
 		if GetDistance(target.pos) < 550 then
 			WasInRange = true
 		end
@@ -777,12 +778,47 @@ function Fizz:Logic()
 				end
 			end
 		end
-		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) then
+		--PrintChat(self:GetTotalDamage(target))
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) and target.health < self:GetRDmg(target) then
 			self:UseR(target)
 		end
 	else
 		WasInRange = false
     end		
+end
+
+function Fizz:GetRDmg(unit)
+	local stage = 3
+	if GetDistance(unit.pos, myHero.pos) < 455 then
+		stage = 1
+	elseif GetDistance(unit.pos, myHero.pos) < 910 then
+		stage = 2
+	end
+	return getdmg("R", unit, myHero, stage, myHero:GetSpellData(_R).level)
+end
+
+function Fizz:GetTotalDamage(unit)
+	local QD = 0
+	local WD = 0
+	local ED = 0
+	local RD = 0
+	local Crange = 550
+	local TD = 0
+	if IsReady(_E) and GetDistance(unit.pos, myHero.pos) < 700 then
+		ED = getdmg("E", unit, myHero, myHero:GetSpellData(_E).level)
+		Crange = 700
+	end
+	if IsReady(_Q) and GetDistance(unit.pos, myHero.pos) < Crange then
+		QD = getdmg("Q", unit, myHero, myHero:GetSpellData(_Q).level) + getdmg("AA", unit, myHero)
+	end
+	if IsReady(_W) and GetDistance(unit.pos, myHero.pos) < Crange then
+		WD = getdmg("W", unit, myHero, myHero:GetSpellData(_W).level)
+	end
+	if IsReady(_R) and GetDistance(unit.pos, myHero.pos) < 1300 then
+		RD = self:GetRDmg(unit)
+	end
+	TD = QD + WD + ED + RD
+	return TD
 end
 
 function Fizz:OnPreAttack(args)
