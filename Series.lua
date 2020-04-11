@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1.50
+    local Version = 1.60
     
     local Files = {
         Lua = {
@@ -53,6 +53,19 @@ do
 
 end
 
+
+local function IsUnderEnemyTurret(pos)
+	--PrintChat("Checking Turrets")
+    local turrets = _G.SDK.ObjectManager:GetTurrets(GetDistance(pos) + 1000)
+    for i = 1, #turrets do
+        local turret = turrets[i]
+        if turret and GetDistance(turret.pos, pos) <= 915 and turret.team == 300-myHero.team then
+        	--PrintChat("turret")
+            return turret
+        end
+    end
+end
+
 function GetDistanceSqr(Pos1, Pos2)
 	local Pos2 = Pos2 or myHero.pos
 	local dx = Pos1.x - Pos2.x
@@ -69,11 +82,13 @@ function GetEnemyHeroes()
 		local Hero = Game.Hero(i)
 		if Hero.isEnemy then
 			table.insert(EnemyHeroes, Hero)
-			--PrintChat(Hero.name)
+			PrintChat(Hero.name)
 		end
 	end
-	PrintChat("Got Enemy Heroes")
+	--PrintChat("Got Enemy Heroes")
 end
+
+
 
 function GetTarget(range)
 	if _G.SDK then
@@ -537,6 +552,8 @@ local EnemyLoaded = false
 local ECastTime = Game:Timer()
 local RCastTime = Game:Timer()
 local casted = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
 local attackedfirst = 0
 local WasInRange = false
 local BuffOnStick = false
@@ -566,7 +583,8 @@ end
 
 function Fizz:Spells()
 	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
-	ESpellData = {speed = 1300, range = 470, delay = 0.25, radius = 200, collision = {}, type = "circular"}
+	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
+	E2SpellData = {speed = 3000, range = 470, delay = 0.75, radius = 200, collision = {}, type = "circular"}
 end
 
 function Fizz:__init()
@@ -625,6 +643,8 @@ end
 function Fizz:Draw()
 	if self.Menu.Draw.UseDraws:Value() then
 		Draw.Circle(myHero.pos, 630, 1, Draw.Color(255, 0, 191, 255))
+		Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+		Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
 		if target then
 		end
 	end
@@ -702,9 +722,12 @@ function Fizz:Logic()
 	if target == nil then return end
 	if Mode() == "Combo" or Mode() == "Harass" and target then
 		local AARange = 175 + target.boundingRadius + myHero.boundingRadius
+		if GetDistance(target.pos) < 550 then
+			WasInRange = true
+		end
 		if GetDistance(target.pos) < AARange then
 			WasInRange = true
-		elseif GetDistance(target.pos) < AARange+50 and not self:CanUse(_Q, Mode()) and not self:CanUse(_E, Mode()) then
+		elseif GetDistance(target.pos) < AARange+50 and self:CanUse(_W, Mode()) and not self:CanUse(_Q, Mode()) and not self:CanUse(_E, Mode()) then
 			Control.CastSpell(HK_W)
 		end
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, 550) then
@@ -713,13 +736,13 @@ function Fizz:Logic()
 					Control.CastSpell(HK_Q, target)
 				end
 			else
+				Control.CastSpell(HK_Q, target)
 				if self:CanUse(_W, Mode()) then
 					Control.CastSpell(HK_W)
 				end
-				Control.CastSpell(HK_Q, target)
 			end
 		end
-		if self:CanUse(_E, Mode()) and ValidTarget(target, 600) then
+		if self:CanUse(_E, Mode()) and ValidTarget(target, 700) then
 			if BuffOnStick and myHero:GetSpellData(_E).name == "FizzETwo" then
 				if ValidTarget(target, 470) then
 					--PrintChat("EEE")
@@ -727,16 +750,30 @@ function Fizz:Logic()
 				end
 			elseif myHero:GetSpellData(_E).name == "FizzE" then
 				--PrintChat("AAA")
-				if GetDistance(target.pos, myHero.pos) < AARange then
-					if casted == 0 and not self:CanUse(_W, Mode()) then
-						Control.CastSpell(HK_E, target)
-					end
-				elseif GetDistance(target.pos, myHero.pos) < 550 then
+				if IsUnderEnemyTurret(target.pos, TEAM_ENEMY) then
+					PrintChat("under")
 					if not self:CanUse(_Q, Mode()) then
-						Control.CastSpell(HK_E, target)
+						if GetDistance(target.pos, myHero.pos) < AARange then
+							if casted == 0 and not self:CanUse(_W, Mode()) then
+								self:UseE(target)
+							end
+						else
+							self:UseE(target)
+						end
 					end
 				else
-					Control.CastSpell(HK_E, target)		
+					--PrintChat("Not under")
+					if GetDistance(target.pos, myHero.pos) < AARange then
+						if casted == 0 and not self:CanUse(_W, Mode()) then
+							self:UseE(target)
+						end
+					elseif GetDistance(target.pos, myHero.pos) < 550 then
+						if not self:CanUse(_Q, Mode()) then
+							self:UseE(target)
+						end
+					else
+						self:UseE(target)	
+					end
 				end
 			end
 		end
@@ -765,10 +802,21 @@ function Fizz:OnPostAttackTick(args)
 	end
 end
 
-function Fizz:UseE2(unit)
-		local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, ESpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 470 then
+function Fizz:UseE(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
 		    	Control.CastSpell(HK_E, pred.CastPos)
+		    	LastESpot = pred.CastPos
+		end 
+end
+
+function Fizz:UseE2(unit)
+		--PrintChat("try E2")
+		local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, E2SpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) then
+		    	Control.CastSpell(HK_E, pred.CastPos)
+		    	--PrintChat("Cast E2")
+		    	LastE2Spot = pred.CastPos
 		end 
 end
 
