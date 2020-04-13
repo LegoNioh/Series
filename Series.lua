@@ -553,7 +553,7 @@ end
 
 function Lucian:UseW(unit)
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 900 then
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 950 then
 		    	Control.CastSpell(HK_W, pred.CastPos)
 		    	Casted = 1
 		end 
