@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 3.60
+    local Version = 3.70
     
     local Files = {
         Lua = {
@@ -284,7 +284,7 @@ function Lucian:Menu()
 end
 
 function Lucian:Spells()
-	WSpellData = {speed = 1600, range = 900, delay = 0.25, radius = 40, collision = {}, type = "linear"}
+	WSpellData = {speed = 1600, range = 900, delay = 0.25, radius = 100, collision = {}, type = "linear"}
 	RSpellData = {speed = 2800, range = 1200, delay = 0, radius = 110, collision = {}, type = "linear"}
 end
 
@@ -553,7 +553,7 @@ end
 
 function Lucian:UseW(unit)
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 900 then
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 900 then
 		    	Control.CastSpell(HK_W, pred.CastPos)
 		    	Casted = 1
 		end 
