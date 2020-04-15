@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 3.80
+    local Version = 3.90
     
     local Files = {
         Lua = {
@@ -758,47 +758,6 @@ function Draven:Tick()
 	--self:DeleteAxes()
 	--self:CreateAxes()
 	--PrintChat(" ")
-	if myHero.attackData.state == 2 or myHero.attackData.state == 1 then
-		--PrintChat("Not Post")
-		PostAttacked = false
-	end
-	if myHero.attackData.state == 2 then
-		PrintChat("2222")
-	end
-	if myHero.activeSpell.name == "DravenSpinningAttack" or myHero.activeSpell.name == "DravenSpinningAttack2" then
-		if OneTickSpin then
-			LastWindup = myHero.activeSpell.windup
-			PostSpin = true
-			PostTime = Game.Timer() + 1.8 - LastWindup
-			--PrintChat(myHero.attackData.state)
-			if not PostAttacked then
-				PrintChat("post 1 tick")
-				for i=1,1,1 do
-					local Timer = LastWindup * 1.2
-					DelayAction(function() self:CreateAxes() end, Timer+ i * 0.10)
-				end
-				PostAttacked = true
-			end
-			if #PostStats > 0 then
-				for i = 1, #PostStats do
-	        		local PostSession = PostStats[i]
-	        		if PostSession.Time == 1337 then
-	        			PostStats[i].Spin = PostSpin
-	        			PostStats[i].Time = PostTime
-	        		else
-	        			table.insert(PostStats, 1, {Spin = true, Time = PostTime})
-	        			return
-	        		end
-	        	end
-	        else
-	        	table.insert(PostStats, 1, {Spin = true, Time = PostTime})
-	        	return
-			end
-			OneTickSpin = false
-		end
-	else
-		OneTickSpin = true
-	end
 	self:MenuManager()
 	if self.Menu.ComboMode.UseRManKey:Value() then
 		self:DirectAxe()
@@ -1052,7 +1011,7 @@ function Draven:CreateAxes()
 				--PrintChat(#PreStats)
 				table.remove(PreStats, #PreStats)
 				--PrintChat(#PreStats)
-				--CreatedTick = true
+				CreatedTick = true
 			end
 			return true
 		end
@@ -1070,6 +1029,7 @@ function Draven:CheckAxe(obj)
 end
 
 function Draven:OnPreAttack(args)
+	Pre = true
 	hasPassive = _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinning") or _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinningAttack")
 	if hasPassive then
 		PreSpin = true
@@ -1080,15 +1040,12 @@ function Draven:OnPreAttack(args)
 		--PrintChat(#PreStats)
 		table.insert(PostStats, 1, {Spin = true, Time = 1337})
 	end
-	local Timer = 0.8 - LastWindup
+	local Timer = 0.5
 	--PrintChat(Timer)
-	--PrintChat("Pre")
-	PreProc = true
-	--for i=1,1,1 do
-	--	PrintChat(i)
-	--	DelayAction(function() self:CreateAxes() end, Timer+ i * 0.10)
-	--end
-	--DelayAction(function() self:CreateAxeDelay(0) end, Timer)
+	for i=1,5,1 do
+		--PrintChat(i)
+		DelayAction(function() self:CreateAxes() end, Timer+ i * 0.10)
+	end
 	CreatedTick = false
 end
 
@@ -1101,38 +1058,19 @@ function Draven:CreateAxeDelay(delay)
 	-- body
 end
 
-
 function Draven:OnPostAttackTick(args)
-	--PrintChat(myHero.activeSpell.name)
-	--[[if false and (myHero.activeSpell.name == "DravenSpinningAttack" or myHero.activeSpell.name == "DravenSpinningAttack2") then
+	if myHero.activeSpell.name == "DravenSpinningAttack" or myHero.activeSpell.name == "DravenSpinningAttack2" then
 		LastWindup = myHero.activeSpell.windup
 		PostSpin = true
 		PostTime = Game.Timer() + 1.8 - LastWindup
-		--PrintChat(myHero.attackData.state)
-		if not PostAttacked then
-			PrintChat("post 1 tick")
-			for i=1,1,1 do
-				local Timer = LastWindup * 1.2
-				DelayAction(function() self:CreateAxes() end, Timer+ i * 0.10)
-			end
-			PostAttacked = true
-		end
-		if #PostStats > 0 then
-			for i = 1, #PostStats do
-        		local PostSession = PostStats[i]
-        		if PostSession.Time == 1337 then
-        			PostStats[i].Spin = PostSpin
-        			PostStats[i].Time = PostTime
-        		else
-        			table.insert(PostStats, 1, {Spin = true, Time = PostTime})
-        			return
-        		end
+		for i = 1, #PostStats do
+        	local PostSession = PostStats[i]
+        	if PostSession.Time == 1337 then
+        		PostStats[i].Spin = PostSpin
+        		PostStats[i].Time = PostTime
         	end
-        else
-        	table.insert(PostStats, 1, {Spin = true, Time = PostTime})
-        	return
-		end
-	end--]]
+        end
+	end
 end
 
 function Draven:DirectAxe()
