@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 3.90
+    local Version = 4.00
     
     local Files = {
         Lua = {
@@ -203,9 +203,12 @@ end
 
 local function ValidTarget(unit, range)
     if (unit and unit.valid and unit.isTargetable and unit.alive and unit.visible and unit.networkID and unit.pathing and unit.health > 0) then
-    	local FinalRange = range
-    	if GetDistance(unit.pos) <= FinalRange then
-        	return true;
+    	if range then
+    		if GetDistance(unit.pos) <= range then
+        		return true;
+        	end
+        else
+        	return true
         end
     end
     return false;
@@ -223,10 +226,26 @@ function Manager:__init()
 		DelayAction(function() self:LoadQuinn() end, 1.05)
 	elseif myHero.charName == "Fizz" then
 		DelayAction(function() self:LoadFizz() end, 1.05)
+	elseif myHero.charName == "Zoe" then
+		DelayAction(function() self:LoadZoe() end, 1.05)
 	elseif myHero.charName == "Draven" then
 		DelayAction(function() self:LoadDraven() end, 1.05)
 	end
 end
+
+function Manager:LoadZoe()
+	Zoe:Spells()
+	Zoe:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() Zoe:Tick() end)
+	Callback.Add("Draw", function() Zoe:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) Zoe:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Zoe:OnPostAttackTick(...) end)
+	end
+end
+
 
 function Manager:LoadLucian()
 	Lucian:Spells()
@@ -251,7 +270,7 @@ function Manager:LoadDraven()
 	if _G.SDK then
 		_G.SDK.Orbwalker:OnPreAttack(function(...) Draven:OnPreAttack(...) end)
 		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Draven:OnPostAttackTick(...) end)
-		_G.SDK.Orbwalker:OnPostAttack(function(...) Aphelios:OnPostAttack(...) end)
+		--_G.SDK.Orbwalker:OnPostAttack(function(...) Aphelios:OnPostAttack(...) end)
 	end
 end
 
@@ -627,6 +646,260 @@ function Lucian:UseR(unit)
 		end 
 end
 
+class "Zoe"
+
+local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
+local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
+local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
+local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
+local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
+local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
+local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
+local IS = {}
+local EnemyLoaded = false
+local ECastTime = Game:Timer()
+local RCastTime = Game:Timer()
+local casted = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local QCastTime = 0
+local attackedfirst = 0
+local WasInRange = false
+local QRecast = false
+local BuffOnStick = false
+local LastHitSpot = myHero.pos
+local Direction = myHero.pos
+
+function Zoe:Menu()
+	self.Menu = MenuElement({type = MENU, id = "Zoe", name = "Zoe"})
+	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
+	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
+	self.Menu.ComboMode:MenuElement({id = "UseRMan", name = "Use R When pressing Manual R key", value = true})
+	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+	self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseW", name = "Use W in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseE", name = "Use smart E in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
+	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Zoe:Spells()
+	RSpellData = {speed = 3000, range = 575, delay = 0.7, radius = 100, collision = {}, type = "linear"}
+	WSpellData = {speed = 1200, range = 800, delay = 0.25, radius = 250, collision = {}, type = "linear"}
+	QSpellData = {speed = 1200, range = 3000, delay = 0, radius = 100, collision = {"minion"}, type = "linear"}
+	Q2SpellData = {speed = 1200, range = 3000, delay = 0, radius = 100, collision = {"minion"}, type = "circular"}
+end
+
+function Zoe:__init()
+	DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Zoe:LoadScript()
+	self:Spells()
+	self:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() self:Tick() end)
+	Callback.Add("Draw", function() self:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+	end
+end
+
+function Zoe:Tick()
+	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+	--PrintChat(myHero:GetSpellData(_E).name)
+	--PrintChat(myHero:GetSpellData(_R).toggleState)
+	target = GetTarget(1400)
+	if myHero:GetSpellData(_Q).name == "ZoeQRecast" then
+		--PrintChat("Casted")
+		QRecast = true
+		if QCastTime == 0 then
+			QCastTime = Game.Timer() + 2
+		end
+	else
+		QCastTime = 0
+		QRecast = false
+	end
+	if QCastTime > 0 then
+		--PrintChat(QCastTime - Game.Timer())
+	end
+	--PrintChat(Game.Latency()/1000)
+	self:ManualRCast()
+	--self:KS()
+	self:Logic()
+	if EnemyLoaded == false then
+		local CountEnemy = 0
+		for i, enemy in pairs(EnemyHeroes) do
+			CountEnemy = CountEnemy + 1
+		end
+		if CountEnemy < 1 then
+			GetEnemyHeroes()
+		else
+			EnemyLoaded = true
+			PrintChat("Enemy Loaded")
+		end
+	end
+end
+
+function Zoe:Draw()
+	if self.Menu.Draw.UseDraws:Value() then
+		Draw.Circle(myHero.pos, 500, 1, Draw.Color(255, 0, 191, 255))
+		--Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+		--Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
+		if target then
+		end
+	end
+end
+
+function Zoe:ManualRCast()
+	if target then
+		if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
+			self:UseR(target)
+		end
+	else
+		for i, enemy in pairs(EnemyHeroes) do
+			if enemy and not enemy.dead and ValidTarget(enemy, 550) then
+				if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
+					self:UseR(target)
+				end
+			end
+		end
+	end
+end
+
+function Zoe:KS()
+	--PrintChat("ksing")
+	for i, enemy in pairs(EnemyHeroes) do
+		if enemy and not enemy.dead and ValidTarget(enemy, 550) then
+			local Qrange = 550 + enemy.boundingRadius + myHero.boundingRadius
+			local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level) + getdmg("AA", enemy, myHero)
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > Qrange and self.Menu.KSMode.UseQ:Value() and enemy.health < Qdamage then
+				Control.CastSpell(HK_Q, enemy)
+			end
+		end
+	end
+end	
+
+function Zoe:CanUse(spell, mode)
+	if mode == nil then
+		mode = Mode()
+	end
+	--PrintChat(Mode())
+	if spell == _Q then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+			return true
+		end
+	elseif spell == _W then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+			return true
+		end
+	elseif spell == _E then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+			return true
+		end
+	elseif spell == _R then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+			return true
+		end
+		if mode == "Manual" and IsReady(spell) and self.Menu.ComboMode.UseRMan:Value() and self.Menu.ComboMode.UseRManKey:Value() then
+			return true
+		end
+	end
+	return false
+end
+
+function Zoe:Logic()
+	if target == nil then return end
+	if target then
+		local AARange = 550 + target.boundingRadius + myHero.boundingRadius
+		if GetDistance(target.pos) < AARange then
+			WasInRange = true
+		end
+		if self:CanUse(_Q, Mode()) and ValidTarget(target) then
+			if QRecast and QCastTime > 0 then
+				local Qleft = QCastTime - Game.Timer()
+				if Qleft < 1.08 then
+					self:UseQ(target)
+				end
+			end
+		end
+		if self:CanUse(_E, Mode()) and ValidTarget(target, 550) then
+			self:UseE(target)
+		end
+		if self:CanUse(_W, Mode()) and ValidTarget(target, 550) then
+			Control.CastSpell(HK_W)
+		end
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) and target.health < self:GetRDmg(target, true) then
+			self:UseR(target)
+		end
+	else
+		WasInRange = false
+    end		
+end
+
+function Zoe:GetRDmg(unit)
+	return getdmg("R", unit, myHero, stage, myHero:GetSpellData(_R).level)
+end
+
+function Zoe:OnPreAttack(args)
+	if target then
+	end
+end
+
+function Zoe:OnPostAttackTick(args)
+	attackedfirst = 1
+	if target then
+	end
+end
+
+function Zoe:UseQ(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) then
+		    	Control.CastSpell(HK_Q, pred.CastPos)
+		    	LastQSpot = pred.CastPos
+		end 
+end
+
+function Zoe:UseE(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+		    	Control.CastSpell(HK_E, pred.CastPos)
+		    	LastESpot = pred.CastPos
+		end 
+end
+
+function Zoe:UseR(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300  then
+		    	Control.CastSpell(HK_R, pred.CastPos)
+		end 
+end
+
 class "Draven"
 
 local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
@@ -666,6 +939,7 @@ local LastWindup = 0.22
 local GlobalTargetAxe = nil
 local BackUpTime = Game.Timer()
 local CreatedTick = false
+local AxeOrbSetMove = true -- Moved from AxeOrb and made global
 local HadStacks = 0
 local AxeComboModeRange = 550
 local HadPassive = false
@@ -729,8 +1003,8 @@ function Draven:MenuManager()
 end
 
 function Draven:Spells()
-	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
-	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
+	RSpellData = {speed = 2000, range = 3000, delay = 0.25, radius = 160, collision = {}, type = "linear"}
+	ESpellData = {speed = 1400, range = 1050, delay = 0.25, radius = 100, collision = {}, type = "linear"}
 end
 
 function Draven:__init()
@@ -754,6 +1028,9 @@ function Draven:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	target = GetTarget(1400)
 	HoldingAxe = _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinning") or _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinningAttack")
+	SecondRBuff = _G.SDK.BuffManager:GetBuff(myHero, "dravenrdoublecast")
+	WBuffAS = _G.SDK.BuffManager:GetBuff(myHero, "dravenfurybuff")
+	WBuffMS = _G.SDK.BuffManager:GetBuff(myHero, "DravenFury")
 	--self:CreateAxeDelay(0.5)
 	--self:DeleteAxes()
 	--self:CreateAxes()
@@ -791,13 +1068,13 @@ function Draven:Logic()
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, 550) then
 			Control.CastSpell(HK_Q)
 		end
-		if self:CanUse(_E, Mode()) and ValidTarget(target, 550) then
+		if self:CanUse(_E, Mode()) and ValidTarget(target, 550) and not AxeOrbSetMove then
 			self:UseE(target)
 		end
 		if self:CanUse(_W, Mode()) and ValidTarget(target, 550) then
 			Control.CastSpell(HK_W)
 		end
-		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) and target.health < self:GetRDmg(target, true) then
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) and target.health < self:GetRDmg(target, true) * 1.8 and not SecondRBuff then
 			self:UseR(target)
 		end
 	else
@@ -865,7 +1142,6 @@ function Draven:AxeOrb()
 	end 
 	local NearTurret = IsNearEnemyTurret(myHero.pos, 600)
 	local UnderTurret = IsUnderEnemyTurret(myHero.pos)
-	local AxeOrbSetMove = true
 	local AxeComboMode = self.Menu.ComboMode.AxeOrbModeCombo:Value()
  	local TargetAxe = nil
 	local SmallRange = self.Menu.ComboMode.AxeOrbStopRange:Value()
@@ -1049,15 +1325,6 @@ function Draven:OnPreAttack(args)
 	CreatedTick = false
 end
 
-function Draven:CreateAxeDelay(delay)
-	if LastCreateTime + delay - Game.Timer() < 0 and Mode() == "Combo" then
-		PrintChat("Create Axe at a delay")
-		LastCreateTime = Game.Timer()
-		self:CreateAxes()
-	end
-	-- body
-end
-
 function Draven:OnPostAttackTick(args)
 	if myHero.activeSpell.name == "DravenSpinningAttack" or myHero.activeSpell.name == "DravenSpinningAttack2" then
 		LastWindup = myHero.activeSpell.windup
@@ -1071,6 +1338,15 @@ function Draven:OnPostAttackTick(args)
         	end
         end
 	end
+end
+
+function Draven:CreateAxeDelay(delay)
+	if LastCreateTime + delay - Game.Timer() < 0 and Mode() == "Combo" then
+		PrintChat("Create Axe at a delay")
+		LastCreateTime = Game.Timer()
+		self:CreateAxes()
+	end
+	-- body
 end
 
 function Draven:DirectAxe()
@@ -1160,17 +1436,21 @@ end
 
 
 function Draven:UseE(unit)
-		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
-		    	Control.CastSpell(HK_E, pred.CastPos)
-		end 
+	local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+	if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+	    	Control.CastSpell(HK_E, pred.CastPos)
+	end 
 end
 
 function Draven:UseR(unit)
+	if not SecondRBuff then
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300  then
-		    	Control.CastSpell(HK_R, pred.CastPos)
-		end 
+		if and pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 3000  then
+	    	Control.CastSpell(HK_R, pred.CastPos)
+	    	local SecondRTime = GetDistance(target.pos) / 2000
+			DelayAction(function() Control.CastSpell(HK_R) end, SecondRTime)
+		end
+	end 
 end
 
 class "Fizz"
