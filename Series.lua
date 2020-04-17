@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 6.00
+    local Version = 7.00
     
     local Files = {
         Lua = {
@@ -1044,7 +1044,7 @@ function Draven:Tick()
 	self:AxeOrb()
 	self:ManualRCast()
 	self:Logic()
-
+	self:KS()
 	if EnemyLoaded == false then
 		local CountEnemy = 0
 		for i, enemy in pairs(EnemyHeroes) do
@@ -1075,7 +1075,7 @@ function Draven:Logic()
 		if self:CanUse(_W, Mode()) and ValidTarget(target, 750) and GetDistance(target.pos) > 500 then
 			Control.CastSpell(HK_W)
 		end
-		if self:CanUse(_R, Mode()) and ValidTarget(target, 3000) and target.health < self:GetRDmg(target, true) * 10.8 and not SecondRBuff then
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 3000) and target.health < self:GetRDmg(target, true) * 1.8 and not SecondRBuff then
 			self:UseR(target)
 		end
 	else
@@ -1391,10 +1391,12 @@ function Draven:KS()
 	--PrintChat("ksing")
 	for i, enemy in pairs(EnemyHeroes) do
 		if enemy and not enemy.dead and ValidTarget(enemy, 550) then
-			local Qrange = 550 + enemy.boundingRadius + myHero.boundingRadius
-			local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level) + getdmg("AA", enemy, myHero)
-			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > Qrange and self.Menu.KSMode.UseQ:Value() and enemy.health < Qdamage then
-				Control.CastSpell(HK_Q, enemy)
+			local Edamage = getdmg("E", enemy, myHero, myHero:GetSpellData(_E).level)
+			if self:CanUse(_E, "KS") and GetDistance(enemy.pos, myHero.pos) < ESpellData.range and enemy.health < Edamage then
+				self:UseE(enemy)
+			end
+			if self:CanUse(_R, "KS") and ValidTarget(enemy, 3000) and enemy.health < self:GetRDmg(enemy) * 1.8 and not SecondRBuff then
+				self:UseR(target)
 			end
 		end
 	end
@@ -1429,11 +1431,17 @@ function Draven:CanUse(spell, mode)
 		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
 			return true
 		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+			return true
+		end
 	elseif spell == _R then
 		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
 			return true
 		end
 		if mode == "Manual" and IsReady(spell) and self.Menu.ComboMode.UseRMan:Value() and self.Menu.ComboMode.UseRManKey:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
 			return true
 		end
 	end
@@ -1459,7 +1467,7 @@ function Draven:UseR(unit)
 			Direction = Vector((myHero.pos-pred.CastPos):Normalized())
 			Spot = myHero.pos - Direction * 700
 	    	Control.CastSpell(HK_R, Spot)
-	    	local SecondRTime = GetDistance(myHero.pos, target.pos) / 2000
+	    	local SecondRTime = GetDistance(myHero.pos, unit.pos) / 2000
 			DelayAction(function() self:UseR2() end, SecondRTime-0.2)
 		end
 	end 
