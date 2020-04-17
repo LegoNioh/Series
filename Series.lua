@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 4.00
+    local Version = 10.80
     
     local Files = {
         Lua = {
@@ -983,7 +983,7 @@ end
 function Draven:MenuManager()
 	--PrintChat("Errr")
 	if self.Menu.ComboMode.AxeOrbHeroRange:Value() ~= MenuHero then
-		PrintChat("Changed Menu")
+		--PrintChat("Changed Menu")
 		MenuHeroTime = Game.Timer() + 2
 	end
 	if self.Menu.ComboMode.AxeOrbTargetRange:Value() ~= MenuStop then
@@ -1025,6 +1025,7 @@ function Draven:LoadScript()
 end
 
 function Draven:Tick()
+	--PrintChat(" ")
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	target = GetTarget(1400)
 	HoldingAxe = _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinning") or _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinningAttack")
@@ -1066,15 +1067,15 @@ function Draven:Logic()
 			WasInRange = true
 		end
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, 550) then
-			Control.CastSpell(HK_Q)
+			--Control.CastSpell(HK_Q)
 		end
 		if self:CanUse(_E, Mode()) and ValidTarget(target, 550) and not AxeOrbSetMove then
 			self:UseE(target)
 		end
-		if self:CanUse(_W, Mode()) and ValidTarget(target, 550) then
+		if self:CanUse(_W, Mode()) and ValidTarget(target, 750) and GetDistance(target.pos) > 500 then
 			Control.CastSpell(HK_W)
 		end
-		if self:CanUse(_R, Mode()) and ValidTarget(target, 1300) and target.health < self:GetRDmg(target, true) * 1.8 and not SecondRBuff then
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 3000) and target.health < self:GetRDmg(target, true) * 1.8 and not SecondRBuff then
 			self:UseR(target)
 		end
 	else
@@ -1165,9 +1166,15 @@ function Draven:AxeOrb()
         					TargetAxe = Axe
         					break
         				end
-	        		elseif GetDistance(Axe.pos, myHero.pos) < self.Menu.ComboMode.AxeOrbHeroRange:Value() then
-	        			TargetAxe = Axe
-	        			break
+	        		else
+	        			if GetDistance(Axe.pos, myHero.pos) < self.Menu.ComboMode.AxeOrbHeroRange:Value() then
+	        				TargetAxe = Axe
+	        				break
+	        			else
+	        				if self:CanUse(_W, "Orb") and ValidTarget(target, 850) then
+								Control.CastSpell(HK_W)
+							end
+	        			end
 	        		end
         		end
         	end
@@ -1240,7 +1247,7 @@ end
 function Draven:CreateAxes()
 	if CreatedTick then return end
 	self:DeleteAxes()
-	PrintChat("Creating Axes")
+	--PrintChat("Creating Axes")
 	local count = Game.MissileCount()
 	--PrintChat()
 	if #PostStats > 0 then 
@@ -1306,6 +1313,9 @@ end
 
 function Draven:OnPreAttack(args)
 	Pre = true
+	if self:CanUse(_Q, Mode()) and target then
+		Control.CastSpell(HK_Q)
+	end
 	hasPassive = _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinning") or _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinningAttack")
 	if hasPassive then
 		PreSpin = true
@@ -1342,7 +1352,7 @@ end
 
 function Draven:CreateAxeDelay(delay)
 	if LastCreateTime + delay - Game.Timer() < 0 and Mode() == "Combo" then
-		PrintChat("Create Axe at a delay")
+		--PrintChat("Create Axe at a delay")
 		LastCreateTime = Game.Timer()
 		self:CreateAxes()
 	end
@@ -1445,7 +1455,7 @@ end
 function Draven:UseR(unit)
 	if not SecondRBuff then
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
-		if and pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 3000  then
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 3000 then
 	    	Control.CastSpell(HK_R, pred.CastPos)
 	    	local SecondRTime = GetDistance(target.pos) / 2000
 			DelayAction(function() Control.CastSpell(HK_R) end, SecondRTime)
