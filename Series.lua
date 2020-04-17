@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 5.00
+    local Version = 5.10
     
     local Files = {
         Lua = {
@@ -1027,7 +1027,7 @@ end
 function Draven:Tick()
 	--PrintChat(" ")
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-	target = GetTarget(1400)
+	target = GetTarget(3000)
 	HoldingAxe = _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinning") or _G.SDK.BuffManager:GetBuff(myHero, "DravenSpinningAttack")
 	SecondRBuff = _G.SDK.BuffManager:GetBuff(myHero, "dravenrdoublecast")
 	WBuffAS = _G.SDK.BuffManager:GetBuff(myHero, "dravenfurybuff")
@@ -1075,7 +1075,7 @@ function Draven:Logic()
 		if self:CanUse(_W, Mode()) and ValidTarget(target, 750) and GetDistance(target.pos) > 500 then
 			Control.CastSpell(HK_W)
 		end
-		if self:CanUse(_R, Mode()) and ValidTarget(target, 3000) and target.health < self:GetRDmg(target, true) * 1.8 and not SecondRBuff then
+		if self:CanUse(_R, Mode()) and ValidTarget(target, 3000) and target.health < self:GetRDmg(target, true) * 10.8 and not SecondRBuff then
 			self:UseR(target)
 		end
 	else
@@ -1152,7 +1152,7 @@ function Draven:AxeOrb()
         	local AxeTime = Axe.endTime - Game.Timer()
 			local AxeMaxDistance = myHero.ms * AxeTime
         	if GetDistance(Axe.pos, myHero.pos) < AxeMaxDistance then
-        		if not IsNearEnemyTurret(Axe.pos, -20) or IsUnderEnemyTurret(myHero.pos) then
+        		if not IsNearEnemyTurret(Axe.pos, 0) or IsUnderEnemyTurret(myHero.pos) then
 	        		if AxeComboMode and target and Mode() == "Combo" then
         				PredSpot = GetUnitPositionNext(target)
         				if PredSpot then
@@ -1456,12 +1456,22 @@ function Draven:UseR(unit)
 	if not SecondRBuff then
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
 		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 3000 then
-	    	Control.CastSpell(HK_R, pred.CastPos)
-	    	local SecondRTime = GetDistance(target.pos) / 2000
-			DelayAction(function() Control.CastSpell(HK_R) end, SecondRTime)
+			Direction = Vector((myHero.pos-pred.CastPos):Normalized())
+			Spot = myHero.pos - Direction * 700
+	    	Control.CastSpell(HK_R, Spot)
+	    	local SecondRTime = GetDistance(myHero.pos, target.pos) / 2000
+			DelayAction(function() self:UseR2() end, SecondRTime)
 		end
 	end 
 end
+
+function Draven:UseR2()
+	if IsReady(_R) then
+		--Control.CastSpell(HK_R) 
+		PrintChat("casting second R")
+	end
+end
+
 
 class "Fizz"
 
