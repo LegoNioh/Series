@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 5.10
+    local Version = 6.00
     
     local Files = {
         Lua = {
@@ -1460,15 +1460,15 @@ function Draven:UseR(unit)
 			Spot = myHero.pos - Direction * 700
 	    	Control.CastSpell(HK_R, Spot)
 	    	local SecondRTime = GetDistance(myHero.pos, target.pos) / 2000
-			DelayAction(function() self:UseR2() end, SecondRTime)
+			DelayAction(function() self:UseR2() end, SecondRTime-0.2)
 		end
 	end 
 end
 
 function Draven:UseR2()
 	if IsReady(_R) then
-		--Control.CastSpell(HK_R) 
-		PrintChat("casting second R")
+		Control.CastSpell(HK_R) 
+		--PrintChat("casting second R")
 	end
 end
 
