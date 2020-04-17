@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 7.00
+    local Version = 7.10
     
     local Files = {
         Lua = {
@@ -1395,7 +1395,7 @@ function Draven:KS()
 			if self:CanUse(_E, "KS") and GetDistance(enemy.pos, myHero.pos) < ESpellData.range and enemy.health < Edamage then
 				self:UseE(enemy)
 			end
-			if self:CanUse(_R, "KS") and ValidTarget(enemy, 3000) and enemy.health < self:GetRDmg(enemy) * 1.8 and not SecondRBuff then
+			if self:CanUse(_R, "KS") and ValidTarget(enemy, 3000) and enemy.health < self:GetRDmg(enemy) * 1.8 and not SecondRBuff and GetDistance(enemy.pos, myHero.pos) > 650 then
 				self:UseR(target)
 			end
 		end
