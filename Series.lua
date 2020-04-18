@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 7.20
+    local Version = 7.30
     
     local Files = {
         Lua = {
@@ -565,7 +565,7 @@ function Lucian:Logic()
 		end
 			--PrintChat(myHero.activeSpell.name)
 		if self:CanUse(_W, Mode()) and ValidTarget(target, 900) and not DoubleShot and Casted == 0 and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" then
-			if GetDistance(target.pos, myHero.pos) > 500 or not self:CanUse(_Q, Mode()) then
+			if GetDistance(target.pos, myHero.pos) > 600 or not self:CanUse(_Q, Mode()) then
 				self:UseW(target)
 			end
 		end
