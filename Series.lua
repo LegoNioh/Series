@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 7.10
+    local Version = 7.20
     
     local Files = {
         Lua = {
@@ -228,8 +228,23 @@ function Manager:__init()
 		DelayAction(function() self:LoadFizz() end, 1.05)
 	elseif myHero.charName == "Zoe" then
 		DelayAction(function() self:LoadZoe() end, 1.05)
+	elseif myHero.charName == "Teemo" then
+		DelayAction(function() self:LoadTeemo() end, 1.05)
 	elseif myHero.charName == "Draven" then
 		DelayAction(function() self:LoadDraven() end, 1.05)
+	end
+end
+
+function Manager:LoadTeemo()
+	Teemo:Spells()
+	Teemo:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() Teemo:Tick() end)
+	Callback.Add("Draw", function() Teemo:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) Teemo:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Teemo:OnPostAttackTick(...) end)
 	end
 end
 
@@ -337,6 +352,7 @@ local EnemyLoaded = false
 local QCastTime = Game:Timer()
 local RCastTime = Game:Timer()
 local Casted = 0
+local CanQclick = true
 local attackedfirst = 0
 local WasInRange = false
 local DoubleShot = false
@@ -349,8 +365,10 @@ function Lucian:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseQMinionCombo", name = "Q on minions in Combo (No FPS Drops)", value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseQMinion", name = "Auto Q on minions (May Cause FPS Drops)", value = false})
+	self.Menu.ComboMode:MenuElement({id = "UseQMana", name = "Min Mana % to use Auto Q", value = 10, min = 0, max = 100, step = 1})
 	self.Menu.ComboMode:MenuElement({id = "UseRMagnet", name = "Magnet when R is active", value = false})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetMouseRange", name = "Magnet Mouse Range", value = 700, min = 100, max = 1200, step = 100})
 	self.Menu.ComboMode:MenuElement({id = "rMagnetHeroRange", name = "Magnet Hero Range", value = 500, min = 100, max = 1200, step = 100})
@@ -396,10 +414,14 @@ function Lucian:Tick()
 	else
 		DoubleShot = false
 	end	
+	if self.Menu.ComboMode.UseRManKey:Value() then
+		_G.SDK.Orbwalker:SetMovement(true)
+		_G.SDK.Orbwalker:SetAttack(true)
+	end
 	self:KS()
 	self:Logic()
-	if myHero:GetSpellData(_R).toggleState == 1 or not target then
-		_G.SDK.Orbwalker:SetMovement(true)
+	if myHero:GetSpellData(_R).toggleState == 1 or not target and myHero.activeSpell.name ~= "LucianQ" then
+		--_G.SDK.Orbwalker:SetMovement(true)
 	end
 	if EnemyLoaded == false then
 		local CountEnemy = 0
@@ -499,6 +521,22 @@ function Lucian:Logic()
 		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 630 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinionCombo:Value() then
 			self:GetQMinion(target)
 		end
+		if myHero.activeSpell.name == "LucianQ" then
+			--_G.SDK.Orbwalker:SetMovement(false)
+			--_G.SDK.Orbwalker:SetAttack(false)
+			if CanQclick == true then
+				--DelayAction(function() self:QClick() end, 0.10)
+				--self:QClick()
+				CanQclick = false
+			end
+			--self:QClick()
+		else
+			if CanQclick == false then
+				--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+				--_G.SDK.Orbwalker:__OnAutoAttackReset()
+			end
+			CanQclick = true
+		end
 		if self:CanUse(_E, Mode()) and myHero:GetSpellData(_R).toggleState == 1 then
 			if GetDistance(target.pos) > 520 then
 				if WasInRange == true and GetDistance(target.pos) < 1050 then
@@ -525,12 +563,10 @@ function Lucian:Logic()
 				end
 			end
 		end
-		if myHero.activeSpell.name == "LucianQ" then
 			--PrintChat(myHero.activeSpell.name)
-		elseif self:CanUse(_W, Mode()) and ValidTarget(target, 900) and not DoubleShot and Casted == 0 then
+		if self:CanUse(_W, Mode()) and ValidTarget(target, 900) and not DoubleShot and Casted == 0 and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" then
 			if GetDistance(target.pos, myHero.pos) > 500 or not self:CanUse(_Q, Mode()) then
 				self:UseW(target)
-				_G.SDK.Orbwalker:SetMovement(true)
 			end
 		end
 		--PrintChat(self:GetRDmg(target))
@@ -550,8 +586,8 @@ function Lucian:Logic()
 			else
 				_G.SDK.Orbwalker:SetMovement(true)
 			end
-		else
-			_G.SDK.Orbwalker:SetMovement(true)
+		elseif myHero.activeSpell.name ~= "LucianQ" then
+			--_G.SDK.Orbwalker:SetMovement(true)
 			Direction = Vector((target.pos-myHero.pos):Normalized())
 		end
 		if self:CanUse(_R, Mode()) and ValidTarget(target, 1200) and myHero:GetSpellData(_R).toggleState == 1 and target.health < self:GetRDmg(target)*0.8 and GetDistance(target.pos) > 650 then
@@ -562,27 +598,50 @@ function Lucian:Logic()
     end		
 end
 
+function Lucian:QClick()
+	local NextSpot = GetUnitPositionNext(myHero)
+	local spot = myHero.pos
+	if NextSpot then
+		local Direction = Vector((myHero.pos-NextSpot):Normalized())
+		spot = myHero.pos - Direction*100
+	else
+		local Direction = Vector((myHero.pos-target.pos):Normalized())
+		spot = myHero.pos- Direction*100
+		PrintChat("using hero spot")
+	end
+	Draw.Circle(mousePos, 50, 1, Draw.Color(255, 0, 191, 255))
+	Control.RightClick(spot:To2D())
+	--Control.RightClick(target.pos:To2D())
+	PrintChat("Q click")
+	--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+	--DelayAction(function() 	Control.Attack(target) PrintChat("Attacking Q attack click") end, 0.15)
+	DelayAction(function() 	Control.RightClick(target.pos:To2D()) end, 0.05)
+end
+
 function Lucian:GetQMinion(unit)
 		--PrintChat("Getting Q minion")
 		local minions = _G.SDK.ObjectManager:GetEnemyMinions(500)
 		local mtarget = nil
 		local mlocation = nil
- 		for i = 1, #minions do
-        	local minion = minions[i]
-    		--PrintChat(minion.team)
-			if minion.team == 300 - myHero.team and IsValid(minion) then
-				--PrintChat("minion")
-				if GetDistance(minion.pos, myHero.pos) < 500 then
-					if GetDistance(unit.pos, minion.pos) < GetDistance(unit.pos, myHero.pos) then
-						CastDirection = Vector((minion.pos-myHero.pos):Normalized())
-						enemydist = GetDistance(unit.pos, myHero.pos)
-						EnemySpot = myHero.pos:Extended(minion.pos, enemydist)
-						Location = EnemySpot
-						--Draw.Circle(Location, 55, 1, Draw.Color(255, 0, 191, 255))
-						if GetDistance(Location, unit.pos) < 50 then
-							if mtarget == nil or GetDistance(Location, unit.pos) < GetDistance(mlocation, unit.pos) then 
-								mtarget = minion
-								mlocation = Location
+		local manaper = myHero.mana / myHero.maxMana * 100
+		if manaper > self.Menu.ComboMode.UseQMana:Value() then
+	 		for i = 1, #minions do
+	        	local minion = minions[i]
+	    		--PrintChat(minion.team)
+				if minion.team == 300 - myHero.team and IsValid(minion) then
+					--PrintChat("minion")
+					if GetDistance(minion.pos, myHero.pos) < 500 then
+						if GetDistance(unit.pos, minion.pos) < GetDistance(unit.pos, myHero.pos) then
+							CastDirection = Vector((minion.pos-myHero.pos):Normalized())
+							enemydist = GetDistance(unit.pos, myHero.pos)
+							EnemySpot = myHero.pos:Extended(minion.pos, enemydist)
+							Location = EnemySpot
+							--Draw.Circle(Location, 55, 1, Draw.Color(255, 0, 191, 255))
+							if GetDistance(Location, unit.pos) < 50 then
+								if mtarget == nil or GetDistance(Location, unit.pos) < GetDistance(mlocation, unit.pos) then 
+									mtarget = minion
+									mlocation = Location
+								end
 							end
 						end
 					end
@@ -614,26 +673,31 @@ function Lucian:OnPostAttackTick(args)
 		--PrintChat(target.boundingRadius)
 		local range = 500 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, range) and not DoubleShot then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, range) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" then
 			if _G.SDK.Orbwalker:CanAttack() then
 					--PrintChat("can attack")
-					DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
+					--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
 			else
+				--PrintChat("Casting Q")
 				Control.CastSpell(HK_Q, target)
+				--DelayAction(function() self:QClick() end, 0.30)
+				--self:QClick()
 			end
 			--PrintChat(myHero.attackSpeed)
 			if myHero.attackSpeed < 1.40 then
 				--PrintChat("cat")
-				DelayAction(function() Control.Move(mousePos) end, 0.75)
+				--DelayAction(function() Control.Move(mousePos) end, 0.75)
 			end
 			Casted = 1
 		end
 	end
 end
 
+
+
 function Lucian:UseW(unit)
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 900 then
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 900 then
 		    	Control.CastSpell(HK_W, pred.CastPos)
 		    	Casted = 1
 		end 
@@ -962,7 +1026,7 @@ function Draven:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "AxeOrbHeroRange", name = "Axe Catch Range From Hero (700)", value = 650, min = 100, max = 1200, step = 50})
-	self.Menu.ComboMode:MenuElement({id = "AxeOrbStopRange", name = "Stop Moving To Axe Range From Axe (80)", value = 80, min = 0, max = 200, step = 10})
+	self.Menu.ComboMode:MenuElement({id = "AxeOrbStopRange", name = "Stop Moving To Axe Range From Axe (80)", value = 80, min = 0, max = 500, step = 10})
 	self.Menu.ComboMode:MenuElement({id = "AxeOrbModeCombo", name = "In fights catch based on target", value = true})
 	self.Menu.ComboMode:MenuElement({id = "AxeOrbTargetRange", name = "Fight Axe Catch Range From Target (900)", value = 900, min = 100, max = 1200, step = 50})
 	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
@@ -1480,6 +1544,229 @@ function Draven:UseR2()
 	end
 end
 
+class "Teemo"
+
+local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
+local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
+local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
+local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
+local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
+local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
+local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
+local IS = {}
+local EnemyLoaded = false
+local ECastTime = Game:Timer()
+local RCastTime = Game:Timer()
+local casted = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local attackedfirst = 0
+local WasInRange = false
+local BuffOnStick = false
+local LastHitSpot = myHero.pos
+local Direction = myHero.pos
+
+function Teemo:Menu()
+	self.Menu = MenuElement({type = MENU, id = "Teemo", name = "Teemo"})
+	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
+	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
+	self.Menu.ComboMode:MenuElement({id = "UseRMan", name = "Use R When pressing Manual R key", value = true})
+	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+	self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseW", name = "Use W in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseE", name = "Use smart E in KS", value = true})
+	self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
+	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
+	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Teemo:Spells()
+	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
+	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
+end
+
+function Teemo:__init()
+	DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Teemo:LoadScript()
+	self:Spells()
+	self:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() self:Tick() end)
+	Callback.Add("Draw", function() self:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+	end
+end
+
+function Teemo:Tick()
+	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+	--PrintChat(myHero:GetSpellData(_E).name)
+	--PrintChat(myHero:GetSpellData(_R).toggleState)
+	ActiveSpell = myHero.activeSpell.name
+	target = GetTarget(1400)
+	self:KS()
+	self:Logic()
+	if EnemyLoaded == false then
+		local CountEnemy = 0
+		for i, enemy in pairs(EnemyHeroes) do
+			CountEnemy = CountEnemy + 1
+		end
+		if CountEnemy < 1 then
+			GetEnemyHeroes()
+		else
+			EnemyLoaded = true
+			PrintChat("Enemy Loaded")
+		end
+	end
+end
+
+function Teemo:Draw()
+	if self.Menu.Draw.UseDraws:Value() then
+		local AARange = 590
+		Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+		Draw.Circle(myHero.pos, 680, 1, Draw.Color(255, 0, 191, 255))
+		--Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+		--Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
+		if target then
+		end
+	end
+end
+
+function Teemo:ManualRCast()
+	if target then
+		if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
+			self:UseR(target)
+		end
+	else
+		for i, enemy in pairs(EnemyHeroes) do
+			if enemy and not enemy.dead and ValidTarget(enemy, 550) then
+				if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
+					self:UseR(target)
+				end
+			end
+		end
+	end
+end
+
+function Teemo:KS()
+	--PrintChat("ksing")
+	for i, enemy in pairs(EnemyHeroes) do
+		if enemy and not enemy.dead and ValidTarget(enemy) then
+			local Qrange = 680
+			local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level)
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) < Qrange and self.Menu.KSMode.UseQ:Value() and enemy.health < Qdamage and ActiveSpell ~= "BlindingDart" then
+				Control.CastSpell(HK_Q, enemy)
+			end
+		end
+	end
+end	
+
+function Teemo:CanUse(spell, mode)
+	if mode == nil then
+		mode = Mode()
+	end
+	--PrintChat(Mode())
+	if spell == _Q then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+			return true
+		end
+	elseif spell == _W then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+			return true
+		end
+	elseif spell == _E then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+			return true
+		end
+	elseif spell == _R then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+			return true
+		end
+		if mode == "Manual" and IsReady(spell) and self.Menu.ComboMode.UseRMan:Value() and self.Menu.ComboMode.UseRManKey:Value() then
+			return true
+		end
+	end
+	return false
+end
+
+function Teemo:Logic()
+	--PrintChat(ActiveSpell)
+	if target == nil then return end
+	if Mode() == "Combo" or Mode() == "Harass" and target then
+		local AARange = 590
+		if GetDistance(target.pos) < AARange then
+			WasInRange = true
+		end
+		local Qrange = 680 
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and GetDistance(target.pos, myHero.pos) > AARange and ActiveSpell ~= "BlindingDart" then
+			Control.CastSpell(HK_Q, target)
+		end
+	else
+		WasInRange = false
+    end		
+end
+
+function Teemo:OnPostAttackTick(args)
+	attackedfirst = 1
+	if target then
+		local Qrange = 680 + target.boundingRadius + myHero.boundingRadius
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) then
+			Control.CastSpell(HK_Q, target)
+		end
+	end
+end
+
+
+function Teemo:GetRDmg(unit)
+	return getdmg("R", unit, myHero, stage, myHero:GetSpellData(_R).level)
+end
+
+function Teemo:OnPreAttack(args)
+	if target then
+	end
+end
+
+function Teemo:UseE(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+		    	Control.CastSpell(HK_E, pred.CastPos)
+		    	LastESpot = pred.CastPos
+		end 
+end
+
+function Teemo:UseR(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300  then
+		    	Control.CastSpell(HK_R, pred.CastPos)
+		end 
+end
 
 class "Fizz"
 
@@ -1737,7 +2024,7 @@ function Fizz:Logic()
 			elseif myHero:GetSpellData(_E).name == "FizzE" then
 				--PrintChat("AAA")
 				if IsUnderEnemyTurret(target.pos) then
-					PrintChat("under")
+					--PrintChat("under")
 					if not self:CanUse(_Q, Mode()) then
 						if GetDistance(target.pos, myHero.pos) < AARange then
 							if casted == 0 and not self:CanUse(_W, Mode()) then
@@ -1968,7 +2255,7 @@ function Quinn:Tick()
 	target = GetTarget(1400)
 	self:GetTargetManager()
 	if SpecialTarget then
-		PrintChat("setting false")
+		--PrintChat("setting false")
 		if not myHero.attackData.state == 2 then
 			_G.SDK.Orbwalker:SetAttack(false)
 		end
@@ -2043,7 +2330,7 @@ function Quinn:GetCloseMarkedMinion()
 		local Aminion = Minions[i]
 		local AARange = 525 + Aminion.boundingRadius + myHero.boundingRadius
 		if ValidTarget(Aminion, AARange) and _G.SDK.BuffManager:HasBuff(Aminion, "QuinnW") then
-			PrintChat("Found new enemy")
+			--PrintChat("Found new enemy")
 			CloseMinion = Aminion
 			return
 		end		
@@ -2078,7 +2365,7 @@ function Quinn:GetCloseMarkedChamp()
 			local AARange = 525 + enemy.boundingRadius + myHero.boundingRadius
 			if ValidTarget(enemy, AARange) and _G.SDK.BuffManager:HasBuff(enemy, "QuinnW") then
 				if not target or not target.networkID == enemy.networkID then
-					PrintChat("Found new Champ")
+					--PrintChat("Found new Champ")
 					CloseChamp = enemy
 					return
 				end
@@ -2214,13 +2501,17 @@ function Quinn:Logic()
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not hasPassive and not UltMode then
 			self:UseQ(target)
 		end
+		local MeUnderTurret = IsUnderEnemyTurret(myHero.pos)
+		local TargetUnderTurret = IsUnderEnemyTurret(target.pos)
 		if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not hasPassive then
-			if GetDistance(target.pos, myHero.pos) < 175 then
-				Control.CastSpell(HK_E, target)
-			elseif GetDistance(target.pos, myHero.pos) > AARange and WasInRange then
-				Control.CastSpell(HK_E, target)
-			elseif UltMode then
-				Control.CastSpell(HK_E, target)
+			if not TargetUnderTurret or MeUnderTurret then
+				if GetDistance(target.pos, myHero.pos) < 175 then
+					Control.CastSpell(HK_E, target)
+				elseif GetDistance(target.pos, myHero.pos) > AARange and WasInRange then
+					Control.CastSpell(HK_E, target)
+				elseif UltMode then
+					Control.CastSpell(HK_E, target)
+				end
 			end
 		end
 		if self:CanUse(_R, Mode()) and ValidTarget(target, AARange) and UltMode then
@@ -3101,7 +3392,7 @@ function Pyke:KS()
 							local pred = _G.PremiumPrediction:GetPrediction(myHero, enemy, spellDataQ)
 							if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < Qdistance then
 				    			Control.CastSpell(HK_Q, pred.CastPos)
-			    				PrintChat("Fire enemy")
+			    				--PrintChat("Fire enemy")
 							end 
 						end
 					elseif enemy and ValidTarget(enemy, 1100) then
@@ -3188,7 +3479,7 @@ function Pyke:UseE(unit)
 				local UnitDist = GetDistance(myHero.pos, unit.pos)
 				local SpotDist = GetDistance(myHero.pos, pred.CastPos)
 				local CastDist = SpotDist - UnitDist
-				local CastSpot = myHero:Extended(pred.CastPos, CastDist)
+				local CastSpot = myHero.pos:Extended(pred.CastPos, CastDist)
 		    	Control.CastSpell(HK_E, CastSpot)
 		end 
 end
