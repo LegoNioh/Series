@@ -5,7 +5,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 7.30
+    local Version = 8.00
     
     local Files = {
         Lua = {
@@ -230,6 +230,8 @@ function Manager:__init()
 		DelayAction(function() self:LoadZoe() end, 1.05)
 	elseif myHero.charName == "Teemo" then
 		DelayAction(function() self:LoadTeemo() end, 1.05)
+	elseif myHero.charName == "MasterYi" then
+		DelayAction(function() self:LoadMasterYi() end, 1.05)
 	elseif myHero.charName == "Draven" then
 		DelayAction(function() self:LoadDraven() end, 1.05)
 	end
@@ -338,15 +340,224 @@ function Manager:LoadQuinn()
 	end
 end
 
+function Manager:LoadMasterYi()
+	MasterYi:Spells()
+	MasterYi:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() MasterYi:Tick() end)
+	Callback.Add("Draw", function() MasterYi:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) MasterYi:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) MasterYi:OnPostAttackTick(...) end)
+	end
+end
+
+
+class "MasterYi"
+
+local EnemyLoaded = false
+local casted = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local attackedfirst = 0
+local WasInRange = false
+local BuffOnStick = false
+local LastHitSpot = myHero.pos
+local Direction = myHero.pos
+
+function MasterYi:Menu()
+	self.Menu = MenuElement({type = MENU, id = "MasterYi", name = "MasterYi"})
+	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
+	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
+	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+	self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function MasterYi:Spells()
+	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
+	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
+end
+
+function MasterYi:__init()
+	DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function MasterYi:LoadScript()
+	self:Spells()
+	self:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() self:Tick() end)
+	Callback.Add("Draw", function() self:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+	end
+end
+
+function MasterYi:Tick()
+	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+	--PrintChat(myHero:GetSpellData(_E).name)
+	--PrintChat(myHero:GetSpellData(_R).toggleState)
+	target = GetTarget(1400)
+	--PrintChat(myHero.activeSpell.name)
+	if myHero.activeSpell.name == "MasterYiQ" then
+		_G.SDK.Orbwalker:SetMovement(false)
+		_G.SDK.Orbwalker:SetAttack(false)
+	else
+		_G.SDK.Orbwalker:SetMovement(true)
+		_G.SDK.Orbwalker:SetAttack(true)
+	end
+	self:KS()
+	self:Logic()
+	if EnemyLoaded == false then
+		local CountEnemy = 0
+		for i, enemy in pairs(EnemyHeroes) do
+			CountEnemy = CountEnemy + 1
+		end
+		if CountEnemy < 1 then
+			GetEnemyHeroes()
+		else
+			EnemyLoaded = true
+			PrintChat("Enemy Loaded")
+		end
+	end
+end
+
+function MasterYi:Draw()
+	if self.Menu.Draw.UseDraws:Value() then
+
+		--Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+		--Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
+		if target then
+			AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+			Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+		end
+	end
+end
+
+function MasterYi:KS()
+	--PrintChat("ksing")
+	for i, enemy in pairs(EnemyHeroes) do
+		if enemy and not enemy.dead and ValidTarget(enemy) then
+			local Qrange = 600
+			local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level)
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) < Qrange and enemy.health < Qdamage then
+				Control.CastSpell(HK_Q, enemy)
+			end
+		end
+	end
+end	
+
+function MasterYi:CanUse(spell, mode)
+	if mode == nil then
+		mode = Mode()
+	end
+	--PrintChat(Mode())
+	if spell == _Q then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+			return true
+		end
+		if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+			return true
+		end
+	elseif spell == _W then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+			return true
+		end
+	elseif spell == _E then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+			return true
+		end
+		if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+			return true
+		end
+	elseif spell == _R then
+		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+			return true
+		end
+		if mode == "Manual" and IsReady(spell) and self.Menu.ComboMode.UseRMan:Value() and self.Menu.ComboMode.UseRManKey:Value() then
+			return true
+		end
+	end
+	return false
+end
+
+function MasterYi:Logic()
+	if target == nil then return end
+	if Mode() == "Combo" or Mode() == "Harass" and target then
+		local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+		if GetDistance(target.pos) < AARange then
+			WasInRange = true
+		end
+		local Qrange = 600
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius then
+			if self:CanUse(_E, Mode()) then
+				Control.CastSpell(HK_E)
+			end
+			Control.CastSpell(HK_Q, target)
+		end
+	else
+		WasInRange = false
+    end		
+end
+
+function MasterYi:OnPostAttackTick(args)
+	attackedfirst = 1
+	if target then
+		local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+		if self:CanUse(_W, Mode()) and ValidTarget(target, AARange) then
+			Control.CastSpell(HK_W)
+		end
+	end
+end
+
+
+function MasterYi:GetRDmg(unit)
+	return getdmg("R", unit, myHero, stage, myHero:GetSpellData(_R).level)
+end
+
+function MasterYi:OnPreAttack(args)
+	if self:CanUse(_E, Mode()) and target then
+		Control.CastSpell(HK_E)
+	end
+end
+
+function MasterYi:UseE(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+		    	Control.CastSpell(HK_E, pred.CastPos)
+		    	LastESpot = pred.CastPos
+		end 
+end
+
+function MasterYi:UseR(unit)
+		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300  then
+		    	Control.CastSpell(HK_R, pred.CastPos)
+		end 
+end
+
 class "Lucian"
 
-local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
-local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
-local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
-local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
-local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
-local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
-local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
 local IS = {}
 local EnemyLoaded = false
 local QCastTime = Game:Timer()
@@ -712,14 +923,6 @@ end
 
 class "Zoe"
 
-local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
-local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
-local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
-local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
-local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
-local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
-local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
-local IS = {}
 local EnemyLoaded = false
 local ECastTime = Game:Timer()
 local RCastTime = Game:Timer()
@@ -966,14 +1169,6 @@ end
 
 class "Draven"
 
-local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
-local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
-local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
-local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
-local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
-local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
-local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
-local IS = {}
 local EnemyLoaded = false
 local ECastTime = Game:Timer()
 local RCastTime = Game:Timer()
@@ -1546,14 +1741,6 @@ end
 
 class "Teemo"
 
-local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
-local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
-local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
-local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
-local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
-local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
-local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
-local IS = {}
 local EnemyLoaded = false
 local ECastTime = Game:Timer()
 local RCastTime = Game:Timer()
@@ -1571,20 +1758,10 @@ function Teemo:Menu()
 	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
 	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
-	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
-	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
-	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
-	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
-	self.Menu.ComboMode:MenuElement({id = "UseRMan", name = "Use R When pressing Manual R key", value = true})
 	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
 	self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
-	self.Menu.KSMode:MenuElement({id = "UseW", name = "Use W in KS", value = true})
-	self.Menu.KSMode:MenuElement({id = "UseE", name = "Use smart E in KS", value = true})
-	self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
 	self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
 	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
-	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
-	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
 	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
 	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
@@ -1643,22 +1820,6 @@ function Teemo:Draw()
 		--Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
 		--Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
 		if target then
-		end
-	end
-end
-
-function Teemo:ManualRCast()
-	if target then
-		if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
-			self:UseR(target)
-		end
-	else
-		for i, enemy in pairs(EnemyHeroes) do
-			if enemy and not enemy.dead and ValidTarget(enemy, 550) then
-				if self:CanUse(_R, "Manual") and ValidTarget(target, 1300) then
-					self:UseR(target)
-				end
-			end
 		end
 	end
 end
@@ -1770,14 +1931,6 @@ end
 
 class "Fizz"
 
-local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
-local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
-local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
-local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
-local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
-local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
-local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
-local IS = {}
 local EnemyLoaded = false
 local ECastTime = Game:Timer()
 local RCastTime = Game:Timer()
@@ -2145,14 +2298,6 @@ end
 
 class "Quinn"
 
-local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
-local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
-local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
-local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
-local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
-local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
-local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
-local IS = {}
 local EnemyLoaded = false
 local LastDist = 0
 local ECastTime = Game:Timer()
@@ -3249,16 +3394,9 @@ end
 
 class "Pyke"
 
-local HeroIcon = "https://www.mobafire.com/images/avatars/yasuo-classic.png"
-local IgniteIcon = "http://pm1.narvii.com/5792/0ce6cda7883a814a1a1e93efa05184543982a1e4_hq.jpg"
-local QIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/e/e5/Steel_Tempest.png"
-local Q3Icon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/4/4b/Steel_Tempest_3.png"
-local WIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/6/61/Wind_Wall.png"
-local EIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/f/f8/Sweeping_Blade.png"
-local RIcon = "https://vignette.wikia.nocookie.net/leagueoflegends/images/c/c6/Last_Breath.png"
+
 local ETravel = true
 local StunCharge = false
-local IS = {}
 local QDown = false
 local EnemyLoaded = false
 local QCastTime = Game:Timer()
