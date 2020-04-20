@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 9.00
+    local Version = 10.80
     
     local Files = {
         Lua = {
@@ -599,7 +599,7 @@ function MissFortune:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEMin", name = "Min Hits To Cast E without Ult", value = 1, min = 0, max = 5, step = 1})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo When Target Low", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRMin", name = "Min Hits To Cast R", value = 1, min = 0, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseRMin", name = "Min Hits To Cast R", value = 3, min = 0, max = 5, step = 1})
     self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Use Manual R key", key = string.byte("T"), value = false})
     self.Menu.ComboMode:MenuElement({id = "StopRManKey", name = "Cancel R key", key = string.byte("R"), value = false})
     self.Menu.ComboMode:MenuElement({id = "UseQMinionCombo", name = "Q Bounce in Combo", value = true})
@@ -609,7 +609,7 @@ function MissFortune:Menu()
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
     self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = true})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
