@@ -1,11 +1,13 @@
 require "PremiumPrediction"
 require "DamageLib"
+require "2DGeometry"
+
 local EnemyHeroes = {}
 
 -- [ AutoUpdate ] --
 do
     
-    local Version = 8.00
+    local Version = 9.00
     
     local Files = {
         Lua = {
@@ -189,6 +191,7 @@ function SetMovement(bool)
 	end
 end
 
+
 function EnableMovement()
 	SetMovement(true)
 end
@@ -232,10 +235,27 @@ function Manager:__init()
 		DelayAction(function() self:LoadTeemo() end, 1.05)
 	elseif myHero.charName == "MasterYi" then
 		DelayAction(function() self:LoadMasterYi() end, 1.05)
+	elseif myHero.charName == "MissFortune" then
+		DelayAction(function() self:LoadMissFortune() end, 1.05)
 	elseif myHero.charName == "Draven" then
 		DelayAction(function() self:LoadDraven() end, 1.05)
 	end
 end
+
+
+function Manager:LoadMissFortune()
+	MissFortune:Spells()
+	MissFortune:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() MissFortune:Tick() end)
+	Callback.Add("Draw", function() MissFortune:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) MissFortune:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) MissFortune:OnPostAttackTick(...) end)
+	end
+end
+
 
 function Manager:LoadTeemo()
 	Teemo:Spells()
@@ -385,7 +405,7 @@ end
 
 function MasterYi:Spells()
 	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
-	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
+	ESpellData = {speed = 3000, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
 	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
 end
 
@@ -554,6 +574,401 @@ function MasterYi:UseR(unit)
 		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300  then
 		    	Control.CastSpell(HK_R, pred.CastPos)
 		end 
+end
+
+class "MissFortune"
+
+local IS = {}
+local EnemyLoaded = false
+local QCastTime = Game:Timer()
+local RCastTime = Game:Timer()
+local Casted = 0
+local CanQclick = true
+local attackedfirst = 0
+local WasInRange = false
+local DoubleShot = false
+local IsUlting = false
+local LastCalledTime = 0
+local Direction = myHero.pos
+
+function MissFortune:Menu()
+    self.Menu = MenuElement({type = MENU, id = "MissFortune", name = "MissFortune"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEMin", name = "Min Hits To Cast E without Ult", value = 1, min = 0, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo When Target Low", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRMin", name = "Min Hits To Cast R", value = 1, min = 0, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Use Manual R key", key = string.byte("T"), value = false})
+    self.Menu.ComboMode:MenuElement({id = "StopRManKey", name = "Cancel R key", key = string.byte("R"), value = false})
+    self.Menu.ComboMode:MenuElement({id = "UseQMinionCombo", name = "Q Bounce in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQMinionHarass", name = "Auto Q Bounce in Harras (May FPS Drop)", value = false})
+    self.Menu.ComboMode:MenuElement({id = "UseQDelay", name = "Bounce check (Higher = More FPS)", value = 0.2, min = 0.1, max = 1, step = 0.1})
+    self.Menu.ComboMode:MenuElement({id = "UseQMana", name = "Min Mana % to use Auto Q", value = 10, min = 0, max = 100, step = 1})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function MissFortune:Spells()
+    WSpellData = {speed = 1600, range = 900, delay = 0.25, radius = 40, collision = {}, type = "linear"}
+    ESpellData = {speed = 1600, range = 1000, delay = 0.25, radius = 200, collision = {}, type = "circular"}
+    RSpellData = {speed = 2800, range = 1300, delay = 0.25, angle = 40, radius = 0, collision = {}, type = "conic"}
+end
+
+function MissFortune:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function MissFortune:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+    end
+end
+
+
+function MissFortune:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(1400)
+    --PrintChat(Casted)
+    IsUlting = myHero.activeSpell.name == "MissFortuneBulletTime" 
+    if self.Menu.ComboMode.UseRManKey:Value() then
+        if target and self:CanUse(_R, "Manual") and ValidTarget(target, 1400) and GetDistance(target.pos) > 350 then
+        	--PrintChat("Should cast R")
+            self:UseR(target, 1)
+        end
+    end
+    if self.Menu.ComboMode.StopRManKey:Value() then
+        _G.SDK.Orbwalker:SetMovement(true)
+        _G.SDK.Orbwalker:SetAttack(true)
+    end
+    --PrintChat(myHero.activeSpell.name)
+    if Casted == 1 then
+    	if IsUlting then
+    		Casted = 0
+    		--PrintChat("casted = 0")
+    	end
+        _G.SDK.Orbwalker:SetMovement(false)
+        _G.SDK.Orbwalker:SetAttack(false)
+    elseif Casted == 0 and not IsUlting then
+    	self:KS()
+    	self:Logic()
+    	_G.SDK.Orbwalker:SetMovement(true)
+        _G.SDK.Orbwalker:SetAttack(true)
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+    if not IsUlting and casted == 0 and self:CanUse(_Q, Mode()) and self.Menu.ComboMode.UseQMinionCombo:Value() then
+    	local BounceTarget = nil
+    	if Mode() == "Combo" then
+    		BounceTarget = self:DelayQBounce(self.Menu.ComboMode.UseQDelay:Value())
+    	end
+    	if Mode() == "Harass" and self.Menu.ComboMode.UseQMinionHarass:Value() then
+			BounceTarget = self:DelayQBounce(self.Menu.ComboMode.UseQDelay:Value())
+		end
+        if BounceTarget then
+        	Control.CastSpell(HK_Q, BounceTarget.CastTarget)
+        end
+    end
+end
+
+function MissFortune:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 550, 1, Draw.Color(255, 0, 191, 255))
+        if target then
+        	local Direction = Vector((target.pos-myHero.pos):Normalized())
+			local EndSpot = target.pos + Direction*500
+			--Draw.Circle(EndSpot, 250, 1, Draw.Color(255, 0, 191, 255))
+			--Direction = Vector((myHero.pos-target.pos):Normalized())
+			--lhs = Vector(mousePos-myHero.pos)
+           -- dotp = lhs:DotProduct(Direction)
+           -- Location = myHero.pos + Direction * dotp
+			--Draw.Circle(Location, 250, 1, Draw.Color(255, 0, 191, 255))
+
+
+        	local BounceTarget = self:GetQBounceTarget(target)
+        	if BounceTarget then
+        		--PrintChat("Bounce Target")
+        		Draw.Circle(BounceTarget.CastTarget.pos, 50, 1, Draw.Color(255, 0, 191, 255))
+        		Draw.Circle(BounceTarget.HitTarget.pos, 50, 1, Draw.Color(255, 255, 191, 255))
+        	end
+        end
+    end
+end
+
+function MissFortune:KS()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy, 900) then
+        end
+    end
+end 
+
+function MissFortune:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.ComboMode.UseQMinion:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Manual" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+function MissFortune:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        if GetDistance(target.pos) < 500 then
+            WasInRange = true
+        end
+        if Casted == 1 then
+            if _G.SDK.Orbwalker:CanAttack() then
+                --Control.Attack(enemy)
+            end
+        end
+        if self:CanUse(_E, Mode()) and GetDistance(target.pos, myHero.pos) < 1000 then
+            self:UseE(target, self.Menu.ComboMode.UseEMin:Value())
+        end
+        if self:CanUse(_R, Mode()) and ValidTarget(target, 1400) and GetDistance(target.pos) > 350 then
+        	--PrintChat("Should cast R")
+            self:UseR(target, self.Menu.ComboMode.UseRMin:Value())
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function MissFortune:DelayQBounce(delay)
+	if Game.Timer() - LastCalledTime > delay then
+		LastCalledTime = Game.Timer()
+		--PrintChat("Delayed Q")
+		return self:GetQBounceTarget()
+	end
+end
+
+function MissFortune:GetQBounceTarget(unit)
+    --PrintChat("Getting Q minion")
+    local minions = _G.SDK.ObjectManager:GetEnemyMinions(1100)
+    local mtarget = nil
+    local mhit = nil
+    local mlocation = nil
+    local ClosestEnemyHero = nil
+    local ClosestDist = 500
+    local manaper = myHero.mana / myHero.maxMana * 100
+	--_G.PremiumPrediction:IsPointInArc(sourcePos, unitPos, endPos, range, angle)
+    if manaper > self.Menu.ComboMode.UseQMana:Value() then -- if Have enough mana
+    	for j, enemy in pairs(EnemyHeroes) do -- Check all the enemy champs first, to see if we can bounce Q off them
+    		if enemy and not enemy.dead and ValidTarget(enemy, 650) then
+				local Direction = Vector((enemy.pos-myHero.pos):Normalized()) -- get the direction from myhero to the enemy hero being checked
+				local EndSpot = enemy.pos + Direction*500 -- Get the furthest spot the Q can bounce to dead behind
+				for i = 1, #minions do -- Start by looping through all the minions to find the closest
+	                local minion = minions[i]
+	                if minion.team == 300 - myHero.team and IsValid(minion) then
+	                    if GetDistance(myHero.pos, enemy.pos) < GetDistance(minion.pos, myHero.pos) and GetDistance(minion.pos, enemy.pos) < 500 then -- If the minion is further away than the enemy champ, but within 500 range of the enemy champ
+							local Distance = self:GetDistanceToMiddle(enemy, EndSpot, minion) -- seee How far it is from the middle line of the cone
+			            	if Distance < ClosestDist then -- if it's our closest, save the distance for later, enemy heros have to be closer than this to their line.
+			            		ClosestDist = Distance
+			            	end
+	                    end
+	                end
+	            end
+         		for j, enemy2 in pairs(EnemyHeroes) do -- Now we search the enemy champions
+         			--PrintChat(enemy2.networkID)
+         			-- If the enemy we want to bounce to is within 500 range, not the enemy we are trying to bounce off, and furhter away than the target we are bouncing off
+					if enemy2 and not enemy2.dead and GetDistance(enemy2.pos, enemy.pos) < 500 and enemy.networkID ~= enemy2.networkID and GetDistance(myHero.pos, enemy.pos) < GetDistance(enemy2.pos, myHero.pos) then 
+			            --PrintChat("Yeah this check worked")
+			            local DistanceMid = self:GetDistanceToMiddle(enemy, EndSpot, enemy2) -- Get the distance to the middle of the cone
+			            --print(DistanceMid)
+			            --PrintChat("Distance")
+			            if DistanceMid < ClosestDist then -- If the distance is the closest (this includes all the minions checked) It will get hit, so save it for now and the hero.
+			            	ClosestEnemyHero = enemy2
+			            	ClosestDist = DistanceMid
+			            	--PrintChat("Found new closest")
+			            end
+					end
+				end
+             	if ClosestEnemyHero and _G.PremiumPrediction:IsPointInArc(enemy.pos, ClosestEnemyHero.pos, EndSpot, 500, 80) then -- Now we have our closest enemy hero, unless nil. If it's in the cone, save the mtarget and the enemy hero the bounce will hit
+             		--PrintChat("Set Closest")
+             		mtarget = enemy
+             		mhit = ClosestEnemyHero
+             		--PrintChat("made closest")
+             	end
+   		 	end
+		end
+		ClosestDist = 500 -- Reset the closest dist, we either didn't find one, or don't need it anyway.
+		if not mtarget then -- If we didn't find one with a bounce from a hero, look for a bounce on minions
+            for i = 1, #minions do -- Loop through all the minions to try and bounce off them
+                local minion = minions[i]
+                if minion.team == 300 - myHero.team and IsValid(minion) then
+                	--PrintChat("In Q range")
+                    if GetDistance(minion.pos, myHero.pos) < 650 then -- If in range to cast Q on
+						local Direction = Vector((minion.pos-myHero.pos):Normalized())
+						local EndSpot = minion.pos + Direction*500 -- Get the furthest spot in the cone the Q bounces from the minion
+						for k = 1, #minions do -- start checking for the closest minion to the middle again
+			                local minion2 = minions[k]
+			                if minion2.team == 300 - myHero.team and IsValid(minion2) and minion.networkID ~= minion2.networkID then -- Make sure its not the same minion we are trying to bounce off
+			                    if GetDistance(myHero.pos, minion.pos) < GetDistance(minion2.pos, myHero.pos) and GetDistance(minion2.pos, minion.pos) < 500 then -- Make sure its in the right spot again
+									local Distance = self:GetDistanceToMiddle(minion, EndSpot, minion2) -- Find the distance to the middle
+					            	if Distance < ClosestDist then -- if It's our closest, save the distance for later to check if the hero's are closer
+					            		ClosestDist = Distance
+					            	end
+			                    end
+			                end
+			            end
+	             		for j, enemy2 in pairs(EnemyHeroes) do -- Now check heors
+							if enemy2 and not enemy2.dead and GetDistance(enemy2.pos, minion.pos) < 500 then
+					            local Distance = self:GetDistanceToMiddle(minion, EndSpot, enemy2) -- Find out how close it is to the middle
+					            if Distance < ClosestDist then -- Check the distance against the closest minion, and the other champs that were deemed closest
+					            	ClosestEnemyHero = enemy2
+					            	ClosestDist = Distance
+					            end
+							end
+						end
+	                 	if ClosestEnemyHero and _G.PremiumPrediction:IsPointInArc(minion.pos, ClosestEnemyHero.pos, EndSpot, 500, 80) then -- If we found a closest hero from a minion bounce, check if its in the arc
+	                 		mtarget = minion -- Save it if it is
+	                 		mhit = ClosestEnemyHero -- Also save who it will hit, useful for draws and checking if its target
+	                 	end
+                    end
+                end
+            end
+        end
+    end
+    if ValidTarget(mtarget, 650) then -- If we found an mtarget and saved it, already checked if it was in the arc
+        return {CastTarget = mtarget, HitTarget = mhit} -- Return both the Cast target, and the Hittarget via a table. BounceQ.CastTarget BounceQ.HitTarget for example.
+    else
+    	return nil -- Didn't find anything, try again later
+    end
+end
+
+function MissFortune:GetDistanceToMiddle(startPos, endPos, checkPos)
+	--PrintChat("Getting dist to middle")
+    local Location = Vector(self:ClosestPointOnLineSegment(checkPos.pos, startPos.pos, endPos))
+    --Draw.Circle(Location, 200, 1, Draw.Color(255, 0, 191, 255))
+    --PrintChat(Location.x)
+    local Distance = self:GetDistance2d(Location, checkPos.pos)
+    --PrintChat(Distance)
+    return Distance
+end
+
+function MissFortune:GetDistance2d(p1, p2)
+    local dx = p2.x - p1.x
+    local dz = p2.z - p1.z
+    return math.sqrt(dx * dx + dz * dz)
+end
+
+function MissFortune:ClosestPointOnLineSegment(p, p1, p2)
+    local px = p.x
+    local pz = p.z
+    local ax = p1.x
+    local az = p1.z
+    local bx = p2.x
+    local bz = p2.z
+    local bxax = bx - ax
+    local bzaz = bz - az
+    local t = ((px - ax) * bxax + (pz - az) * bzaz) / (bxax * bxax + bzaz * bzaz)
+    if (t < 0) then
+        return p1, false
+    end
+    if (t > 1) then
+        return p2, false
+    end
+    return {x = ax + t * bxax, z = az + t * bzaz}, true
+end
+
+function MissFortune:GetRDmg(unit, hits)
+    local level = myHero:GetSpellData(_R).level
+    local RDmg = getdmg("R", unit, myHero, myHero:GetSpellData(_R).level)
+    if hits then
+        return RDmg * hits
+    else
+        return  RDmg * (12 + 2*level)
+    end
+end
+
+
+function MissFortune:OnPreAttack(args)
+end
+
+function MissFortune:OnPostAttackTick(args)
+    attackedfirst = 1
+    if target and Mode() == "Combo" or Mode() == "Harass" then
+    	if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) < 650 then
+        	Control.CastSpell(HK_Q, target)
+        end
+        if self:CanUse(_W, Mode()) and GetDistance(target.pos, myHero.pos) < 650 then
+        	Control.CastSpell(HK_W)
+        end
+    end
+end
+
+function MissFortune:UseE(unit, hits)
+        local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, ESpellData)
+        --PrintChat("trying E")
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1000 and pred.HitCount >= hits then
+                Control.CastSpell(HK_E, pred.CastPos)
+                --Casted = 1
+        end 
+end
+
+function MissFortune:UseR(unit, hits)
+        local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300 and (pred.HitCount >= hits or target.health < self:GetRDmg(target)*0.8) then
+        	--PrintChat("Casting R")
+        	_G.SDK.Orbwalker:SetMovement(false)
+        	_G.SDK.Orbwalker:SetAttack(false)
+            Control.CastSpell(HK_R, pred.CastPos)
+            Casted = 1
+        end 
 end
 
 class "Lucian"
