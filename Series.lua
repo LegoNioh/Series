@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 9.20
+    local Version = 9.30
     
     local Files = {
         Lua = {
@@ -397,6 +397,7 @@ local LastE2Spot = myHero.pos
 local PickingCard = false
 local attackedfirst = 0
 local WasInRange = false
+local ComboCard = "Gold"
 local LockGold = false
 local LockBlue = false
 local BuffOnStick = false
@@ -447,15 +448,20 @@ function TwistedFate:Tick()
     --PrintChat(myHero:GetSpellData(_R).toggleState)
     target = GetTarget(1400)
     --PrintChat(myHero.activeSpell.name)
-    if self.Menu.GoldKey:Value() then
+    if self.Menu.GoldKey:Value() and IsReady(_W) then
     	LockGold = true
     	LockBlue = false
+    elseif self.Menu.GoldKey:Value() then
+    	ComboCard = "Gold"
     end
     if LockGold == true and IsReady(_W) then
     	self:UseW("Gold")
     end
-    if self.Menu.BlueKey:Value() then
+    if self.Menu.BlueKey:Value() and IsReady(_W) then
     	LockBlue = true
+    	LockGold = false
+    elseif self.Menu.BlueKey:Value() then
+    	ComboCard = "Blue"
     end
     if LockBlue == true and IsReady(_W) then
     	self:UseW("Blue")
@@ -535,11 +541,11 @@ function TwistedFate:Logic()
             WasInRange = true
         end
         local Qrange = 1450
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius then
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) then
             self:UseQ(target)
         end
         if self:CanUse(_W, Mode()) and ValidTarget(target, AARange) then
-            self:UseW("Gold")
+            self:UseW(ComboCard)
         end
     else
         WasInRange = false
@@ -572,7 +578,7 @@ end
 function TwistedFate:UseW(card)
 	if card == "Gold" then
 		card = "GoldCardLock"
-	elseif card == "Blue" then
+	else
 		card = "BlueCardLock"
 	end
 	if myHero:GetSpellData(_W).name == card then
@@ -580,6 +586,7 @@ function TwistedFate:UseW(card)
 		PickingCard = false
 		LockGold = false
 		LockBlue = false
+		ComboCard = "Gold"
 	elseif myHero:GetSpellData(_W).name == "PickACard" then
 		if PickingCard == false then
 			Control.CastSpell(HK_W)
