@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 9.10
+    local Version = 9.20
     
     local Files = {
         Lua = {
@@ -237,8 +237,23 @@ function Manager:__init()
 		DelayAction(function() self:LoadMasterYi() end, 1.05)
 	elseif myHero.charName == "MissFortune" then
 		DelayAction(function() self:LoadMissFortune() end, 1.05)
+	elseif myHero.charName == "TwistedFate" then
+		DelayAction(function() self:LoadTwistedFate() end, 1.05)
 	elseif myHero.charName == "Draven" then
 		DelayAction(function() self:LoadDraven() end, 1.05)
+	end
+end
+
+function Manager:LoadTwistedFate()
+	TwistedFate:Spells()
+	TwistedFate:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() TwistedFate:Tick() end)
+	Callback.Add("Draw", function() TwistedFate:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) TwistedFate:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) TwistedFate:OnPostAttackTick(...) end)
 	end
 end
 
@@ -373,6 +388,207 @@ function Manager:LoadMasterYi()
 	end
 end
 
+class "TwistedFate"
+
+local EnemyLoaded = false
+local casted = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local PickingCard = false
+local attackedfirst = 0
+local WasInRange = false
+local LockGold = false
+local LockBlue = false
+local BuffOnStick = false
+local LastHitSpot = myHero.pos
+local Direction = myHero.pos
+
+function TwistedFate:Menu()
+    self.Menu = MenuElement({type = MENU, id = "TwistedFate", name = "TwistedFate"})
+    self.Menu:MenuElement({id = "GoldKey", name = "Gold Card Key (buffers a Gold Card)", key = string.byte("Space"), value = false})
+    self.Menu:MenuElement({id = "BlueKey", name = "Blue Card Key (buffers a Blue Card", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function TwistedFate:Spells()
+    QSpellData = {speed = 1000, range = 1450, delay = 0.25, radius = 200, collision = {}, type = "linear"}
+end
+
+function TwistedFate:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function TwistedFate:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+    end
+end
+
+function TwistedFate:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    --PrintChat(myHero:GetSpellData(_W).name)
+    --PrintChat(myHero:GetSpellData(_R).toggleState)
+    target = GetTarget(1400)
+    --PrintChat(myHero.activeSpell.name)
+    if self.Menu.GoldKey:Value() then
+    	LockGold = true
+    	LockBlue = false
+    end
+    if LockGold == true and IsReady(_W) then
+    	self:UseW("Gold")
+    end
+    if self.Menu.BlueKey:Value() then
+    	LockBlue = true
+    end
+    if LockBlue == true and IsReady(_W) then
+    	self:UseW("Blue")
+    end
+    self:KS()
+    self:Logic()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function TwistedFate:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+
+        --Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+        --Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
+        if target then
+            AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+        end
+    end
+end
+
+function TwistedFate:KS()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+            local Qrange = 600
+            local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level)
+            if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) < Qrange and enemy.health < Qdamage then
+                self:UseQ(enemy)
+            end
+        end
+    end
+end 
+
+function TwistedFate:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+function TwistedFate:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local Qrange = 1450
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius then
+            self:UseQ(target)
+        end
+        if self:CanUse(_W, Mode()) and ValidTarget(target, AARange) then
+            self:UseW("Gold")
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function TwistedFate:OnPostAttackTick(args)
+    attackedfirst = 1
+    if target then
+    end
+end
+
+
+function TwistedFate:GetRDmg(unit)
+    return getdmg("R", unit, myHero, stage, myHero:GetSpellData(_R).level)
+end
+
+function TwistedFate:OnPreAttack(args)
+    if self:CanUse(_E, Mode()) and target then
+    end
+end
+
+function TwistedFate:UseQ(unit)
+        local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+                Control.CastSpell(HK_Q, pred.CastPos)
+        end 
+end
+
+function TwistedFate:UseW(card)
+	if card == "Gold" then
+		card = "GoldCardLock"
+	elseif card == "Blue" then
+		card = "BlueCardLock"
+	end
+	if myHero:GetSpellData(_W).name == card then
+		Control.CastSpell(HK_W)
+		PickingCard = false
+		LockGold = false
+		LockBlue = false
+	elseif myHero:GetSpellData(_W).name == "PickACard" then
+		if PickingCard == false then
+			Control.CastSpell(HK_W)
+			PickingCard = true
+		end
+	else
+		PickingCard = false
+	end
+end
 
 class "MasterYi"
 
