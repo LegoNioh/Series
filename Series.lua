@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 12.00
+    local Version = 13.00
     
     local Files = {
         Lua = {
@@ -802,7 +802,7 @@ function Riven:UseQ3(unit)
 			local Direction2 = Vector((myHero.pos-unit.pos):Normalized())
 			local MoveSpot = myHero.pos - Direction2*400
 			Control.RightClick(mousePos:To2D())
-			if CheckQSpot(unit) then
+			if CheckQSpot(unit) and not self.Menu.ComboMode.UseQFast:Value()  then
 				if self:CanUse(_W, Mode()) and Q == 1 then
 	            	Control.CastSpell(HK_W)
 	            	DelayAction(function() Control.CastSpell(HK_Q, EndSpot) end, 0.05)
@@ -853,7 +853,7 @@ function Riven:UseQ(unit)
 			local Direction2 = Vector((myHero.pos-unit.pos):Normalized())
 			local MoveSpot = myHero.pos - Direction2*400
 			Control.RightClick(mousePos:To2D())
-			if CheckQSpot(unit) then
+			if CheckQSpot(unit) and not self.Menu.ComboMode.UseQFast:Value() then
 				if self:CanUse(_W, Mode()) and Q == 1 then
 	            	Control.CastSpell(HK_W)
 	            	DelayAction(function() Control.CastSpell(HK_Q, EndSpot) end, 0.05)
