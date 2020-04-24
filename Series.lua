@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 14.00
+    local Version = 15.00
     
     local Files = {
         Lua = {
@@ -652,12 +652,18 @@ function Riven:GetInRange(unit)
 				local Damages = self:GetDamages(unit, 1)
 				--PrintChat(Damages.Totaldmg)
 				if Damages.Totaldmg > unit.health then
+					if R == 1 and self:CanUse(_R, Mode()) then
+						Control.CastSpell(HK_R)
+        			end
 					Control.CastSpell(HK_E, unit.pos)
 				end 
 			elseif Q < 4 and GetDistance(unit.pos, myHero.pos) < 790 then
 				local Damages = self:GetDamages(unit, 2)
 				--PrintChat("Casting Close E")
 				if Damages.Totaldmg > unit.health then
+					if R == 1 and self:CanUse(_R, Mode()) then
+						Control.CastSpell(HK_R)
+        			end
 					Control.CastSpell(HK_E, unit.pos)
 				end 
 			end
