@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 15.00
+    local Version = 20.00
     
     local Files = {
         Lua = {
@@ -407,6 +407,7 @@ class "Riven"
 
 local EnemyLoaded = false
 local casted = 0
+local LastCalledTime = 0
 local LastESpot = myHero.pos
 local LastE2Spot = myHero.pos
 local PickingCard = false
@@ -425,8 +426,8 @@ local Direction = myHero.pos
 
 function Riven:Menu()
     self.Menu = MenuElement({type = MENU, id = "Riven", name = "Riven"})
-    self.Menu:MenuElement({id = "GoldKey", name = "Gold Card Key (buffers a Gold Card)", key = string.byte("Space"), value = false})
-    self.Menu:MenuElement({id = "BlueKey", name = "Blue Card Key (buffers a Blue Card", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ToggleFightKey", name = "Toggle Fighting", key = string.byte("A"), value = false, toggle = true})
+    self.Menu:MenuElement({id = "FleeKey", name = "Disengage Key", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQFast", name = "Use Fast Q Mode", value = true})
@@ -436,15 +437,20 @@ function Riven:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "GapUseQ", name = "Use Q To Gap Close with damage calcs", value = true})
     self.Menu.ComboMode:MenuElement({id = "GapUseE", name = "Use E To Gap Close with damage calcs", value = true})
-    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
-    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use R in Harass", value = false})
-    self.Menu:MenuElement({id = "KS", name = "Killsteal", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in KS", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Harass", value = false})
+
+    self.Menu:MenuElement({id = "FleeMode", name = "Flee", type = MENU})
+    self.Menu.FleeMode:MenuElement({id = "UseQ", name = "Use Q to Flee", value = true})
+    self.Menu.FleeMode:MenuElement({id = "UseE", name = "Use E to Flee", value = true})
+
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
@@ -477,7 +483,9 @@ function Riven:Tick()
     --PrintChat(myHero:GetSpellData(_Q).ammo)
     --PrintChat(myHero:GetSpellData(_R).name)
     target = GetTarget(1400)
-    --PrintChat(myHero.attackData.state)
+    if myHero.pathing.isDashing then
+    	--PrintChat("Dashing")
+    end
     --self:KS()
     if myHero:GetSpellData(_R).name == "RivenFengShuiEngine" then
     	R = 1
@@ -485,10 +493,10 @@ function Riven:Tick()
     	R = 2
     end
     Q = myHero:GetSpellData(_Q).ammo+1
-    if Q == 1 or not target or GetDistance(target.pos, myHero.pos) > _G.SDK.Data:GetAutoAttackRange(myHero) then
+    if Q == 1 or not target or GetDistance(target.pos, myHero.pos) > _G.SDK.Data:GetAutoAttackRange(myHero) or not self.Menu.ToggleFightKey:Value() or self.Menu.FleeKey:Value() then
     	_G.SDK.Orbwalker:SetMovement(true)
     elseif target then
-    	if self.Menu.ComboMode.UseQFast:Value() then 
+    	if self.Menu.ComboMode.UseQFast:Value() and self.Menu.ComboMode.UseQ:Value() and self.Menu.ToggleFightKey:Value() and not self.Menu.FleeKey:Value() then 
     		_G.SDK.Orbwalker:SetMovement(false)
     	end
     	if myHero.attackData.state == 3 then
@@ -505,7 +513,11 @@ function Riven:Tick()
     	local Damages = self:GetDamages(target, 3)
     	--PrintChat(Damages.Totaldmg)
     end
-    self:Logic()
+    if self.Menu.FleeKey:Value() then
+    	self:Escape()
+    elseif self.Menu.ToggleFightKey:Value() then
+   		self:Logic()
+   	end
     if EnemyLoaded == false then
         local CountEnemy = 0
         for i, enemy in pairs(EnemyHeroes) do
@@ -538,6 +550,12 @@ function Riven:Draw()
 				Draw.Circle(spot, 150, 1, Draw.Color(255, 0, 191, 255))
 			end
         end
+        if not self.Menu.ToggleFightKey:Value() then
+        	--DrawText(i, 48, object.pos:ToScreen(), DrawColor(255, 0, 255, 0))
+        	--Draw.Text("Fighting Off", 18, myHero.pos:ToScreen(), Draw.Color(255, 255, 0, 0))
+        	Draw.Text("Fighting Off", 18, 370, 40, Draw.Color(255, 255, 0, 0))
+        	Draw.Text("Fighting Off", 18, myHero.pos:ToScreen().x-40, myHero.pos:ToScreen().y-110, Draw.Color(255, 255, 0, 0))
+        end
     end
 end
 
@@ -559,6 +577,9 @@ function Riven:CanUse(spell, mode)
             return true
         end
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
             return true
         end
         if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
@@ -588,10 +609,30 @@ function Riven:CanUse(spell, mode)
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
             return true
         end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseE:Value() then
+            return true
+        end
     end
     return false
 end
 
+
+function Riven:DelayEscapeClick(delay)
+	if Game.Timer() - LastCalledTime > delay then
+		LastCalledTime = Game.Timer()
+		Control.RightClick(mousePos:To2D())
+	end
+end
+
+function Riven:Escape()
+	self:DelayEscapeClick(0.10)
+	if self:CanUse(_E, "Flee") then
+		Control.CastSpell(HK_E, mousePos)
+	end
+	if self:CanUse(_Q, "Flee") and not myHero.pathing.isDashing then
+		Control.CastSpell(HK_Q)
+	end
+end
 
 function Riven:Logic()
     if target == nil then return end
@@ -604,11 +645,15 @@ function Riven:Logic()
         local QRange = 270
         local Q3Range = 270
         local WRange = 250
-        local ERange = 250
+        local ERange = 250 + AARange
         if self:CanUse(_Q, Mode()) then
-        	ERange = 250 + 250
+        	ERange = 250 + 270
         end
        -- PrintChat(Q)
+        local Damages = self:GetDamages(target, 3)
+        if Damages.Rdmg > target.health and self:CanUse(_R, Mode()) and R == 2 and GetDistance(target.pos, myHero.pos) < 900 then
+        	self:UseR(target)
+        end
         if Q < 4 and self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and attacked == 1 then
         	if R == 1 and self:CanUse(_R, Mode()) and self:CanKill(target) and not self:CanUse(_E, Mode()) and not self:CanUse(_W, Mode()) then
 				Control.CastSpell(HK_R)
@@ -624,16 +669,20 @@ function Riven:Logic()
         	end
             Control.CastSpell(HK_W)
         end
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and Q == 1 and (not self:CanUse(_Q, Mode()) or GetDistance(target.pos, myHero.pos) > 270) then
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and (Q == 1 or GetDistance(target.pos, myHero.pos) > 270) and (not self:CanUse(_Q, Mode()) or GetDistance(target.pos, myHero.pos) > 270) then
         	if R == 1 and self:CanUse(_R, Mode()) and self:CanKill(target) then
 				Control.CastSpell(HK_R)
         	end
             Control.CastSpell(HK_E, target)
+            if self:CanUse(_W, Mode()) then
+            	Control.CastSpell(HK_W)
+            end
         end
-        local Damages = self:GetDamages(target, 3)
         --PrintChat(Damages.Rdmg)
-        if Damages.Rdmg > target.health and self:CanUse(_R, Mode()) and R == 2 and GetDistance(target.pos, myHero.pos) < 900 and (GetDistance(target.pos, myHero.pos) > AARange or myHero.attackData.state == 3)then
-        	self:UseR(target)
+        if not self:CanUse(_E, Mode()) and not self:CanUse(_W, Mode()) and not self:CanUse(_Q, Mode()) and self:CanUse(_R, Mode()) then
+        	if GetDistance(target.pos, myHero.pos) < 800 and Damages.Rdmg > target.health and (GetDistance(target.pos, myHero.pos) > AARange or myHero.attackData.state == 3) then
+        		Control.CastSpell(HK_R)
+        	end
         end
     else
         WasInRange = false
@@ -667,7 +716,7 @@ function Riven:GetInRange(unit)
 					Control.CastSpell(HK_E, unit.pos)
 				end 
 			end
-		elseif self:CanUse(_Q, Mode()) and self.Menu.ComboMode.GapUseQ:Value() then
+		elseif self:CanUse(_Q, Mode()) and self.Menu.ComboMode.GapUseQ:Value() and not myHero.pathing.isDashing then
 			if Q == 1 and GetDistance(unit.pos, myHero.pos) < 810 then
 				local Damages = self:GetDamages(unit, 1)
 				if Damages.Totaldmg > unit.health then
@@ -742,42 +791,35 @@ function Riven:GetDamages(unit, MaxQ)
 	elseif PassiveStage == 6 then
 		Pdmg = myHero.totalDamage * 0.50
 	end
-    local Rdmg = 0
-    local Qdmg = 0
-    local Wdmg = 0
+    local Rdmg = getdmg("R", unit, myHero, 1, myHero:GetSpellData(_R).level)
+    local Qdmg = getdmg("Q", unit, myHero, 1, myHero:GetSpellData(_Q).level)
+    local Wdmg = getdmg("W", unit, myHero, 1, myHero:GetSpellData(_W).level)
     local AAdmg = getdmg("AA", unit, myHero) 
+    local totalDamage = 0
     if self:CanUse(_Q, Mode()) then
-    	if Q > 0 then
-    		Qdmg = getdmg("Q", unit, myHero, 1, myHero:GetSpellData(_Q).level)
-    	end
     	if Q == 1 and MaxQ == 3 then
-    		Qdmg = (Qdmg+AAdmg+Pdmg) * 3
+    		totalDamage = totalDamage + (Qdmg + AAdmg + Pdmg) * 3
     	elseif Q < 4 and MaxQ > 1 then
-    		Qdmg = (Qdmg+AAdmg+Pdmg) * 2
+    		totalDamage = totalDamage + (Qdmg + AAdmg + Pdmg) * 2
+    	elseif MaxQ == 1 then
+    	    totalDamage = totalDamage + (Qdmg + AAdmg + Pdmg)
     	end
     end 
     if self:CanUse(_W, Mode()) then
-    	Wdmg = getdmg("W", unit, myHero, 1, myHero:GetSpellData(_W).level) + Pdmg + AAdmg
+    	totalDamage = totalDamage + Wdmg + AAdmg + Pdmg
     end 
-    local totalDamage = Qdmg+Wdmg+Rdmg
+    
     if self:CanUse(_R, Mode()) then
-    	local percenthp = (unit.health / unit.maxHealth)*100
-    	if percenthp < 25 then
-    		percenthp = 25
-    	end
-    	Rdmg = getdmg("R", unit, myHero, 1, myHero:GetSpellData(_R).level)
-    	Rdmg = Rdmg + Rdmg*(0.026*(100-percenthp))
-    	totalDamage = Qdmg + Wdmg + Rdmg
-    	totalDamage = totalDamage + totalDamage*0.2
-    else
-    	totalDamage = Qdmg + Wdmg + Rdmg
+    	totalDamage = totalDamage * 1.2 + Rdmg
     end
     local Damages = {Qdmg = Qdmg, Wdmg = Wdmg, Rdmg =Rdmg, AAdmg = AAdmg, Totaldmg = totalDamage}
+    --PrintChat(totalDamage)
     return Damages
 end
 
 function Riven:CanKill(unit)
 	local Damages = self:GetDamages(unit, 3)
+	--PrintChat(Damages.Totaldmg)
 	return Damages.Totaldmg > unit.health
 end
 
