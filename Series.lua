@@ -7,7 +7,7 @@ local EnemyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 9.30
+    local Version = 12.00
     
     local Files = {
         Lua = {
@@ -229,6 +229,8 @@ function Manager:__init()
 		DelayAction(function() self:LoadQuinn() end, 1.05)
 	elseif myHero.charName == "Fizz" then
 		DelayAction(function() self:LoadFizz() end, 1.05)
+	elseif myHero.charName == "Riven" then
+		DelayAction(function() self:LoadRiven() end, 1.05)
 	elseif myHero.charName == "Zoe" then
 		DelayAction(function() self:LoadZoe() end, 1.05)
 	elseif myHero.charName == "Teemo" then
@@ -362,6 +364,19 @@ function Manager:LoadFizz()
 	end
 end
 
+function Manager:LoadRiven()
+	Riven:Spells()
+	Riven:Menu()
+	--
+	--GetEnemyHeroes()
+	Callback.Add("Tick", function() Riven:Tick() end)
+	Callback.Add("Draw", function() Riven:Draw() end)
+	if _G.SDK then
+		_G.SDK.Orbwalker:OnPreAttack(function(...) Riven:OnPreAttack(...) end)
+		_G.SDK.Orbwalker:OnPostAttackTick(function(...) Riven:OnPostAttackTick(...) end)
+	end
+end
+
 function Manager:LoadQuinn()
 	Quinn:Spells()
 	Quinn:Menu()
@@ -386,6 +401,497 @@ function Manager:LoadMasterYi()
 		_G.SDK.Orbwalker:OnPreAttack(function(...) MasterYi:OnPreAttack(...) end)
 		_G.SDK.Orbwalker:OnPostAttackTick(function(...) MasterYi:OnPostAttackTick(...) end)
 	end
+end
+
+class "Riven"
+
+local EnemyLoaded = false
+local casted = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local PickingCard = false
+local attackedfirst = 0
+local Q = 1
+local R = 1
+local WasInRange = false
+local ComboCard = "Gold"
+local LockGold = false
+local LockBlue = false
+local OneTick
+local BuffOnStick = false
+local attacked = 0
+local LastHitSpot = myHero.pos
+local Direction = myHero.pos
+
+function Riven:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Riven", name = "Riven"})
+    self.Menu:MenuElement({id = "GoldKey", name = "Gold Card Key (buffers a Gold Card)", key = string.byte("Space"), value = false})
+    self.Menu:MenuElement({id = "BlueKey", name = "Blue Card Key (buffers a Blue Card", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQFast", name = "Use Fast Q Mode", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQHop", name = "Hop over targets with Q", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "GapUseQ", name = "Use Q To Gap Close with damage calcs", value = true})
+    self.Menu.ComboMode:MenuElement({id = "GapUseE", name = "Use E To Gap Close with damage calcs", value = true})
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use R in Harass", value = false})
+    self.Menu:MenuElement({id = "KS", name = "Killsteal", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in KS", value = false})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Riven:Spells()
+    QSpellData = {speed = 1000, range = 500, delay = 0.25, radius = 150, collision = {}, type = "circular"}
+    RSpellData = {speed = 1600, range = 900, delay = 0.25, angle = 75, radius = 0, collision = {}, type = "conic"}
+end
+
+function Riven:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Riven:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+    end
+end
+
+function Riven:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    --PrintChat(myHero:GetSpellData(_Q).ammo)
+    --PrintChat(myHero:GetSpellData(_R).name)
+    target = GetTarget(1400)
+    --PrintChat(myHero.attackData.state)
+    --self:KS()
+    if myHero:GetSpellData(_R).name == "RivenFengShuiEngine" then
+    	R = 1
+    else
+    	R = 2
+    end
+    Q = myHero:GetSpellData(_Q).ammo+1
+    if Q == 1 or not target or GetDistance(target.pos, myHero.pos) > _G.SDK.Data:GetAutoAttackRange(myHero) then
+    	_G.SDK.Orbwalker:SetMovement(true)
+    elseif target then
+    	if self.Menu.ComboMode.UseQFast:Value() then 
+    		_G.SDK.Orbwalker:SetMovement(false)
+    	end
+    	if myHero.attackData.state == 3 then
+    		if OneTick then
+    			attackedfirst = 1
+    			attacked = 1
+    			OneTick = false
+    		end
+    	else
+    		OneTick = true
+    	end
+    end
+    if target then
+    	local Damages = self:GetDamages(target, 3)
+    	--PrintChat(Damages.Totaldmg)
+    end
+    self:Logic()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Riven:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+
+        --Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
+        --Draw.Circle(LastE2Spot, 85, 1, Draw.Color(255, 255, 0, 255))
+        --Draw.Circle(cursorPos, 85, 1, Draw.Color(255, 255, 0, 255))
+        --Draw.Circle(mousePos, 185, 1, Draw.Color(255, 0, 0, 255))
+        if target then
+            AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+            Draw.Circle(myHero.pos, 270, 1, Draw.Color(255, 0, 191, 255))
+            local NextSpot = GetUnitPositionNext(myHero)
+			local spot = myHero.pos
+			if NextSpot then
+				local Direction = Vector((myHero.pos-NextSpot):Normalized())
+				spot = myHero.pos - Direction*270
+				Draw.Circle(spot, 150, 1, Draw.Color(255, 0, 191, 255))
+			end
+        end
+    end
+end
+
+function Riven:KS()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Riven:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+function Riven:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+    	self:GetInRange(target)
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local QRange = 270
+        local Q3Range = 270
+        local WRange = 250
+        local ERange = 250
+        if self:CanUse(_Q, Mode()) then
+        	ERange = 250 + 250
+        end
+       -- PrintChat(Q)
+        if Q < 4 and self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and attacked == 1 then
+        	if R == 1 and self:CanUse(_R, Mode()) and self:CanKill(target) and not self:CanUse(_E, Mode()) and not self:CanUse(_W, Mode()) then
+				Control.CastSpell(HK_R)
+        	end
+            self:UseQ(target)
+        end
+        if Q == 4 and self:CanUse(_Q, Mode()) and ValidTarget(target, Q3Range) and attacked == 1 then
+            self:UseQ3(target)
+        end
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and Q == 1 and not self:CanUse(_Q, Mode()) and attacked == 1 then
+        	if R == 1 and self:CanUse(_R, Mode()) and self:CanKill(target) and not self:CanUse(_E, Mode()) then
+				Control.CastSpell(HK_R)
+        	end
+            Control.CastSpell(HK_W)
+        end
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and Q == 1 and (not self:CanUse(_Q, Mode()) or GetDistance(target.pos, myHero.pos) > 270) then
+        	if R == 1 and self:CanUse(_R, Mode()) and self:CanKill(target) then
+				Control.CastSpell(HK_R)
+        	end
+            Control.CastSpell(HK_E, target)
+        end
+        local Damages = self:GetDamages(target, 3)
+        --PrintChat(Damages.Rdmg)
+        if Damages.Rdmg > target.health and self:CanUse(_R, Mode()) and R == 2 and GetDistance(target.pos, myHero.pos) < 900 and (GetDistance(target.pos, myHero.pos) > AARange or myHero.attackData.state == 3)then
+        	self:UseR(target)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function Riven:GetInRange(unit)
+	--PrintChat("Getting in range")
+	local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+	if unit and GetDistance(unit.pos, myHero.pos) > AARange then
+		--PrintChat("Got unit")
+		if self:CanUse(_E, Mode()) and self:CanUse(_Q, Mode()) and self.Menu.ComboMode.GapUseE:Value() then
+			--PrintChat("Can use E")
+			if Q == 1 and GetDistance(unit.pos, myHero.pos) < 1060 then
+				--PrintChat("Checking damage for E")
+				local Damages = self:GetDamages(unit, 1)
+				--PrintChat(Damages.Totaldmg)
+				if Damages.Totaldmg > unit.health then
+					Control.CastSpell(HK_E, unit.pos)
+				end 
+			elseif Q < 4 and GetDistance(unit.pos, myHero.pos) < 790 then
+				local Damages = self:GetDamages(unit, 2)
+				--PrintChat("Casting Close E")
+				if Damages.Totaldmg > unit.health then
+					Control.CastSpell(HK_E, unit.pos)
+				end 
+			end
+		elseif self:CanUse(_Q, Mode()) and self.Menu.ComboMode.GapUseQ:Value() then
+			if Q == 1 and GetDistance(unit.pos, myHero.pos) < 810 then
+				local Damages = self:GetDamages(unit, 1)
+				if Damages.Totaldmg > unit.health then
+					Control.CastSpell(HK_Q, unit.pos)
+				end 
+			elseif Q < 4 and GetDistance(unit.pos, myHero.pos) < 540 then
+				local Damages = self:GetDamages(unit, 2)
+				if Damages.Totaldmg > unit.health then
+					Control.CastSpell(HK_Q, unit.pos)
+				end 
+			end
+		end
+	end
+
+end
+
+function Riven:UseR(unit)
+        local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 900 then
+            Control.CastSpell(HK_R, pred.CastPos)
+        end 
+end
+
+function Riven:PredQSpot(unit)
+        local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, QSpellData)
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) then
+            return pred.CastPos
+        end 
+end
+
+function CheckQSpot(unit)
+	local NextSpot = GetUnitPositionNext(myHero)
+	local spot = myHero.pos
+	if NextSpot then
+		local Direction = Vector((myHero.pos-NextSpot):Normalized())
+		spot = myHero.pos - Direction*270
+	end
+	if GetDistance(spot, unit.pos) < 150 then
+		return true
+	end
+	return false
+end
+
+function Riven:OnPostAttackTick(args)
+    if target then
+    	local Damages = self:GetDamages(target, 3)
+    	if (not self:CanUse(_Q, Mode()) or Damages.Rdmg > target.health) and self:CanUse(_R, Mode()) and R == 2 and GetDistance(target.pos, myHero.pos) < 900 then
+        	--self:UseR(target)
+        end
+    end
+	if target and attacked == 0 and self.Menu.ComboMode.UseQFast:Value() then
+		--PrintChat("Clicking")
+		Control.RightClick(mousePos:To2D())
+	end
+	--PrintChat("Attacked = 1")
+    attackedfirst = 1
+    attacked = 1
+end
+
+
+function Riven:GetDamages(unit, MaxQ)
+	local Pdmg = myHero.totalDamage * 0.25
+	local PassiveStage = myHero.levelData.lvl / 3
+	if PassiveStage == 2 then
+		Pdmg = myHero.totalDamage * 0.30
+	elseif PassiveStage == 3 then
+		Pdmg = myHero.totalDamage * 0.35
+	elseif PassiveStage == 4 then
+		Pdmg = myHero.totalDamage * 0.40
+	elseif PassiveStage == 5 then
+		Pdmg = myHero.totalDamage * 0.45
+	elseif PassiveStage == 6 then
+		Pdmg = myHero.totalDamage * 0.50
+	end
+    local Rdmg = 0
+    local Qdmg = 0
+    local Wdmg = 0
+    local AAdmg = getdmg("AA", unit, myHero) 
+    if self:CanUse(_Q, Mode()) then
+    	if Q > 0 then
+    		Qdmg = getdmg("Q", unit, myHero, 1, myHero:GetSpellData(_Q).level)
+    	end
+    	if Q == 1 and MaxQ == 3 then
+    		Qdmg = (Qdmg+AAdmg+Pdmg) * 3
+    	elseif Q < 4 and MaxQ > 1 then
+    		Qdmg = (Qdmg+AAdmg+Pdmg) * 2
+    	end
+    end 
+    if self:CanUse(_W, Mode()) then
+    	Wdmg = getdmg("W", unit, myHero, 1, myHero:GetSpellData(_W).level) + Pdmg + AAdmg
+    end 
+    local totalDamage = Qdmg+Wdmg+Rdmg
+    if self:CanUse(_R, Mode()) then
+    	local percenthp = (unit.health / unit.maxHealth)*100
+    	if percenthp < 25 then
+    		percenthp = 25
+    	end
+    	Rdmg = getdmg("R", unit, myHero, 1, myHero:GetSpellData(_R).level)
+    	Rdmg = Rdmg + Rdmg*(0.026*(100-percenthp))
+    	totalDamage = Qdmg + Wdmg + Rdmg
+    	totalDamage = totalDamage + totalDamage*0.2
+    else
+    	totalDamage = Qdmg + Wdmg + Rdmg
+    end
+    local Damages = {Qdmg = Qdmg, Wdmg = Wdmg, Rdmg =Rdmg, AAdmg = AAdmg, Totaldmg = totalDamage}
+    return Damages
+end
+
+function Riven:CanKill(unit)
+	local Damages = self:GetDamages(unit, 3)
+	return Damages.Totaldmg > unit.health
+end
+
+function Riven:OnPreAttack(args)
+    if self:CanUse(_E, Mode()) and target then
+    end
+end
+
+function Riven:UseQ3(unit)
+	if self.Menu.ComboMode.UseQHop:Value() then
+			--PrintChat("Check Q 3")
+		    local Direction = Vector((unit.pos-myHero.pos):Normalized())
+			local EndSpot = unit.pos + Direction*400
+			local Direction2 = Vector((myHero.pos-unit.pos):Normalized())
+			local MoveSpot = myHero.pos - Direction2*400
+			Control.RightClick(MoveSpot:To2D())
+			if CheckQSpot(unit) then
+	        	Control.CastSpell(HK_Q, EndSpot)
+	        	--PrintChat("Cast Q 3")
+	        	attacked = 0
+	       	else
+		        Control.CastSpell(HK_Q, unit)
+		        attacked = 0
+	        end
+    else
+    	 local Direction = Vector((unit.pos-myHero.pos):Normalized())
+			local EndSpot = unit.pos + Direction*400
+			local Direction2 = Vector((myHero.pos-unit.pos):Normalized())
+			local MoveSpot = myHero.pos - Direction2*400
+			Control.RightClick(mousePos:To2D())
+			if CheckQSpot(unit) then
+				if self:CanUse(_W, Mode()) and Q == 1 then
+	            	Control.CastSpell(HK_W)
+	            	DelayAction(function() Control.CastSpell(HK_Q, EndSpot) end, 0.05)
+	            else
+	        		Control.CastSpell(HK_Q, EndSpot)
+	        	end
+	        	--PrintChat("Cast Q 1 or 2")
+	        	attacked = 0
+	    	elseif self:CanUse(_W, Mode()) and Q == 1 then
+	            Control.CastSpell(HK_W)
+	            DelayAction(function() Control.CastSpell(HK_Q, unit) end, 0.05)
+	        else
+	        	Control.CastSpell(HK_Q, unit)
+	        end
+	        attacked = 0
+   	end
+end
+
+function Riven:UseQ(unit)
+		--PrintChat("Check Q 1 or 2")
+		if self.Menu.ComboMode.UseQHop:Value() then
+			local Direction = Vector((unit.pos-myHero.pos):Normalized())
+			local EndSpot = unit.pos + Direction*400
+			local Direction2 = Vector((myHero.pos-unit.pos):Normalized())
+			local MoveSpot = myHero.pos - Direction2*400
+			Control.RightClick(MoveSpot:To2D())
+			if CheckQSpot(unit) then
+				if self:CanUse(_W, Mode()) and Q == 1 then
+	            	Control.CastSpell(HK_W)
+	            	DelayAction(function() Control.CastSpell(HK_Q, EndSpot) end, 0.05)
+	            else
+	        		Control.CastSpell(HK_Q, EndSpot)
+	        	end
+	        	--PrintChat("Cast Q 1 or 2")
+	        	attacked = 0
+	        else
+		        if self:CanUse(_W, Mode()) and Q == 1 then
+		            Control.CastSpell(HK_W)
+		            DelayAction(function() Control.CastSpell(HK_Q, unit) end, 0.05)
+		        else
+		        	Control.CastSpell(HK_Q, unit)
+		        end
+		        attacked = 0
+	        end
+	    else
+	        local Direction = Vector((unit.pos-myHero.pos):Normalized())
+			local EndSpot = unit.pos + Direction*400
+			local Direction2 = Vector((myHero.pos-unit.pos):Normalized())
+			local MoveSpot = myHero.pos - Direction2*400
+			Control.RightClick(mousePos:To2D())
+			if CheckQSpot(unit) then
+				if self:CanUse(_W, Mode()) and Q == 1 then
+	            	Control.CastSpell(HK_W)
+	            	DelayAction(function() Control.CastSpell(HK_Q, EndSpot) end, 0.05)
+	            else
+	        		Control.CastSpell(HK_Q, EndSpot)
+	        	end
+	        	--PrintChat("Cast Q 1 or 2")
+	        	attacked = 0
+	    	elseif self:CanUse(_W, Mode()) and Q == 1 then
+	            Control.CastSpell(HK_W)
+	            DelayAction(function() Control.CastSpell(HK_Q, unit) end, 0.05)
+	        else
+	        	Control.CastSpell(HK_Q, unit)
+	        end
+	        attacked = 0
+       	end
+end
+
+function Riven:UseW(card)
+    if card == "Gold" then
+        card = "GoldCardLock"
+    else
+        card = "BlueCardLock"
+    end
+    if myHero:GetSpellData(_W).name == card then
+        Control.CastSpell(HK_W)
+        PickingCard = false
+        LockGold = false
+        LockBlue = false
+        ComboCard = "Gold"
+    elseif myHero:GetSpellData(_W).name == "PickACard" then
+        if PickingCard == false then
+            Control.CastSpell(HK_W)
+            PickingCard = true
+        end
+    else
+        PickingCard = false
+    end
 end
 
 class "TwistedFate"
