@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1.00
+    local Version = 3.00
     
     local Files = {
         Lua = {
@@ -343,7 +343,7 @@ function Jayce:Tick()
     self:GetCDs()
     --PrintChat(Q2CD)
     self:KS()
-    if self.Menu.QE:Value() then 
+    if self.Menu.QE:Value() and Weapon == "Gun" then 
     	self:QECombo()
     end
     if self.Menu.Insec:Value() then
@@ -516,8 +516,12 @@ function Jayce:Logic()
             WasInRange = true
         end
         if Weapon == "Hammer" then
+            local MeUnderTurret = IsUnderEnemyTurret(myHero.pos)
+            local TargetUnderTurret = IsUnderEnemyTurret(target.pos)
             if self:CanUse(_Q, Mode(), Weapon) and ValidTarget(target, 600) and not myHero.pathing.isDashing then
-                Control.CastSpell(HK_Q, target)
+                if not TargetUnderTurret or MeUnderTurret then
+                    Control.CastSpell(HK_Q, target)
+                end
             end
             if self:CanUse(_W, Mode(), Weapon) and ValidTarget(target, 285) then
                 Control.CastSpell(HK_W)
@@ -561,8 +565,9 @@ function Jayce:Logic()
             if self:CanUse(_E, Mode(), Weapon) and ValidTarget(target, 1470) and self:CanUse(_Q, Mode(), Weapon) then
             	self:UseQ2(target)
             end
-
-            if self:CanUse(_R, Mode(), Weapon) then
+            local MeUnderTurret = IsUnderEnemyTurret(myHero.pos)
+            local TargetUnderTurret = IsUnderEnemyTurret(target.pos)
+            if self:CanUse(_R, Mode(), Weapon) and (not TargetUnderTurret or MeUnderTurret) then
                 if GetDistance(target.pos, myHero.pos) < 125 then
                     if self:CanUse(_W, Mode(), Weapon) then
                         Control.CastSpell(HK_W)
@@ -601,12 +606,13 @@ function Jayce:QECombo()
         	local MouseDist = GetDistance(enemy.pos, mousePos)
         	if MouseDist < SmallDist then
         		QETarget = enemy
+                PrintChat("Got QETarget")
         	end
         end
     end
     if QETarget and  Weapon == "Gun" and IsReady(_Q) and IsReady(_E) and ValidTarget(QETarget, 1470) and self.Menu.AimQE:Value() then
     	self:UseQ2Man(QETarget)
-    else
+    elseif IsReady(_Q) and IsReady(_E) then
     	local Espot = Vector(myHero.pos):Extended(mousePos, 100)
         DelayAction(function() Control.CastSpell(HK_Q, mousePos) end, 0.05)
         Control.CastSpell(HK_E, Espot)
@@ -646,7 +652,7 @@ function Jayce:Insec(target)
     	else
     		if Q1CD < Game.Timer() and E1CD < Game.Timer() then
 	    		local TargetDist = GetDistance(InsecTarget.pos, myHero.pos)
-	    		local Espot = Vector(myHero.pos):Extended(InsecTarget.pos, TargetDist-200)
+	    		local Espot = Vector(myHero.pos):Extended(InsecTarget.pos, TargetDist-150)
 	    		if IsReady(_E) then
 	        		Control.CastSpell(HK_E, Espot)
 	        	end
