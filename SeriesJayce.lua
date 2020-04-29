@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 8.00
+    local Version = 10.00
     
     local Files = {
         Lua = {
@@ -483,7 +483,7 @@ function Viktor:Logic()
             Control.CastSpell(HK_R, target)
             --LastDirect = Game.Timer() + 1
         end
-        if self:CanUse(_R, Mode()) and ValidTarget(target) and Edown == false and not CastingQ and not CastingW and not CastingR and myHero:GetSpellData(_R).name == "ViktorChaosStormGuide" and myHero.attackData.state == 3 then
+        if self:CanUse(_R, Mode()) and ValidTarget(target) and Edown == false and not CastingQ and not CastingW and not CastingR and myHero:GetSpellData(_R).name == "ViktorChaosStormGuide" and (myHero.attackData.state == 3 or GetDistance(target) > AARange) then
             self:DirectR(target.pos)
         end
     else
