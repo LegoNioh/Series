@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 6.00
+    local Version = 7.00
     
     local Files = {
         Lua = {
@@ -272,6 +272,7 @@ local LastCalledTime = 0
 local LastESpot = myHero.pos
 local LastE2Spot = myHero.pos
 local PickingCard = false
+local TargetAttacking = false
 local attackedfirst = 0
 local CastingQ = false
 local LastDirect = 0
@@ -454,7 +455,12 @@ function Viktor:Logic()
         local WRange = 800
         local RRange = 700
         local TargetNextSpot = GetUnitPositionNext(target)
-        local TargetAttacking = GetDistance(myHero.pos, target.pos) > GetDistance(myHero.pos, TargetNextSpot)
+        if TargetNextSpot then
+            TargetAttacking = GetDistance(myHero.pos, target.pos) > GetDistance(myHero.pos, TargetNextSpot)
+        else
+            TargetAttacking = false
+        end
+
         if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and Edown == false and not CastingQ and not CastingW then
             if target.isDashing and TargetAttacking and self.Menu.ComboMode.UseEDef:Value() then
                 Control.CastSpell(HK_W, myHero)
@@ -527,19 +533,19 @@ function Viktor:UseW(unit, hits, attacking)
     local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
     --PrintChat("trying E")
     if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
-            if attacking == true then
-                local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
-                local Wspot = pred.CastPos - Direction*100
-                Control.CastSpell(HK_W, Wspot)
+        if attacking == true then
+            local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
+            local Wspot = pred.CastPos - Direction*100
+            Control.CastSpell(HK_W, Wspot)
+        else
+            local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
+            local Wspot = pred.CastPos + Direction*100
+            if GetDistance(myHero.pos, Wspot) > 800 then
+                Control.CastSpell(HK_W, pred.CastPos)
             else
-                local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
-                local Wspot = pred.CastPos + Direction*100
-                if GetDistance(myHero.pos, Wspot) > 800 then
-                    Control.CastSpell(HK_W, pred.CastPos)
-                else
-                    Control.CastSpell(HK_W, Wspot)
-                end
+                Control.CastSpell(HK_W, Wspot)
             end
+        end
             --Casted = 1
     end 
 end
