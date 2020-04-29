@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 3.00
+    local Version = 5.00
     
     local Files = {
         Lua = {
@@ -232,6 +232,8 @@ class "Manager"
 function Manager:__init()
     if myHero.charName == "Jayce" then
         DelayAction(function() self:LoadJayce() end, 1.05)
+    elseif myHero.charName == "Viktor" then
+        DelayAction(function() self:LoadViktor() end, 1.05)
     end
 end
 
@@ -249,6 +251,326 @@ function Manager:LoadJayce()
     end
 end
 
+function Manager:LoadViktor()
+    Viktor:Spells()
+    Viktor:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Viktor:Tick() end)
+    Callback.Add("Draw", function() Viktor:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Viktor:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Viktor:OnPostAttackTick(...) end)
+    end
+end
+
+class "Viktor"
+
+local EnemyLoaded = false
+local casted = 0
+local LastCalledTime = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local PickingCard = false
+local attackedfirst = 0
+local CastingQ = false
+local LastDirect = 0
+local CastingW = false
+local CastingR = false
+local ReturnMouse = mousePos
+local Q = 1
+local Edown = false
+local R = 1
+local WasInRange = false
+local OneTick
+local attacked = 0
+
+function Viktor:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Viktor", name = "Viktor"})
+    self.Menu:MenuElement({id = "FleeKey", name = "Disengage Key", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEDef", name = "Use Defensive E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEAtt", name = "Use Offensive E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEAttHits", name = "Min enemies for Offensive E", value = 1, min = 1, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Harass", value = false})
+
+    self.Menu:MenuElement({id = "FleeMode", name = "Flee", type = MENU})
+    self.Menu.FleeMode:MenuElement({id = "UseQ", name = "Use Q to Flee", value = true})
+    self.Menu.FleeMode:MenuElement({id = "UseE", name = "Use E to Flee", value = true})
+
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Viktor:Spells()
+    ESpellData = {speed = 1350, range = 500, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+    WSpellData = {speed = 3000, range = 800, delay = 0.5, radius = 300, collision = {}, type = "circular"}
+    RSpellData = {speed = 3000, range = 700, delay = 0.25, radius = 300, collision = {}, type = "circular"}
+end
+
+function Viktor:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Viktor:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+    end
+end
+
+function Viktor:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(1400)
+    CastingQ = myHero.activeSpell.name == "ViktorPowerTransfer"
+    CastingW = myHero.activeSpell.name == "ViktorGravitonField"
+    CastingR = myHero.activeSpell.name == "ViktorChaosStorm"
+    --PrintChat(myHero.activeSpell.name)
+    --PrintChat(myHero:GetSpellData(_R).name)
+    self:Logic()
+    if not IsReady(_E) then
+        Edown = false
+    end
+    if Edown == true then
+        _G.SDK.Orbwalker:SetMovement(false)
+    else
+        _G.SDK.Orbwalker:SetMovement(true)
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Viktor:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 300, 1, Draw.Color(255, 0, 191, 255))
+        if target then
+        end
+    end
+end
+
+function Viktor:KS()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Viktor:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+function Viktor:DelayEscapeClick(delay)
+    if Game.Timer() - LastCalledTime > delay then
+        LastCalledTime = Game.Timer()
+        Control.RightClick(mousePos:To2D())
+    end
+end
+
+
+function Viktor:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local ERange = 1025
+        local QRange = 600
+        local WRange = 800
+        local RRange = 700
+        local TargetNextSpot = GetUnitPositionNext(target)
+        local TargetAttacking = GetDistance(myHero.pos, target.pos) > GetDistance(myHero.pos, TargetNextSpot)
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and Edown == false and not CastingQ and not CastingW then
+            if target.isDashing and TargetAttacking and self.Menu.ComboMode.UseEDef:Value() then
+                Control.CastSpell(HK_W, myHero)
+            elseif GetDistance(myHero.pos, target.pos) < 300 and self.Menu.ComboMode.UseEDef:Value() then
+                Control.CastSpell(HK_W, myHero)
+            elseif self.Menu.ComboMode.UseEAtt:Value() then
+                self:UseW(target, self.Menu.ComboMode.UseEAttHits:Value(), TargetAttacking)
+            end
+        end
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingR then
+            self:UseE(target)
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and Edown == false and not CastingQ and not CastingW and not CastingR then
+            Control.CastSpell(HK_Q, target)
+        end
+        local RDmg = getdmg("R", target, myHero, 1, myHero:GetSpellData(_R).level)
+        local RDmgTick = getdmg("R", target, myHero, 2, myHero:GetSpellData(_R).level)
+        local RDmgTotal = RDmg + RDmgTick*2
+        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange) and Edown == false and not CastingQ and not CastingW and not CastingR and target.health < RDmgTotal and myHero:GetSpellData(_R).name == "ViktorChaosStorm"then
+            Control.CastSpell(HK_R, target)
+            --LastDirect = Game.Timer() + 1
+        end
+        if self:CanUse(_R, Mode()) and ValidTarget(target) and Edown == false and not CastingQ and not CastingW and not CastingR and myHero:GetSpellData(_R).name == "ViktorChaosStormGuide" and myHero.attackData.state == 3 then
+            self:DirectR(target.pos)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function Viktor:DirectR(spot)
+    if LastDirect - Game.Timer() < 0 then
+        Control.CastSpell(HK_R, target)
+        LastDirect = Game.Timer() + 1
+    end
+end
+
+function Viktor:UseE2(ECastPos, unit, pred)
+            if Control.IsKeyDown(HK_E) then
+                Control.SetCursorPos(pred.CastPos)
+                Control.KeyUp(HK_E)
+                DelayAction(function() Control.SetCursorPos(ReturnMouse) end, 0.01)
+                DelayAction(function() Edown = false end, 0.50)   
+            end
+end
+
+function Viktor:OnPostAttackTick(args)
+    if target then
+    end
+    attackedfirst = 1
+    attacked = 1
+end
+
+function Viktor:OnPreAttack(args)
+    if self:CanUse(_E, Mode()) and target then
+    end
+end
+
+
+function Viktor:UseR1(unit, hits)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
+    --PrintChat("trying E")
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 701 and pred.HitCount >= hits then
+            Control.CastSpell(HK_R, pred.CastPos)
+            --Casted = 1
+    end 
+end
+
+function Viktor:UseW(unit, hits, attacking)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
+    --PrintChat("trying E")
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
+            if attacking == true then
+                local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
+                local Wspot = pred.CastPos - Direction*100
+                Control.CastSpell(HK_W, Wspot)
+            else
+                local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
+                local Wspot = pred.CastPos + Direction*100
+                if GetDistance(myHero, Wspot) > 800 then
+                    Control.CastSpell(HK_W, pred.CastPos)
+                else
+                    Control.CastSpell(HK_W, Wspot)
+                end
+            end
+            --Casted = 1
+    end 
+end
+
+function Viktor:UseE(unit)
+    if GetDistance(unit.pos, myHero.pos) < 1025 then
+        --PrintChat("Using E")
+        local Direction = Vector((myHero.pos-unit.pos):Normalized())
+        local Espot = myHero.pos - Direction*480
+        if GetDistance(myHero.pos, unit.pos) < 480 then
+            Espot = unit.pos
+        end
+        --Control.SetCursorPos(Espot)
+        --Control.CastSpell(HK_E, unit)
+        local pred = _G.PremiumPrediction:GetPrediction(Espot, unit, ESpellData)
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and Espot:DistanceTo(pred.CastPos) < 501 then
+            if Control.IsKeyDown(HK_E) and Edown == true then
+                --_G.SDK.Orbwalker:SetMovement(false)
+                --PrintChat("E down")
+                self:UseE2(Espot, unit, pred)
+            elseif Edown == false then
+                --_G.SDK.Orbwalker:SetMovement(true)
+                ReturnMouse = mousePos
+                --PrintChat("Pressing E")
+                Control.SetCursorPos(Espot)
+                Control.KeyDown(HK_E)
+                Edown = true
+            end
+        end
+    end
+end
 
 class "Jayce"
 
@@ -573,12 +895,12 @@ function Jayce:Logic()
                         Control.CastSpell(HK_W)
                     end
                     Control.CastSpell(HK_R)
-                elseif GetDistance(target.pos, myHero.pos) < 240 and (Q1CD < Game.Timer() or W1CD < Game.Timer() or E1CD < Game.Timer() or Wbuff) then
+                elseif GetDistance(target.pos, myHero.pos) < 240 and (Q1CD < Game.Timer() or W1CD < Game.Timer() or E1CD < Game.Timer() or Wbuff) and myHero.mana > 80 then
                     if self:CanUse(_W, Mode(), Weapon) then
                         Control.CastSpell(HK_W)
                     end
                     Control.CastSpell(HK_R)
-                elseif GetDistance(target.pos, myHero.pos) < 600 and Q1CD < Game.Timer() and (W1CD < Game.Timer() or E1CD < Game.Timer() or Wbuff) and not self:CanUse(_Q, Mode(), Weapon) then
+                elseif GetDistance(target.pos, myHero.pos) < 600 and Q1CD < Game.Timer() and (W1CD < Game.Timer() or E1CD < Game.Timer() or Wbuff) and not self:CanUse(_Q, Mode(), Weapon) and myHero.mana > 80 then
                     if self:CanUse(_W, Mode(), Weapon) then
                         Control.CastSpell(HK_W)
                     end
