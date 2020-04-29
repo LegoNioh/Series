@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 5.00
+    local Version = 6.00
     
     local Files = {
         Lua = {
@@ -534,7 +534,7 @@ function Viktor:UseW(unit, hits, attacking)
             else
                 local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
                 local Wspot = pred.CastPos + Direction*100
-                if GetDistance(myHero, Wspot) > 800 then
+                if GetDistance(myHero.pos, Wspot) > 800 then
                     Control.CastSpell(HK_W, pred.CastPos)
                 else
                     Control.CastSpell(HK_W, Wspot)
