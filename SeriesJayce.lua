@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 7.00
+    local Version = 8.00
     
     local Files = {
         Lua = {
@@ -560,7 +560,7 @@ function Viktor:UseE(unit)
         end
         --Control.SetCursorPos(Espot)
         --Control.CastSpell(HK_E, unit)
-        local pred = _G.PremiumPrediction:GetPrediction(Espot, unit, ESpellData)
+        local pred = _G.PremiumPrediction:GetAOEPrediction(Espot, unit, ESpellData)
         if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and Espot:DistanceTo(pred.CastPos) < 501 then
             if Control.IsKeyDown(HK_E) and Edown == true then
                 --_G.SDK.Orbwalker:SetMovement(false)
