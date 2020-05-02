@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 3.00
+    local Version = 4.00
     
     local Files = {
         Lua = {
@@ -1367,14 +1367,14 @@ end
 
 function Neeko:UseE(unit, hits)
     local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, ESpellData)
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1001 and pred.HitCount >= hits then
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1001 and pred.HitCount >= hits then
         Control.CastSpell(HK_E, pred.CastPos)
     end 
 end
 
 function Neeko:UseQ(unit, hits)
     local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, QSpellData)
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
         Control.CastSpell(HK_Q, pred.CastPos)
     end 
 end
