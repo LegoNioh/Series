@@ -7,18 +7,18 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 20.00
+    local Version = 1.00
     
     local Files = {
         Lua = {
             Path = SCRIPT_PATH,
             Name = "SeriesJayce.lua",
-            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesJayce.lua"
+            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesV2.lua"
         },
         Version = {
             Path = SCRIPT_PATH,
             Name = "Series.version",
-            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesJayce.version"    -- check if Raw Adress correct pls.. after you have create the version file on Github
+            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesV2.version"    -- check if Raw Adress correct pls.. after you have create the version file on Github
         }
     }
     
@@ -44,12 +44,6 @@ do
             print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
-            print("Version Changes: Added Lucian Auto Q On Minions") 
-            print("Version Changes: Added Fizz")
-            print("Version Changes: Added Fizz Last Hit") 
-            print("Version Changes: Fixed FPS drops on Lucian Auto Q")
-            print("Version Changes: Added Quinn")
-            print("Version Changes: Lots of Quinn changes...")  
         end
     
     end
@@ -154,7 +148,7 @@ end
 
 function GetTarget(range)
     if _G.SDK then
-        return _G.SDK.TargetSelector:GetTarget(range, _G.SDK.DAMAGE_TYPE_PHYSICAL);
+        return _G.SDK.TargetSelector:GetTarget(range, _G.SDK.DAMAGE_TYPE_MAGICAL);
     else
         return _G.GOS:GetTarget(range,"AD")
     end
@@ -234,6 +228,10 @@ function Manager:__init()
         DelayAction(function() self:LoadJayce() end, 1.05)
     elseif myHero.charName == "Viktor" then
         DelayAction(function() self:LoadViktor() end, 1.05)
+    elseif myHero.charName == "Velkoz" then
+        DelayAction(function() self:LoadVelkoz() end, 1.05)
+    elseif myHero.charName == "Orianna" then
+        DelayAction(function() self:LoadOrianna() end, 1.05)
     end
 end
 
@@ -251,6 +249,32 @@ function Manager:LoadJayce()
     end
 end
 
+function Manager:LoadVelkoz()
+    Velkoz:Spells()
+    Velkoz:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Velkoz:Tick() end)
+    Callback.Add("Draw", function() Velkoz:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Velkoz:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Velkoz:OnPostAttackTick(...) end)
+    end
+end
+
+function Manager:LoadOrianna()
+    Orianna:Spells()
+    Orianna:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Orianna:Tick() end)
+    Callback.Add("Draw", function() Orianna:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Orianna:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Orianna:OnPostAttackTick(...) end)
+    end
+end
+
 function Manager:LoadViktor()
     Viktor:Spells()
     Viktor:Menu()
@@ -261,6 +285,873 @@ function Manager:LoadViktor()
     if _G.SDK then
         _G.SDK.Orbwalker:OnPreAttack(function(...) Viktor:OnPreAttack(...) end)
         _G.SDK.Orbwalker:OnPostAttackTick(function(...) Viktor:OnPostAttackTick(...) end)
+    end
+end
+
+
+class "Orianna"
+
+local EnemyLoaded = false
+local Whits = 0
+local Rhits = 0
+local AllyLoaded = false
+
+local GotBall = "None"
+local BallUnit = myHero
+local Ball = nil
+local arrived = true
+local CurrentSpot = myHero.pos
+local LastSpot = myHero.pos
+local StartSpot = myHero.pos
+
+local CastedQ = false
+local TickQ = false
+local CastedE = false
+local TickE = false
+local CastTime = 0
+
+local attackedfirst = 0
+local WasInRange = false
+
+function Orianna:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Orianna", name = "Orianna"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWmin", name = "Number of Targets(W)", value = 1, min = 1, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRmin", name = "Number of Targets(R)", value = 2, min = 1, max = 5, step = 1})
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu.KSMode:MenuElement({id = "UseW", name = "Use W in KS", value = true})
+    self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseWmin", name = "Number of Targets(W)", value = 1, min = 1, max = 5, step = 1})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseRmin", name = "Number of Targets(R)", value = 3, min = 1, max = 5, step = 1})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Auto Use Q", value = false})
+    self.Menu.AutoMode:MenuElement({id = "UseW", name = "Auto Use W", value = false})
+    self.Menu.AutoMode:MenuElement({id = "UseWmin", name = "Number of Targets(W)", value = 1, min = 1, max = 5, step = 1})
+    self.Menu.AutoMode:MenuElement({id = "UseE", name = "Auto Use E", value = false})
+    self.Menu.AutoMode:MenuElement({id = "UseR", name = "Auto Use R", value = false})
+    self.Menu.AutoMode:MenuElement({id = "UseRmin", name = "Number of Targets(R)", value = 3, min = 1, max = 5, step = 1})
+    self.Menu:MenuElement({id = "FarmMode", name = "Farm", type = MENU})
+    self.Menu.FarmMode:MenuElement({id = "UseQ", name = "Use Q to farm", value = false})
+    self.Menu.FarmMode:MenuElement({id = "UseW", name = "Use W to farm", value = false})
+    self.Menu.FarmMode:MenuElement({id = "UseWmin", name = "Number of Targets(W)", value = 2, min = 1, max = 10, step = 1})
+    self.Menu.FarmMode:MenuElement({id = "UseE", name = "Use E to farm", value = false})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Orianna:Spells()
+    QSpellData = {speed = 1400, range = 2000, delay = 0.10, radius = 100, collision = {}, type = "linear"}
+end
+
+function Orianna:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Orianna:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+    end
+end
+
+function Orianna:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    --PrintChat(myHero:GetSpellData(_W).name)
+    --PrintChat(myHero:GetSpellData(_R).toggleState)
+    target = GetTarget(1400)
+    --PrintChat(myHero.activeSpell.name)
+    --PrintChat(GotBall)
+    self:ProcessSpells()
+    if TickQ or TickE then
+        Ball = self:ScanForBall()
+        TickQ = false
+        TickE = false
+    end
+    --self:KS()
+    self:TrackBall()
+    if Mode() == "LaneClear" then
+        self:LaneClear()
+    else
+        self:Logic()
+        self:Auto()
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+    if AllyLoaded == false then
+        local CountAlly = 0
+        for i, ally in pairs(AllyHeroes) do
+            CountAlly = CountAlly + 1
+        end
+        if CountAlly < 1 then
+            GetAllyHeroes()
+        else
+            AllyLoaded = true
+            PrintChat("Ally Loaded")
+        end
+    end
+end
+
+function Orianna:LaneClear()
+    local FarmWhits = 0
+    --PrintChat("Farming")
+    if self:CanUse(_Q, "Farm") or self:CanUse(_W, "Farm") or self:CanUse(_E, "Farm") then
+        local Minions = _G.SDK.ObjectManager:GetEnemyMinions(850)
+        for i = 1, #Minions do
+            local minion = Minions[i]
+            local Qrange = 825
+            if CurrentSpot and arrived then
+                --PrintChat("Current farm spot")
+                local Qdamage = getdmg("Q", minion, myHero)
+                if self:CanUse(_Q, "Farm") and ValidTarget(minion, Qrange) then
+                    --PrintChat("Casting Q farm")
+                    self:UseQ(minion, 1)
+                end
+                if GetDistance(minion.pos, CurrentSpot) < 250 then
+                    FarmWhits = FarmWhits + 1
+                    local Wdamage = getdmg("W", minion, myHero)
+                    if self:CanUse(_W, "Farm") then
+                        if FarmWhits >= self.Menu.FarmMode.UseWmin:Value() then
+                            Control.CastSpell(HK_W)
+                        end
+                    end
+                end
+                if self:CanUse(_E, "Farm") then
+                    if GotBall == "Q" then
+                        local Direction = Vector((CurrentSpot-myHero.pos):Normalized())
+                        local EDist = GetDistance(minion.pos, CurrentSpot)
+                        ESpot = CurrentSpot - Direction * EDist
+                        if GetDistance(ESpot, minion.pos) < 100 then
+                            Control.CastSpell(HK_E, myHero)
+                        end                    
+                    end 
+                end
+            end
+        end
+    end
+end
+
+function Orianna:ProcessSpells()
+    if myHero:GetSpellData(_Q).currentCd == 0 then
+        CastedQ = false
+    else
+        if CastedQ == false then
+            --GotBall = "QCast"
+            TickQ = true
+        end
+        CastedQ = true
+    end
+    if myHero:GetSpellData(_E).currentCd == 0 then
+        CastedE = false
+    else
+        if CastedE == false then
+            --GotBall = "ECast"
+            TickE = true
+        end
+        CastedE = true
+    end
+end
+
+function Orianna:ScanForBall()
+    local count = Game.MissileCount()
+    for i = count, 1, -1 do
+        local missile = Game.Missile(i)
+        local data = missile.missileData
+        if data and data.owner == myHero.handle then
+            if data.name == "OrianaIzuna" then
+                CastTime = Game.Timer()
+                GotBall = "Q"
+                return missile
+            end
+            if data.name == "OrianaRedact" then
+                --PrintChat("Found E")
+                if data.target then
+                    --PrintChat(data.target)
+                    --PrintChat(myHero.handle)
+                    for i, ally in pairs(AllyHeroes) do
+                        if ally and not ally.dead then
+                            if ally.handle == data.target then
+                                --PrintChat(ally.charName)
+                                BallUnit = ally
+                                GotBall = "Etarget"
+                                CastTime = Game.Timer()
+                                return missile
+                            end
+                        end
+                    end
+                end
+                CastTime = Game.Timer()
+                --GotBall = "E"
+                return missile
+            end
+        end
+    end
+end
+
+function Orianna:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+
+        Draw.Circle(myHero.pos, 100, 1, Draw.Color(255, 0, 0, 255))
+        if Ball and (Ball.missileData.name == "OrianaIzuna" or Ball.missileData.name == "OrianaRedact") then
+            Draw.Circle(Vector(Ball.missileData.placementPos), 100, 1, Draw.Color(255, 0, 191, 255))
+        end
+        if LastSpot and StartSpot then
+            if GotBall == "Q" then
+                Draw.Circle(LastSpot, 200, 1, Draw.Color(255, 0, 191, 255))
+                Draw.Circle(StartSpot, 200, 1, Draw.Color(255, 0, 191, 255))
+            elseif GotBall == "Etarget" then
+                Draw.Circle(StartSpot, 200, 1, Draw.Color(255, 0, 191, 255))
+                Draw.Circle(BallUnit.pos, 200, 1, Draw.Color(255, 0, 191, 255))
+            end     
+        end
+        if CurrentSpot then
+            Draw.Circle(CurrentSpot, 100, 1, Draw.Color(255, 255, 0, 100))
+        end
+        if target then
+            AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+        end
+    end
+end
+
+function Orianna:TrackBall()
+    if Ball and (Ball.missileData.name == "OrianaIzuna" or Ball.missileData.name == "OrianaRedact") then
+        --PrintChat(Ball.missileData.speed)
+        LastSpot = Vector(Ball.missileData.endPos)
+        StartSpot = Vector(Ball.missileData.startPos)
+    end
+    if LastSpot and StartSpot then
+        --PrintChat("Last spot and start spot")
+        if GotBall == "Q" then
+            local TimeGone = Game.Timer() - CastTime
+            local Traveldist = 1400*TimeGone
+            local Direction = Vector((StartSpot-LastSpot):Normalized())
+            CurrentSpot = StartSpot - Direction * Traveldist
+            if GetDistance(StartSpot, LastSpot) < Traveldist then
+                arrived = true
+                CurrentSpot = LastSpot
+                Traveldist = GetDistance(StartSpot, LastSpot) + 100
+            else
+                arrived = false
+            end
+        elseif GotBall == "Etarget" then
+            --PrintChat("Got Etarget")
+            local TimeGone = Game.Timer() - CastTime
+            local Traveldist = 1850*TimeGone
+            local Direction = Vector((StartSpot-BallUnit.pos):Normalized())
+            CurrentSpot = StartSpot - Direction * Traveldist
+            if GetDistance(StartSpot, BallUnit.pos) < Traveldist then
+                arrived = true
+                CurrentSpot = BallUnit.pos
+                Traveldist = GetDistance(StartSpot, BallUnit.pos) + 100
+            else
+                arrived = false
+            end
+        elseif GotBall == "None" then
+            --PrintChat("none")
+            CurrentSpot = myHero.pos
+        end
+        if (GetDistance(CurrentSpot, myHero.pos) > 1250 or GetDistance(CurrentSpot, myHero.pos) < 100) and GotBall == "Q" and arrived == true then
+            --PrintChat("Returning Q")
+            CurrentSpot = myHero.pos
+            GotBall = "Return"
+        elseif GetDistance(CurrentSpot, myHero.pos) > 1350 and (GotBall == "Etarget" or GotBall == "E") and arrived == true then
+            --PrintChat("Returning E")
+            --PrintChat(GetDistance(CurrentSpot, myHero.pos))
+            CurrentSpot = myHero.pos
+            BallUnit = nil
+            GotBall = "Return"
+        end
+        if GotBall == "Return" then
+            CurrentSpot = myHero.pos
+        end   
+    end
+end 
+
+function Orianna:KS()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+            local Qrange = 600
+            local Qdamage = getdmg("Q", enemy, myHero, myHero:GetSpellData(_Q).level)
+            if CurrentSpot and arrived then
+                if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, CurrentSpot) < Qrange and enemy.health < Qdamage then
+                    self:UseQ(enemy)
+                end
+            end
+        end
+    end
+end 
+
+function Orianna:Auto()
+    Whits = 0
+    Rhits = 0
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+            local Qrange = 825
+            if CurrentSpot and arrived then
+                local what = nil
+                local Qdamage = getdmg("Q", enemy, myHero)
+                if self:CanUse(_Q, "KS") and ValidTarget(enemy, Qrange) and Qdamage > enemy.health then
+                    self:UseQ(enemy, 1)
+                end
+                if self:CanUse(_Q, "Auto") and ValidTarget(enemy, Qrange) then
+                    self:UseQ(enemy, 1)
+                end
+                if GetDistance(enemy.pos, CurrentSpot) < 250 then
+                    Whits = Whits + 1
+                    local Wdamage = getdmg("W", enemy, myHero)
+                    if self:CanUse(_W, "Auto") then
+                        if Whits >= self.Menu.AutoMode.UseWmin:Value() then
+                            Control.CastSpell(HK_W)
+                        end
+                    end
+                    if self:CanUse(_W, "KS") then
+                        if enemy.health < Wdamage then
+                            Control.CastSpell(HK_W)
+                        end
+                    end
+                end
+                if GetDistance(enemy.pos, CurrentSpot) < 325 then
+                    Rhits = Rhits + 1
+                    local Rdamage = getdmg("R", enemy, myHero)
+                    if self:CanUse(_R, "Auto") then
+                        if Rhits >= self.Menu.AutoMode.UseRmin:Value() then
+                            Control.CastSpell(HK_R)
+                        end
+                    end
+                    if self:CanUse(_R, "KS") then
+                        if enemy.health < Rdamage then
+                            Control.CastSpell(HK_R)
+                        end
+                    end
+                end
+                if self:CanUse(_E, "Auto") then
+                    if GotBall == "Q" then
+                        local Direction = Vector((CurrentSpot-myHero.pos):Normalized())
+                        local EDist = GetDistance(enemy.pos, CurrentSpot)
+                        ESpot = CurrentSpot - Direction * EDist
+                        if GetDistance(ESpot, enemy.pos) < 100 then
+                            Control.CastSpell(HK_E, myHero)
+                        end                    
+                    end 
+                end
+            end
+        end
+    end
+
+end
+
+function Orianna:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Farm" and IsReady(spell) and self.Menu.FarmMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseW:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseW:Value() then
+            return true
+        end
+        if mode == "Farm" and IsReady(spell) and self.Menu.FarmMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "Farm" and IsReady(spell) and self.Menu.FarmMode.UseE:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+function Orianna:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local Qrange = 825
+        if CurrentSpot and arrived then
+            if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) then
+                self:UseQ(target, 1)
+            end
+            if self:CanUse(_W, Mode()) and GetDistance(target.pos, CurrentSpot) < 250 then
+                if Mode() == "Combo" and Whits >= self.Menu.ComboMode.UseWmin:Value() then
+                    Control.CastSpell(HK_W)
+                elseif Mode() == "Harass" and Whits >= self.Menu.HarassMode.UseWmin:Value() then
+                    Control.CastSpell(HK_W)
+                end
+            end
+            if self:CanUse(_R, Mode()) and GetDistance(target.pos, CurrentSpot) < 325 then
+                if Mode() == "Combo" and Rhits >= self.Menu.ComboMode.UseRmin:Value() then
+                    Control.CastSpell(HK_R)
+                elseif Mode() == "Harass" and Rhits >= self.Menu.HarassMode.UseRmin:Value() then
+                    Control.CastSpell(HK_R)
+                end
+            end
+            if self:CanUse(_E, Mode()) then
+                if GotBall == "Q" then
+                    local Direction = Vector((CurrentSpot-myHero.pos):Normalized())
+                    local EDist = GetDistance(target.pos, CurrentSpot)
+                    ESpot = CurrentSpot - Direction * EDist
+                    if GetDistance(ESpot, target.pos) < 100 then
+                        Control.CastSpell(HK_E, myHero)
+                    end                    
+                end 
+            end
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function Orianna:OnPostAttackTick(args)
+    attackedfirst = 1
+    if target then
+    end
+end
+
+
+function Orianna:GetRDmg(unit)
+    return getdmg("R", unit, myHero, stage, myHero:GetSpellData(_R).level)
+end
+
+function Orianna:OnPreAttack(args)
+    if self:CanUse(_E, Mode()) and target then
+    end
+end
+
+function Orianna:UseQ(unit, hits)
+    if arrived and CurrentSpot then
+        if self:CanUse(_E, Mode()) then
+            local ErouteDist = GetDistance(myHero.pos, unit.pos) + GetDistance(myHero.pos, CurrentSpot) * 0.75
+            if GetDistance(CurrentSpot, unit.pos) > ErouteDist then
+                Control.CastSpell(HK_E, myHero)
+            else
+                pred = _G.PremiumPrediction:GetAOEPrediction(CurrentSpot, unit, QSpellData)
+                if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 825 and pred.HitCount >= hits then
+                    Control.CastSpell(HK_Q, pred.CastPos)
+                end            
+            end
+        else
+            pred = _G.PremiumPrediction:GetAOEPrediction(CurrentSpot, unit, QSpellData)
+            if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 825 and pred.HitCount >= hits then
+                    Control.CastSpell(HK_Q, pred.CastPos)
+            end
+        end
+    end
+end
+
+function Orianna:UseW(card)
+    if card == "Gold" then
+        card = "GoldCardLock"
+    else
+        card = "BlueCardLock"
+    end
+    if myHero:GetSpellData(_W).name == card then
+        Control.CastSpell(HK_W)
+        PickingCard = false
+        LockGold = false
+        LockBlue = false
+        ComboCard = "Gold"
+    elseif myHero:GetSpellData(_W).name == "PickACard" then
+        if PickingCard == false then
+            Control.CastSpell(HK_W)
+            PickingCard = true
+        end
+    else
+        PickingCard = false
+    end
+end
+
+
+class "Velkoz"
+
+local EnemyLoaded = false
+local casted = 0
+local LastCalledTime = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local PickingCard = false
+local TargetAttacking = false
+local attackedfirst = 0
+local CastingQ = false
+local LastDirect = 0
+local CastingW = false
+local CastingR = false
+local ReturnMouse = mousePos
+local Q = 1
+local Edown = false
+local R = 1
+local WasInRange = false
+local OneTick
+local attacked = 0
+
+function Velkoz:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Velkoz", name = "Velkoz"})
+    self.Menu:MenuElement({id = "FleeKey", name = "Disengage Key", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEDef", name = "Use Defensive E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEAtt", name = "Use Offensive E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEAttHits", name = "Min enemies for Offensive E", value = 1, min = 1, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Harass", value = false})
+
+    self.Menu:MenuElement({id = "FleeMode", name = "Flee", type = MENU})
+    self.Menu.FleeMode:MenuElement({id = "UseQ", name = "Use Q to Flee", value = true})
+    self.Menu.FleeMode:MenuElement({id = "UseE", name = "Use E to Flee", value = true})
+
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Velkoz:Spells()
+    ESpellData = {speed = 1350, range = 500, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+    WSpellData = {speed = 3000, range = 800, delay = 0.5, radius = 300, collision = {}, type = "circular"}
+    RSpellData = {speed = 3000, range = 700, delay = 0.25, radius = 300, collision = {}, type = "circular"}
+end
+
+function Velkoz:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Velkoz:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+    end
+end
+
+function Velkoz:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(1400)
+    CastingQ = myHero.activeSpell.name == "VelkozPowerTransfer"
+    CastingW = myHero.activeSpell.name == "VelkozGravitonField"
+    CastingR = myHero.activeSpell.name == "VelkozChaosStorm"
+    --PrintChat(myHero.activeSpell.name)
+    --PrintChat(myHero:GetSpellData(_R).name)
+    if Mode() == "LaneClear" then
+
+    else
+        self:Logic()
+    end
+    if not IsReady(_E) then
+        Edown = false
+    end
+    if Edown == true then
+        _G.SDK.Orbwalker:SetMovement(false)
+    else
+        _G.SDK.Orbwalker:SetMovement(true)
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Velkoz:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 300, 1, Draw.Color(255, 0, 191, 255))
+        if target then
+        end
+    end
+end
+
+function Velkoz:KS()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Velkoz:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+function Velkoz:DelayEscapeClick(delay)
+    if Game.Timer() - LastCalledTime > delay then
+        LastCalledTime = Game.Timer()
+        Control.RightClick(mousePos:To2D())
+    end
+end
+
+
+function Velkoz:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local ERange = 1025
+        local QRange = 600
+        local WRange = 800
+        local RRange = 700
+        local TargetNextSpot = GetUnitPositionNext(target)
+        if TargetNextSpot then
+            TargetAttacking = GetDistance(myHero.pos, target.pos) > GetDistance(myHero.pos, TargetNextSpot)
+        else
+            TargetAttacking = false
+        end
+
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and Edown == false and not CastingQ and not CastingW then
+            if target.isDashing and TargetAttacking and self.Menu.ComboMode.UseEDef:Value() then
+                Control.CastSpell(HK_W, myHero)
+            elseif GetDistance(myHero.pos, target.pos) < 300 and self.Menu.ComboMode.UseEDef:Value() then
+                Control.CastSpell(HK_W, myHero)
+            elseif self.Menu.ComboMode.UseEAtt:Value() then
+                self:UseW(target, self.Menu.ComboMode.UseEAttHits:Value(), TargetAttacking)
+            end
+        end
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingR then
+            self:UseE(target)
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and Edown == false and not CastingQ and not CastingW and not CastingR then
+            Control.CastSpell(HK_Q, target)
+        end
+        local RDmg = getdmg("R", target, myHero, 1, myHero:GetSpellData(_R).level)
+        local RDmgTick = getdmg("R", target, myHero, 2, myHero:GetSpellData(_R).level)
+        local RDmgTotal = RDmg + RDmgTick*2
+        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange) and Edown == false and not CastingQ and not CastingW and not CastingR and target.health < RDmgTotal and myHero:GetSpellData(_R).name == "VelkozChaosStorm"then
+            Control.CastSpell(HK_R, target)
+            --LastDirect = Game.Timer() + 1
+        end
+        if self:CanUse(_R, Mode()) and ValidTarget(target) and Edown == false and not CastingQ and not CastingW and not CastingR and myHero:GetSpellData(_R).name == "VelkozChaosStormGuide" and (myHero.attackData.state == 3 or GetDistance(myHero.pos, target.pos) > AARange) then
+            self:DirectR(target.pos)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function Velkoz:DirectR(spot)
+    if LastDirect - Game.Timer() < 0 then
+        Control.CastSpell(HK_R, target)
+        LastDirect = Game.Timer() + 1
+    end
+end
+
+function Velkoz:UseE2(ECastPos, unit, pred)
+            if Control.IsKeyDown(HK_E) then
+                Control.SetCursorPos(pred.CastPos)
+                Control.KeyUp(HK_E)
+                DelayAction(function() Control.SetCursorPos(ReturnMouse) end, 0.01)
+                DelayAction(function() Edown = false end, 0.50)   
+            end
+end
+
+function Velkoz:OnPostAttackTick(args)
+    if target then
+    end
+    attackedfirst = 1
+    attacked = 1
+end
+
+function Velkoz:OnPreAttack(args)
+    if self:CanUse(_E, Mode()) and target then
+    end
+end
+
+
+function Velkoz:UseR1(unit, hits)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
+    --PrintChat("trying E")
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 701 and pred.HitCount >= hits then
+            Control.CastSpell(HK_R, pred.CastPos)
+            --Casted = 1
+    end 
+end
+
+function Velkoz:UseW(unit, hits, attacking)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
+    --PrintChat("trying E")
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
+        if attacking == true then
+            local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
+            local Wspot = pred.CastPos - Direction*100
+            Control.CastSpell(HK_W, Wspot)
+        else
+            local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
+            local Wspot = pred.CastPos + Direction*100
+            if GetDistance(myHero.pos, Wspot) > 800 then
+                Control.CastSpell(HK_W, pred.CastPos)
+            else
+                Control.CastSpell(HK_W, Wspot)
+            end
+        end
+            --Casted = 1
+    end 
+end
+
+function Velkoz:UseE(unit)
+    if GetDistance(unit.pos, myHero.pos) < 1025 then
+        --PrintChat("Using E")
+        local Direction = Vector((myHero.pos-unit.pos):Normalized())
+        local Espot = myHero.pos - Direction*480
+        if GetDistance(myHero.pos, unit.pos) < 480 then
+            Espot = unit.pos
+        end
+        --Control.SetCursorPos(Espot)
+        --Control.CastSpell(HK_E, unit)
+        local pred = _G.PremiumPrediction:GetPrediction(Espot, unit, ESpellData)
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and Espot:DistanceTo(pred.CastPos) < 501 then
+            if Control.IsKeyDown(HK_E) and Edown == true then
+                --_G.SDK.Orbwalker:SetMovement(false)
+                --PrintChat("E down")
+                self:UseE2(Espot, unit, pred)
+            elseif Edown == false then
+                --_G.SDK.Orbwalker:SetMovement(true)
+                ReturnMouse = mousePos
+                --PrintChat("Pressing E")
+                Control.SetCursorPos(Espot)
+                Control.KeyDown(HK_E)
+                Edown = true
+            end
+        end
     end
 end
 
