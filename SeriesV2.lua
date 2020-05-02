@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 4.00
+    local Version = 5.00
     
     local Files = {
         Lua = {
@@ -1220,7 +1220,7 @@ end
 
 function Neeko:Spells()
     ESpellData = {speed = 1300, range = 1000, delay = 0.25, radius = 70, collision = {}, type = "linear"}
-    QSpellData = {speed = 600, range = 800, delay = 0.5, radius = 225, collision = {}, type = "circular"}
+    QSpellData = {speed = 1300, range = 800, delay = 0.10, radius = 225, collision = {}, type = "circular"}
 end
 
 function Neeko:__init()
@@ -1265,7 +1265,7 @@ end
 
 function Neeko:Draw()
     if self.Menu.Draw.UseDraws:Value() then
-        Draw.Circle(myHero.pos, 300, 1, Draw.Color(255, 0, 191, 255))
+        Draw.Circle(myHero.pos, 225, 1, Draw.Color(255, 0, 191, 255))
         if target then
         end
     end
@@ -1374,8 +1374,14 @@ end
 
 function Neeko:UseQ(unit, hits)
     local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, QSpellData)
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
-        Control.CastSpell(HK_Q, pred.CastPos)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and pred.HitCount >= hits then
+        if myHero.pos:DistanceTo(pred.CastPos) < 801 then
+            Control.CastSpell(HK_Q, pred.CastPos)
+        else
+            local Direction = Vector((myHero.pos-pred.CastPos):Normalized())
+            local Espot = myhero.pos - Direction*800
+            Control.CastSpell(HK_Q, pred.Espot)
+        end
     end 
 end
 
