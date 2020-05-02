@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1.00
+    local Version = 2.00
     
     local Files = {
         Lua = {
@@ -654,18 +654,19 @@ function Orianna:Auto()
                 end
                 if self:CanUse(_E, "Auto") then
                     if GotBall == "Q" then
-                        local Direction = Vector((CurrentSpot-myHero.pos):Normalized())
-                        local EDist = GetDistance(enemy.pos, CurrentSpot)
-                        ESpot = CurrentSpot - Direction * EDist
-                        if GetDistance(ESpot, enemy.pos) < 100 then
-                            Control.CastSpell(HK_E, myHero)
-                        end                    
+                        if (GetDistance(enemy.pos, CurrentSpot) > 250 or not self:CanUse(_W, "Auto") or Whits < self.Menu.AutoMode.UseWmin:Value()) and (GetDistance(enemy.pos, CurrentSpot) > 325 or not self:CanUse(_R, "Auto") or Whits < self.Menu.AutoMode.UseRmin:Value()) then
+                            local Direction = Vector((CurrentSpot-myHero.pos):Normalized())
+                            local EDist = GetDistance(enemy.pos, CurrentSpot)
+                            ESpot = CurrentSpot - Direction * EDist
+                            if GetDistance(ESpot, enemy.pos) < 100 then
+                                Control.CastSpell(HK_E, myHero)
+                            end 
+                        end                   
                     end 
                 end
             end
         end
     end
-
 end
 
 function Orianna:CanUse(spell, mode)
@@ -748,6 +749,7 @@ function Orianna:Logic()
                 self:UseQ(target, 1)
             end
             if self:CanUse(_W, Mode()) and GetDistance(target.pos, CurrentSpot) < 250 then
+                --PrintChat("Can use W")
                 if Mode() == "Combo" and Whits >= self.Menu.ComboMode.UseWmin:Value() then
                     Control.CastSpell(HK_W)
                 elseif Mode() == "Harass" and Whits >= self.Menu.HarassMode.UseWmin:Value() then
@@ -763,11 +765,13 @@ function Orianna:Logic()
             end
             if self:CanUse(_E, Mode()) then
                 if GotBall == "Q" then
-                    local Direction = Vector((CurrentSpot-myHero.pos):Normalized())
-                    local EDist = GetDistance(target.pos, CurrentSpot)
-                    ESpot = CurrentSpot - Direction * EDist
-                    if GetDistance(ESpot, target.pos) < 100 then
-                        Control.CastSpell(HK_E, myHero)
+                    if (GetDistance(target.pos, CurrentSpot) > 250 or not self:CanUse(_W, Mode()) or Whits < self.Menu.ComboMode.UseWmin:Value()) and (GetDistance(target.pos, CurrentSpot) > 325 or not self:CanUse(_R, Mode()) or Rhits < self.Menu.ComboMode.UseRmin:Value()) then
+                        local Direction = Vector((CurrentSpot-myHero.pos):Normalized())
+                        local EDist = GetDistance(target.pos, CurrentSpot)
+                        ESpot = CurrentSpot - Direction * EDist
+                        if GetDistance(ESpot, target.pos) < 100 then
+                            Control.CastSpell(HK_E, myHero)
+                        end
                     end                    
                 end 
             end
