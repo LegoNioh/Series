@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 2.00
+    local Version = 3.00
     
     local Files = {
         Lua = {
@@ -230,6 +230,8 @@ function Manager:__init()
         DelayAction(function() self:LoadViktor() end, 1.05)
     elseif myHero.charName == "Velkoz" then
         DelayAction(function() self:LoadVelkoz() end, 1.05)
+    elseif myHero.charName == "Neeko" then
+        DelayAction(function() self:LoadNeeko() end, 1.05)
     elseif myHero.charName == "Orianna" then
         DelayAction(function() self:LoadOrianna() end, 1.05)
     end
@@ -246,6 +248,19 @@ function Manager:LoadJayce()
     if _G.SDK then
         _G.SDK.Orbwalker:OnPreAttack(function(...) Jayce:OnPreAttack(...) end)
         _G.SDK.Orbwalker:OnPostAttackTick(function(...) Jayce:OnPostAttackTick(...) end)
+    end
+end
+
+function Manager:LoadNeeko()
+    Neeko:Spells()
+    Neeko:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Neeko:Tick() end)
+    Callback.Add("Draw", function() Neeko:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Neeko:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Neeko:OnPostAttackTick(...) end)
     end
 end
 
@@ -1157,6 +1172,211 @@ function Velkoz:UseE(unit)
             end
         end
     end
+end
+
+class "Neeko"
+
+local EnemyLoaded = false
+local casted = 0
+local LastCalledTime = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local PickingCard = false
+local TargetAttacking = false
+local attackedfirst = 0
+local CastingQ = false
+local LastDirect = 0
+local CastingW = false
+local CastingR = false
+local ReturnMouse = mousePos
+local Q = 1
+local Edown = false
+local R = 1
+local WasInRange = false
+local OneTick
+local attacked = 0
+
+function Neeko:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Neeko", name = "Neeko"})
+    self.Menu:MenuElement({id = "FleeKey", name = "Disengage Key", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+
+    self.Menu:MenuElement({id = "FleeMode", name = "Flee", type = MENU})
+    self.Menu.FleeMode:MenuElement({id = "UseQ", name = "Use Q to Flee", value = true})
+    self.Menu.FleeMode:MenuElement({id = "UseE", name = "Use E to Flee", value = true})
+
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu.KSMode:MenuElement({id = "UseE", name = "Use E in KS", value = true})
+
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Neeko:Spells()
+    ESpellData = {speed = 1300, range = 1000, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+    QSpellData = {speed = 600, range = 800, delay = 0.5, radius = 225, collision = {}, type = "circular"}
+end
+
+function Neeko:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Neeko:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+    end
+end
+
+function Neeko:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(1400)
+    CastingQ = myHero.activeSpell.name == "NeekoQ"
+    CastingE = myHero.activeSpell.name == "NeekoE"
+    --PrintChat(myHero.activeSpell.name)
+    --PrintChat(myHero:GetSpellData(_R).name)
+    self:Logic()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Neeko:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 300, 1, Draw.Color(255, 0, 191, 255))
+        if target then
+        end
+    end
+end
+
+function Neeko:KS()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Neeko:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseE:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+function Neeko:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local ERange = 1000
+        local QRange = 800
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingE then
+            self:UseE(target, 1)
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingE then
+            self:UseQ(target, 1)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function Neeko:OnPostAttackTick(args)
+    if target then
+    end
+    attackedfirst = 1
+    attacked = 1
+end
+
+function Neeko:OnPreAttack(args)
+    if self:CanUse(_E, Mode()) and target then
+    end
+end
+
+function Neeko:UseE(unit, hits)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, ESpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1001 and pred.HitCount >= hits then
+        Control.CastSpell(HK_E, pred.CastPos)
+    end 
+end
+
+function Neeko:UseQ(unit, hits)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
+        Control.CastSpell(HK_Q, pred.CastPos)
+    end 
 end
 
 class "Viktor"
