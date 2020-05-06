@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 11.00
+    local Version = 12.00
     
     local Files = {
         Lua = {
@@ -456,8 +456,18 @@ function Vayne:Auto()
     --PrintChat("ksing")
     for i, enemy in pairs(EnemyHeroes) do
         if enemy and not enemy.dead and ValidTarget(enemy) then
-            if self:CanUse(_E, "Auto") and ValidTarget(enemy, 550) and not CastingE and self:CheckWallStun(enemy) then
-                Control.CastSpell(HK_E, enemy)
+            if self:CanUse(_E, "KS") and ValidTarget(enemy, ERange) and TwoStacks == 2 then
+                local Edamage = getdmg("E", enemy, myHero)
+                local Wdamage = getdmg("W", enemy, myHero)
+                if enemy.health < Edamage + Wdamage then
+                    Control.CastSpell(HK_E, enemy)
+                end
+            end
+            local Wall = self:CheckWallStun(enemy)
+            if self:CanUse(_E, "Auto")) and ValidTarget(enemy, ERange) and not CastingE and Wall ~= nil and not enemy.pathing.isDashing then
+                if TwoStacks ~= 1 or GetDistance(myHero.pos, Wall) < AARange then
+                    Control.CastSpell(HK_E, enemy)
+                end
             end
         end
     end
