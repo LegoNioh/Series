@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 6.00
+    local Version = 8.00
     
     local Files = {
         Lua = {
@@ -515,7 +515,7 @@ function Vayne:Logic()
             WasInRange = true
         end
         local ERange = 550
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingE and self:CheckWallStun(target) then
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingE and self:CheckWallStun(target) and not target.pathing.isDashing then
             Control.CastSpell(HK_E, target)
         end
     else
@@ -535,13 +535,13 @@ function Vayne:CheckWallStun(unit)
     end
     local FoundStun = false
     for i=1, 5 do
-        ESpot = PredictedPos + Direction * (95*i) 
+        ESpot = PredictedPos + Direction * (90*i) 
         if MapPosition:inWall(ESpot) then
             FoundStun = true
             if HadStun == false then
                 StunTime = Game.Timer()
                 HadStun = true
-            elseif Game.Timer() - StunTime > 0.1 then
+            elseif Game.Timer() - StunTime > 0.05 then
                 HadStun = false
                 return true
             end
