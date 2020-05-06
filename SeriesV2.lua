@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 8.00
+    local Version = 10.00
     
     local Files = {
         Lua = {
@@ -363,6 +363,7 @@ function Vayne:Menu()
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEDelay", name = "E Delay", value = 50, min = 0, max = 200, step = 10})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
@@ -428,7 +429,7 @@ function Vayne:Draw()
             local PredictedPos = unit.pos
             local Direction = Vector((PredictedPos-myHero.pos):Normalized())
             if NextSpot then
-                local Time = (GetDistance(unit.pos, myHero.pos) / 2000) * 0.5
+                local Time = (GetDistance(unit.pos, myHero.pos) / 2000) + 0.25
                 local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
                 PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
                 Direction = Vector((PredictedPos-myHero.pos):Normalized())
@@ -528,7 +529,7 @@ function Vayne:CheckWallStun(unit)
     local PredictedPos = unit.pos
     local Direction = Vector((PredictedPos-myHero.pos):Normalized())
     if NextSpot then
-        local Time = (GetDistance(unit.pos, myHero.pos) / 2000) * 0.5
+        local Time = (GetDistance(unit.pos, myHero.pos) / 2000) + 0.25
         local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
         PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
         Direction = Vector((PredictedPos-myHero.pos):Normalized())
@@ -541,7 +542,7 @@ function Vayne:CheckWallStun(unit)
             if HadStun == false then
                 StunTime = Game.Timer()
                 HadStun = true
-            elseif Game.Timer() - StunTime > 0.05 then
+            elseif Game.Timer() - StunTime > (self.Menu.ComboMode.UseEDelay:Value()/1000) then
                 HadStun = false
                 return true
             end
