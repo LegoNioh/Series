@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 12.00
+    local Version = 20.00
     
     local Files = {
         Lua = {
@@ -347,6 +347,8 @@ local TargetAttacking = false
 local attackedfirst = 0
 local CastingQ = false
 local LastDirect = 0
+local Flash = nil
+local FlashSpell = nil
 local CastingW = false
 local LastHit = nil
 local WStacks = 0
@@ -363,8 +365,10 @@ local attacked = 0
 
 function Vayne:Menu()
     self.Menu = MenuElement({type = MENU, id = "Vayne", name = "Vayne"})
+    self.Menu:MenuElement({id = "EFlashKey", name = "E-Flash To Mouse", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQStun", name = "Use Q To Roll For Stun", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEDelay", name = "E Delay", value = 50, min = 0, max = 200, step = 10})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
@@ -405,6 +409,16 @@ end
 function Vayne:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
     target = GetTarget(1400)
+    if myHero:GetSpellData(SUMMONER_1).name:find("Flash") then
+        Flash = SUMMONER_1
+        FlashSpell = HK_SUMMONER_1
+    elseif myHero:GetSpellData(SUMMONER_2).name:find("Flash") then
+        Flash = SUMMONER_2
+        FlashSpell = HK_SUMMONER_2
+    else 
+        Flash = nil
+    end
+
     CastingE = myHero.activeSpell.name == "VayneCondemn"
     if target then
         TwoStacks = _G.SDK.BuffManager:GetBuffCount(target, "VayneSilveredDebuff")
@@ -413,6 +427,12 @@ function Vayne:Tick()
         TwoStacks = 0
     end
     --PrintChat(myHero.activeSpell.name)
+    if self.Menu.EFlashKey:Value() then
+        --self:Eflash()
+    end
+    if target then
+        self:GetStunSpot(target)
+    end
     self:Logic()
     self:Auto()
     if EnemyLoaded == false then
@@ -429,10 +449,26 @@ function Vayne:Tick()
     end
 end
 
+
+function Vayne:Eflash()
+    if target then
+        local PreMouse = mousePos
+        if IsReady(_E) and ValidTarget(target, 550) and Flash and IsReady(Flash) then
+            Control.CastSpell(HK_E, target)
+            DelayAction(function() Control.CastSpell(FlashSpell, PreMouse) end, 0.05)
+        end  
+    end
+end 
+
+
 function Vayne:Draw()
     if self.Menu.Draw.UseDraws:Value() then
+        --local Xadd = Vector(100,0,0)
+        --local HeroAdded = Vector(myHero.pos + Xadd)
+        --Draw.Circle(HeroAdded, 225, 1, Draw.Color(255, 0, 191, 255))
         Draw.Circle(myHero.pos, 225, 1, Draw.Color(255, 0, 191, 255))
         if target then
+            self:DrawStunSpot()
             local unit = target
             local NextSpot = GetUnitPositionNext(unit)
             local PredictedPos = unit.pos
@@ -452,20 +488,139 @@ function Vayne:Draw()
     end
 end
 
+function Vayne:GetStunSpot(unit)
+    local Adds = {Vector(100,0,0), Vector(66,0,66), Vector(0,0,100), Vector(-66,0,66), Vector(-100,0,0), Vector(66,0,-66), Vector(0,0,-100), Vector(-66,0,-66)}
+    local Xadd = Vector(100,0,0)
+    for i = 1, #Adds do
+        local TargetAdded = Vector(unit.pos + Adds[i])
+        local Direction = Vector((unit.pos-TargetAdded):Normalized())
+        --Draw.Circle(TargetAdded, 30, 1, Draw.Color(255, 0, 191, 255))
+        for i=1, 5 do
+            local ESSpot = unit.pos + Direction * (87*i) 
+            --Draw.Circle(ESpot, 30, 1, Draw.Color(255, 0, 191, 255))
+            if MapPosition:inWall(ESSpot) then
+                local FlashDirection = Vector((unit.pos-ESSpot):Normalized())
+
+
+                local FlashSpot = unit.pos - Direction * 400
+                local MinusDist = GetDistance(FlashSpot, myHero.pos)
+                if MinusDist > 400 then
+                    FlashSpot = unit.pos - Direction * (800-MinusDist)
+                end
+                local QSpot = unit.pos - Direction * 300
+                if MinusDist < 700 then
+                    if self.Menu.EFlashKey:Value() then
+                        if IsReady(_E) and Flash and IsReady(Flash) then
+                            Control.CastSpell(HK_E, unit)
+                            DelayAction(function() Control.CastSpell(FlashSpell, QSpot) end, 0.05)
+                        end                          
+                    end
+                end
+
+                local QSpot = unit.pos - Direction * 300
+                local MinusDistQ = GetDistance(QSpot, myHero.pos)
+                if MinusDistQ > 300 then
+                    QSpot = unit.pos - Direction * (600-MinusDistQ)
+                end
+                if MinusDistQ < 470 then
+                    if self.Menu.ComboMode.UseQStun:Value() and Mode() == "Combo" then
+                        if IsReady(_Q) and IsReady(_E) then
+                            Control.CastSpell(HK_Q, QSpot)
+                        end                          
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+
+function Vayne:DrawStunSpot()
+    local Adds = {Vector(100,0,0), Vector(66,0,66), Vector(0,0,100), Vector(-66,0,66), Vector(-100,0,0), Vector(66,0,-66), Vector(0,0,-100), Vector(-66,0,-66)}
+    local Xadd = Vector(100,0,0)
+    for i = 1, #Adds do
+        local TargetAdded = Vector(target.pos + Adds[i])
+        local Direction = Vector((target.pos-TargetAdded):Normalized())
+        --Draw.Circle(TargetAdded, 30, 1, Draw.Color(255, 0, 191, 255))
+        for i=1, 5 do
+            local ESSpot = target.pos + Direction * (87*i) 
+            --Draw.Circle(ESpot, 30, 1, Draw.Color(255, 0, 191, 255))
+            if MapPosition:inWall(ESSpot) then
+                Draw.Circle(TargetAdded, 30, 1, Draw.Color(255, 0, 191, 255))
+                Draw.Circle(ESSpot, 30, 1, Draw.Color(255, 0, 191, 255))
+                local FlashDirection = Vector((target.pos-ESSpot):Normalized())
+
+
+                local FlashSpot = target.pos - Direction * 400
+                local MinusDist = GetDistance(FlashSpot, myHero.pos)
+                if MinusDist > 400 then
+                    FlashSpot = target.pos - Direction * (800-MinusDist)
+                end
+                local QSpot = target.pos - Direction * 300
+                if MinusDist < 700 then
+                    Draw.Circle(FlashSpot, 30, 1, Draw.Color(255, 0, 255, 255))
+                end
+
+                local QSpot = target.pos - Direction * 300
+                local MinusDistQ = GetDistance(QSpot, myHero.pos)
+                if MinusDistQ > 300 then
+                    QSpot = target.pos - Direction * (600-MinusDistQ)
+                end
+                if MinusDistQ < 470 then
+                    Draw.Circle(QSpot, 30, 1, Draw.Color(255, 255, 100, 100))
+                end
+            end
+        end
+    end
+end
+
+function Vayne:CheckWallStun(unit)
+    local NextSpot = GetUnitPositionNext(unit)
+    local PredictedPos = unit.pos
+    local Direction = Vector((PredictedPos-myHero.pos):Normalized())
+    if NextSpot then
+        local Time = (GetDistance(unit.pos, myHero.pos) / 2000) + 0.25
+        local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
+        PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
+        Direction = Vector((PredictedPos-myHero.pos):Normalized())
+    end
+    local FoundStun = false
+    for i=1, 5 do
+        ESpot = PredictedPos + Direction * (87*i) 
+        if MapPosition:inWall(ESpot) then
+            FoundStun = true
+            if HadStun == false then
+                StunTime = Game.Timer()
+                HadStun = true
+            elseif Game.Timer() - StunTime > (self.Menu.ComboMode.UseEDelay:Value()/1000) then
+                HadStun = false
+                return ESpot
+            end
+        end
+    end
+    if FoundStun == false then
+        HadStun = false
+    end
+    return nil
+end
+
+
 function Vayne:Auto()
     --PrintChat("ksing")
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
     for i, enemy in pairs(EnemyHeroes) do
         if enemy and not enemy.dead and ValidTarget(enemy) then
-            if self:CanUse(_E, "KS") and ValidTarget(enemy, ERange) and TwoStacks == 2 then
+            --[[if self:CanUse(_E, "KS") and ValidTarget(enemy, 550) and TwoStacks == 2 then
                 local Edamage = getdmg("E", enemy, myHero)
                 local Wdamage = getdmg("W", enemy, myHero)
                 if enemy.health < Edamage + Wdamage then
                     Control.CastSpell(HK_E, enemy)
                 end
-            end
-            local Wall = self:CheckWallStun(enemy)
-            if self:CanUse(_E, "Auto")) and ValidTarget(enemy, ERange) and not CastingE and Wall ~= nil and not enemy.pathing.isDashing then
-                if TwoStacks ~= 1 or GetDistance(myHero.pos, Wall) < AARange then
+            end]]--
+            if self:CanUse(_E, "Auto") and ValidTarget(enemy, 550) and not CastingE and not enemy.pathing.isDashing then
+                local Wall = self:CheckWallStun(enemy)
+                if Wall and TwoStacks ~= 1 or GetDistance(myHero.pos, Wall) < AARange then
                     Control.CastSpell(HK_E, enemy)
                 end
             end
@@ -537,8 +692,8 @@ function Vayne:Logic()
         local ERange = 550
 
         if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and TwoStacks == 2 then
-            local Edamage = getdmg("E", enemy, myHero)
-            local Wdamage = getdmg("W", enemy, myHero)
+            local Edamage = getdmg("E", target, myHero)
+            local Wdamage = getdmg("W", target, myHero)
             if target.health < Edamage + Wdamage then
                 Control.CastSpell(HK_E, target)
             end
@@ -555,35 +710,6 @@ function Vayne:Logic()
     end     
 end
 
-function Vayne:CheckWallStun(unit)
-    local NextSpot = GetUnitPositionNext(unit)
-    local PredictedPos = unit.pos
-    local Direction = Vector((PredictedPos-myHero.pos):Normalized())
-    if NextSpot then
-        local Time = (GetDistance(unit.pos, myHero.pos) / 2000) + 0.25
-        local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
-        PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
-        Direction = Vector((PredictedPos-myHero.pos):Normalized())
-    end
-    local FoundStun = false
-    for i=1, 5 do
-        ESpot = PredictedPos + Direction * (87*i) 
-        if MapPosition:inWall(ESpot) then
-            FoundStun = true
-            if HadStun == false then
-                StunTime = Game.Timer()
-                HadStun = true
-            elseif Game.Timer() - StunTime > (self.Menu.ComboMode.UseEDelay:Value()/1000) then
-                HadStun = false
-                return ESpot
-            end
-        end
-    end
-    if FoundStun == false then
-        HadStun = false
-    end
-    return nil
-end
 
 
 function Vayne:OnPostAttack(args)
