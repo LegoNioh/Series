@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 10.00
+    local Version = 11.00
     
     local Files = {
         Lua = {
@@ -251,6 +251,7 @@ function Manager:LoadVayne()
     if _G.SDK then
         _G.SDK.Orbwalker:OnPreAttack(function(...) Vayne:OnPreAttack(...) end)
         _G.SDK.Orbwalker:OnPostAttackTick(function(...) Vayne:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Vayne:OnPostAttack(...) end)
     end
 end
 
@@ -347,6 +348,8 @@ local attackedfirst = 0
 local CastingQ = false
 local LastDirect = 0
 local CastingW = false
+local LastHit = nil
+local WStacks = 0
 local HadStun = false
 local StunTime = Game.Timer()
 local CastingR = false
@@ -403,6 +406,12 @@ function Vayne:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
     target = GetTarget(1400)
     CastingE = myHero.activeSpell.name == "VayneCondemn"
+    if target then
+        TwoStacks = _G.SDK.BuffManager:GetBuffCount(target, "VayneSilveredDebuff")
+        --PrintChat(TwoStacks)
+    else
+        TwoStacks = 0
+    end
     --PrintChat(myHero.activeSpell.name)
     self:Logic()
     self:Auto()
@@ -436,7 +445,7 @@ function Vayne:Draw()
             end
 
             for i=1, 5 do
-                ESpot = PredictedPos + Direction * (95*i)
+                ESpot = PredictedPos + Direction * (87*i)
                 Draw.Circle(ESpot, 50, 1, Draw.Color(255, 0, 191, 255)) 
             end
         end
@@ -516,8 +525,20 @@ function Vayne:Logic()
             WasInRange = true
         end
         local ERange = 550
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingE and self:CheckWallStun(target) and not target.pathing.isDashing then
-            Control.CastSpell(HK_E, target)
+
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and TwoStacks == 2 then
+            local Edamage = getdmg("E", enemy, myHero)
+            local Wdamage = getdmg("W", enemy, myHero)
+            if target.health < Edamage + Wdamage then
+                Control.CastSpell(HK_E, target)
+            end
+        end
+
+        local Wall = self:CheckWallStun(target)
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingE and Wall ~= nil and not target.pathing.isDashing then
+            if TwoStacks ~= 1 or GetDistance(myHero.pos, Wall) < AARange then
+                Control.CastSpell(HK_E, target)
+            end
         end
     else
         WasInRange = false
@@ -536,7 +557,7 @@ function Vayne:CheckWallStun(unit)
     end
     local FoundStun = false
     for i=1, 5 do
-        ESpot = PredictedPos + Direction * (90*i) 
+        ESpot = PredictedPos + Direction * (87*i) 
         if MapPosition:inWall(ESpot) then
             FoundStun = true
             if HadStun == false then
@@ -544,45 +565,29 @@ function Vayne:CheckWallStun(unit)
                 HadStun = true
             elseif Game.Timer() - StunTime > (self.Menu.ComboMode.UseEDelay:Value()/1000) then
                 HadStun = false
-                return true
+                return ESpot
             end
         end
     end
     if FoundStun == false then
         HadStun = false
     end
-    return false
+    return nil
 end
 
-function Vayne:CheckWallStun2(unit)
-    local NextSpot = GetUnitPositionNext(unit)
-    local PredictedPos = unit.pos
-    local Direction = Vector((PredictedPos-myHero.pos):Normalized())
-    if NextSpot then
-        local Time = (GetDistance(unit.pos, myHero.pos) / 2000) * 0.5
-        local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
-        PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
-        Direction = Vector((PredictedPos-myHero.pos):Normalized())
-    end
-    for i=1, 5 do
-        ESpot = PredictedPos + Direction * (95*i) 
-        if MapPosition:inWall(ESpot) then
-            PrintChat("Second Stun true")
-            return true
-        end
-    end
-    return false
+
+function Vayne:OnPostAttack(args)
 end
 
 function Vayne:OnPostAttackTick(args)
-    if target then
-    end
     attackedfirst = 1
     attacked = 1
 end
 
 function Vayne:OnPreAttack(args)
-    if self:CanUse(_E, Mode()) and target then
+    if target then
+        --PrintChat(myHero.activeSpell.name)
+        --PrintChat(target.charName)
     end
 end
 
