@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 20.00
+    local Version = 21.00
     
     local Files = {
         Lua = {
@@ -355,6 +355,7 @@ local WStacks = 0
 local HadStun = false
 local StunTime = Game.Timer()
 local CastingR = false
+local UseBuffs = false
 local ReturnMouse = mousePos
 local Q = 1
 local Edown = false
@@ -366,6 +367,7 @@ local attacked = 0
 function Vayne:Menu()
     self.Menu = MenuElement({type = MENU, id = "Vayne", name = "Vayne"})
     self.Menu:MenuElement({id = "EFlashKey", name = "E-Flash To Mouse", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "UseBuffFunc", name = "Use Buff Functions(May Cause Crashes)", value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQStun", name = "Use Q To Roll For Stun", value = true})
@@ -409,6 +411,7 @@ end
 function Vayne:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
     target = GetTarget(1400)
+    UseBuffs = self.Menu.UseBuffFunc:Value()
     if myHero:GetSpellData(SUMMONER_1).name:find("Flash") then
         Flash = SUMMONER_1
         FlashSpell = HK_SUMMONER_1
@@ -418,11 +421,13 @@ function Vayne:Tick()
     else 
         Flash = nil
     end
-
     CastingE = myHero.activeSpell.name == "VayneCondemn"
     if target then
-        TwoStacks = _G.SDK.BuffManager:GetBuffCount(target, "VayneSilveredDebuff")
-        --PrintChat(TwoStacks)
+        if UseBuffs then
+            TwoStacks = _G.SDK.BuffManager:GetBuffCount(target, "VayneSilveredDebuff")
+        else
+            TwoStacks = 2
+        end
     else
         TwoStacks = 0
     end
@@ -620,7 +625,7 @@ function Vayne:Auto()
             end]]--
             if self:CanUse(_E, "Auto") and ValidTarget(enemy, 550) and not CastingE and not enemy.pathing.isDashing then
                 local Wall = self:CheckWallStun(enemy)
-                if Wall and TwoStacks ~= 1 or GetDistance(myHero.pos, Wall) < AARange then
+                if Wall and (TwoStacks ~= 1 or GetDistance(myHero.pos, Wall) < AARange) then
                     Control.CastSpell(HK_E, enemy)
                 end
             end
@@ -691,7 +696,7 @@ function Vayne:Logic()
         end
         local ERange = 550
 
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and TwoStacks == 2 then
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and UseBuffs and TwoStacks == 2 then
             local Edamage = getdmg("E", target, myHero)
             local Wdamage = getdmg("W", target, myHero)
             if target.health < Edamage + Wdamage then
@@ -2225,15 +2230,15 @@ function Jayce:Tick()
     --PrintChat(Q2CD)
     self:KS()
     if self.Menu.QE:Value() and Weapon == "Gun" then 
-    	self:QECombo()
+        self:QECombo()
     end
     if self.Menu.Insec:Value() then
-    	SetMovement(false)
-    	self:Insec()
+        SetMovement(false)
+        self:Insec()
     else
-    	StartSpot = nil
-    	SetMovement(true)
-    	self:Logic()
+        StartSpot = nil
+        SetMovement(true)
+        self:Logic()
     end
     if EnemyLoaded == false then
         local CountEnemy = 0
@@ -2419,8 +2424,8 @@ function Jayce:Logic()
                 end
             end
             if self:CanUse(_R, Mode(), Weapon) then
-            	if GetDistance(target.pos, myHero.pos) > 700 then
-            		Control.CastSpell(HK_R)
+                if GetDistance(target.pos, myHero.pos) > 700 then
+                    Control.CastSpell(HK_R)
                 elseif GetDistance(target.pos, myHero.pos) > 285 and not self:CanUse(_Q, Mode(), Weapon) then
                     Control.CastSpell(HK_R)
                 elseif GetDistance(target.pos, myHero.pos) > 240 and not self:CanUse(_W, Mode(), Weapon) and not self:CanUse(_Q, Mode(), Weapon) then
@@ -2428,11 +2433,11 @@ function Jayce:Logic()
                 elseif GetDistance(target.pos, myHero.pos) > AARange and not self:CanUse(_E, Mode(), Weapon) and not self:CanUse(_W, Mode(), Weapon) and not self:CanUse(_Q, Mode(), Weapon) then
                     Control.CastSpell(HK_R)
                 elseif W2CD < Game.Timer() and not self:CanUse(_E, Mode(), Weapon) and not self:CanUse(_W, Mode(), Weapon) and not self:CanUse(_Q, Mode(), Weapon) then
-                	Control.CastSpell(HK_R)
+                    Control.CastSpell(HK_R)
                 end
             end
         else
-        	--PrintChat("Gun")
+            --PrintChat("Gun")
             if self:CanUse(_Q, Mode(), Weapon) and ValidTarget(target, 1050) and not self:CanUse(_E, Mode(), Weapon) then
                 self:UseQ(target)
             end
@@ -2444,7 +2449,7 @@ function Jayce:Logic()
             end
 
             if self:CanUse(_E, Mode(), Weapon) and ValidTarget(target, 1470) and self:CanUse(_Q, Mode(), Weapon) then
-            	self:UseQ2(target)
+                self:UseQ2(target)
             end
             local MeUnderTurret = IsUnderEnemyTurret(myHero.pos)
             local TargetUnderTurret = IsUnderEnemyTurret(target.pos)
@@ -2473,79 +2478,79 @@ function Jayce:Logic()
 end
 
 function Jayce:DelayEscapeClick(delay, pos)
-	if Game.Timer() - LastCalledTime > delay then
-		LastCalledTime = Game.Timer()
-		Control.RightClick(pos:To2D())
-	end
+    if Game.Timer() - LastCalledTime > delay then
+        LastCalledTime = Game.Timer()
+        Control.RightClick(pos:To2D())
+    end
 end
 
 function Jayce:QECombo()
-	local SmallDist = 1000
-	local QETarget = nil
+    local SmallDist = 1000
+    local QETarget = nil
     for i, enemy in pairs(EnemyHeroes) do
         if enemy and not enemy.dead and ValidTarget(enemy) then
-        	local MouseDist = GetDistance(enemy.pos, mousePos)
-        	if MouseDist < SmallDist then
-        		QETarget = enemy
+            local MouseDist = GetDistance(enemy.pos, mousePos)
+            if MouseDist < SmallDist then
+                QETarget = enemy
                 PrintChat("Got QETarget")
-        	end
+            end
         end
     end
     if QETarget and  Weapon == "Gun" and IsReady(_Q) and IsReady(_E) and ValidTarget(QETarget, 1470) and self.Menu.AimQE:Value() then
-    	self:UseQ2Man(QETarget)
+        self:UseQ2Man(QETarget)
     elseif IsReady(_Q) and IsReady(_E) then
-    	local Espot = Vector(myHero.pos):Extended(mousePos, 100)
+        local Espot = Vector(myHero.pos):Extended(mousePos, 100)
         DelayAction(function() Control.CastSpell(HK_Q, mousePos) end, 0.05)
         Control.CastSpell(HK_E, Espot)
-   	end	
+    end 
 end
 
 function Jayce:Insec(target)
-	local SmallDist = 1000
-	local InsecTarget = nil
+    local SmallDist = 1000
+    local InsecTarget = nil
     for i, enemy in pairs(EnemyHeroes) do
         if enemy and not enemy.dead and ValidTarget(enemy) then
-        	local MouseDist = GetDistance(enemy.pos, mousePos)
-        	if MouseDist < SmallDist then
-        		InsecTarget = enemy
-        	end
+            local MouseDist = GetDistance(enemy.pos, mousePos)
+            if MouseDist < SmallDist then
+                InsecTarget = enemy
+            end
         end
     end
     if InsecTarget and ValidTarget(InsecTarget, 600) then
-    	if Weapon == "Hammer" then
-    		if IsReady(_Q) and IsReady(_E) and not myHero.pathing.isDashing then
-    			if StartSpot == nil then
-    				StartSpot = myHero.pos
-    			end
-    			Control.CastSpell(HK_Q, InsecTarget)
-    		end
-    		if StartSpot ~= nil and not IsReady(_Q) and IsReady(_E) then
-    			local TargetFromStartDist = GetDistance(InsecTarget.pos, StartSpot)
-    			local Espot = Vector(StartSpot):Extended(InsecTarget.pos, TargetFromStartDist+200)
-    			self:DelayEscapeClick(0.10, Espot)
-    			if GetDistance(myHero.pos, Espot) < 100 then
-    				Control.CastSpell(HK_E, InsecTarget)
-    				StartSpot = nil
-    			end
-    		else
-    			self:DelayEscapeClick(0.10, mousePos)
-    		end
-    	else
-    		if Q1CD < Game.Timer() and E1CD < Game.Timer() then
-	    		local TargetDist = GetDistance(InsecTarget.pos, myHero.pos)
-	    		local Espot = Vector(myHero.pos):Extended(InsecTarget.pos, TargetDist-150)
-	    		if IsReady(_E) then
-	        		Control.CastSpell(HK_E, Espot)
-	        	end
-	        	if IsReady(_R) then
-	        		Control.CastSpell(HK_R)
-	        	end
-	        else
-        		self:DelayEscapeClick(0.10, mousePos)
-        	end
-    	end
+        if Weapon == "Hammer" then
+            if IsReady(_Q) and IsReady(_E) and not myHero.pathing.isDashing then
+                if StartSpot == nil then
+                    StartSpot = myHero.pos
+                end
+                Control.CastSpell(HK_Q, InsecTarget)
+            end
+            if StartSpot ~= nil and not IsReady(_Q) and IsReady(_E) then
+                local TargetFromStartDist = GetDistance(InsecTarget.pos, StartSpot)
+                local Espot = Vector(StartSpot):Extended(InsecTarget.pos, TargetFromStartDist+200)
+                self:DelayEscapeClick(0.10, Espot)
+                if GetDistance(myHero.pos, Espot) < 100 then
+                    Control.CastSpell(HK_E, InsecTarget)
+                    StartSpot = nil
+                end
+            else
+                self:DelayEscapeClick(0.10, mousePos)
+            end
+        else
+            if Q1CD < Game.Timer() and E1CD < Game.Timer() then
+                local TargetDist = GetDistance(InsecTarget.pos, myHero.pos)
+                local Espot = Vector(myHero.pos):Extended(InsecTarget.pos, TargetDist-150)
+                if IsReady(_E) then
+                    Control.CastSpell(HK_E, Espot)
+                end
+                if IsReady(_R) then
+                    Control.CastSpell(HK_R)
+                end
+            else
+                self:DelayEscapeClick(0.10, mousePos)
+            end
+        end
     else
-    	self:DelayEscapeClick(0.10, mousePos)
+        self:DelayEscapeClick(0.10, mousePos)
     end
 end
 
@@ -2553,12 +2558,12 @@ end
 function Jayce:OnPostAttackTick(args)
     attackedfirst = 1
     if target then
-    	if Weapon == "Gun" then
-			local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if Weapon == "Gun" then
+            local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
             if self:CanUse(_W, Mode(), Weapon) and ValidTarget(target, AARange+100) then
                 Control.CastSpell(HK_W)
             end
-    	end
+        end
     end
 end
 
@@ -2580,9 +2585,9 @@ end
 function Jayce:UseQ2(unit)
         local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, Q2SpellData)
         if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1470 then
-        		local Espot = Vector(myHero.pos):Extended(pred.CastPos, 100)
-        		DelayAction(function() Control.CastSpell(HK_Q, pred.CastPos) end, 0.05)
-        		Control.CastSpell(HK_E, Espot)
+                local Espot = Vector(myHero.pos):Extended(pred.CastPos, 100)
+                DelayAction(function() Control.CastSpell(HK_Q, pred.CastPos) end, 0.05)
+                Control.CastSpell(HK_E, Espot)
         end 
 end
 
@@ -2590,13 +2595,13 @@ end
 function Jayce:UseQ2Man(unit)
         local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, Q2SpellData)
         if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1470 then
-        		local Espot = Vector(myHero.pos):Extended(pred.CastPos, 100)
-        		DelayAction(function() Control.CastSpell(HK_Q, pred.CastPos) end, 0.05)
-        		Control.CastSpell(HK_E, Espot)
-       	else
-       		local Espot = Vector(myHero.pos):Extended(mousePos, 100)
-        	DelayAction(function() Control.CastSpell(HK_Q, mousePos) end, 0.05)
-        	Control.CastSpell(HK_E, Espot)
+                local Espot = Vector(myHero.pos):Extended(pred.CastPos, 100)
+                DelayAction(function() Control.CastSpell(HK_Q, pred.CastPos) end, 0.05)
+                Control.CastSpell(HK_E, Espot)
+        else
+            local Espot = Vector(myHero.pos):Extended(mousePos, 100)
+            DelayAction(function() Control.CastSpell(HK_Q, mousePos) end, 0.05)
+            Control.CastSpell(HK_E, Espot)
         end 
 end
 
