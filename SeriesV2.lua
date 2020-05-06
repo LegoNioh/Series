@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 21.00
+    local Version = 22.00
     
     local Files = {
         Lua = {
@@ -371,13 +371,15 @@ function Vayne:Menu()
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQStun", name = "Use Q To Roll For Stun", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E to stun in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEGap", name = "Anti Gap Close E", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEDelay", name = "E Delay", value = 50, min = 0, max = 200, step = 10})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E to stun in Harass", value = false})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu.AutoMode:MenuElement({id = "UseE", name = "Auto Use E", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseE", name = "Auto Use E to stun", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseEGap", name = "Anti Gap Close E", value = true})
 
     self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
     self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
@@ -472,6 +474,19 @@ function Vayne:Draw()
         --local HeroAdded = Vector(myHero.pos + Xadd)
         --Draw.Circle(HeroAdded, 225, 1, Draw.Color(255, 0, 191, 255))
         Draw.Circle(myHero.pos, 225, 1, Draw.Color(255, 0, 191, 255))
+
+        local path = myHero.pathing;
+        if path.hasMovePath then
+            for i = path.pathIndex, path.pathCount do
+                local path_vec = myHero:GetPath(i)
+                if path.isDashing then
+                    Draw.Circle(path_vec,100,1,Draw.Color(255,0,0,255))
+                else
+                    Draw.Circle(path_vec,100,1,Draw.Color(255,225,255,255))
+                end
+            end
+        end
+
         if target then
             self:DrawStunSpot()
             local unit = target
@@ -491,6 +506,19 @@ function Vayne:Draw()
             end
         end
     end
+end
+
+function Vayne:AntiDash(unit)
+    local path = unit.pathing;
+    if path.hasMovePath then
+        for i = path.pathIndex, path.pathCount do
+            local path_vec = unit:GetPath(i)
+            if path.isDashing then
+                return path_vec
+            end
+        end
+    end
+    return false
 end
 
 function Vayne:GetStunSpot(unit)
@@ -629,6 +657,22 @@ function Vayne:Auto()
                     Control.CastSpell(HK_E, enemy)
                 end
             end
+            if self:CanUse(_E, "AutoGap") and ValidTarget(enemy, 550) and not CastingE then
+                local DashSpot = self:AntiDash(enemy)
+                if DashSpot then
+                    if GetDistance(DashSpot) < 225 then
+                        Control.CastSpell(HK_E, enemy)
+                    end
+                end
+            end
+            if self:CanUse(_E, "ComboGap") and Mode() == "Combo" and ValidTarget(enemy, 550) and not CastingE then
+                local DashSpot = self:AntiDash(enemy)
+                if DashSpot then
+                    if GetDistance(DashSpot) < 225 then
+                        Control.CastSpell(HK_E, enemy)
+                    end
+                end
+            end
         end
     end
 end 
@@ -672,10 +716,16 @@ function Vayne:CanUse(spell, mode)
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
             return true
         end
+        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
+            return true
+        end
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
             return true
         end
         if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
             return true
         end
         if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
