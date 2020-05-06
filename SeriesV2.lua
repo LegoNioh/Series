@@ -1,13 +1,14 @@
 require "PremiumPrediction"
 require "DamageLib"
 require "2DGeometry"
+require "MapPositionGOS"
 
 local EnemyHeroes = {}
 local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 5.00
+    local Version = 6.00
     
     local Files = {
         Lua = {
@@ -232,8 +233,24 @@ function Manager:__init()
         DelayAction(function() self:LoadVelkoz() end, 1.05)
     elseif myHero.charName == "Neeko" then
         DelayAction(function() self:LoadNeeko() end, 1.05)
+    elseif myHero.charName == "Vayne" then
+        DelayAction(function() self:LoadVayne() end, 1.05)
     elseif myHero.charName == "Orianna" then
         DelayAction(function() self:LoadOrianna() end, 1.05)
+    end
+end
+
+
+function Manager:LoadVayne()
+    Vayne:Spells()
+    Vayne:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Vayne:Tick() end)
+    Callback.Add("Draw", function() Vayne:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Vayne:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Vayne:OnPostAttackTick(...) end)
     end
 end
 
@@ -303,6 +320,277 @@ function Manager:LoadViktor()
     end
 end
 
+function Manager:LoadViktor()
+    Viktor:Spells()
+    Viktor:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Viktor:Tick() end)
+    Callback.Add("Draw", function() Viktor:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Viktor:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Viktor:OnPostAttackTick(...) end)
+    end
+end
+
+
+class "Vayne"
+
+local EnemyLoaded = false
+local casted = 0
+local LastCalledTime = 0
+local LastESpot = myHero.pos
+local LastE2Spot = myHero.pos
+local PickingCard = false
+local TargetAttacking = false
+local attackedfirst = 0
+local CastingQ = false
+local LastDirect = 0
+local CastingW = false
+local HadStun = false
+local StunTime = Game.Timer()
+local CastingR = false
+local ReturnMouse = mousePos
+local Q = 1
+local Edown = false
+local R = 1
+local WasInRange = false
+local OneTick
+local attacked = 0
+
+function Vayne:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Vayne", name = "Vayne"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu.AutoMode:MenuElement({id = "UseE", name = "Auto Use E", value = true})
+
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu.KSMode:MenuElement({id = "UseE", name = "Use E in KS", value = true})
+
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Vayne:Spells()
+end
+
+function Vayne:__init()
+    DelayAction(function() self:LoadScript() end, 1.05)
+end
+
+function Vayne:LoadScript()
+    self:Spells()
+    self:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() self:Tick() end)
+    Callback.Add("Draw", function() self:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
+    end
+end
+
+function Vayne:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(1400)
+    CastingE = myHero.activeSpell.name == "VayneCondemn"
+    --PrintChat(myHero.activeSpell.name)
+    self:Logic()
+    self:Auto()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Vayne:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 225, 1, Draw.Color(255, 0, 191, 255))
+        if target then
+            local unit = target
+            local NextSpot = GetUnitPositionNext(unit)
+            local PredictedPos = unit.pos
+            local Direction = Vector((PredictedPos-myHero.pos):Normalized())
+            if NextSpot then
+                local Time = (GetDistance(unit.pos, myHero.pos) / 2000) * 0.5
+                local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
+                PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
+                Direction = Vector((PredictedPos-myHero.pos):Normalized())
+            end
+
+            for i=1, 5 do
+                ESpot = PredictedPos + Direction * (95*i)
+                Draw.Circle(ESpot, 50, 1, Draw.Color(255, 0, 191, 255)) 
+            end
+        end
+    end
+end
+
+function Vayne:Auto()
+    --PrintChat("ksing")
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+            if self:CanUse(_E, "Auto") and ValidTarget(enemy, 550) and not CastingE and self:CheckWallStun(enemy) then
+                Control.CastSpell(HK_E, enemy)
+            end
+        end
+    end
+end 
+
+function Vayne:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+function Vayne:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local ERange = 550
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingE and self:CheckWallStun(target) then
+            Control.CastSpell(HK_E, target)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function Vayne:CheckWallStun(unit)
+    local NextSpot = GetUnitPositionNext(unit)
+    local PredictedPos = unit.pos
+    local Direction = Vector((PredictedPos-myHero.pos):Normalized())
+    if NextSpot then
+        local Time = (GetDistance(unit.pos, myHero.pos) / 2000) * 0.5
+        local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
+        PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
+        Direction = Vector((PredictedPos-myHero.pos):Normalized())
+    end
+    local FoundStun = false
+    for i=1, 5 do
+        ESpot = PredictedPos + Direction * (95*i) 
+        if MapPosition:inWall(ESpot) then
+            FoundStun = true
+            if HadStun == false then
+                StunTime = Game.Timer()
+                HadStun = true
+            elseif Game.Timer() - StunTime > 0.1 then
+                HadStun = false
+                return true
+            end
+        end
+    end
+    if FoundStun == false then
+        HadStun = false
+    end
+    return false
+end
+
+function Vayne:CheckWallStun2(unit)
+    local NextSpot = GetUnitPositionNext(unit)
+    local PredictedPos = unit.pos
+    local Direction = Vector((PredictedPos-myHero.pos):Normalized())
+    if NextSpot then
+        local Time = (GetDistance(unit.pos, myHero.pos) / 2000) * 0.5
+        local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
+        PredictedPos = unit.pos - UnitDirection * (unit.ms*Time)
+        Direction = Vector((PredictedPos-myHero.pos):Normalized())
+    end
+    for i=1, 5 do
+        ESpot = PredictedPos + Direction * (95*i) 
+        if MapPosition:inWall(ESpot) then
+            PrintChat("Second Stun true")
+            return true
+        end
+    end
+    return false
+end
+
+function Vayne:OnPostAttackTick(args)
+    if target then
+    end
+    attackedfirst = 1
+    attacked = 1
+end
+
+function Vayne:OnPreAttack(args)
+    if self:CanUse(_E, Mode()) and target then
+    end
+end
+
+function Vayne:UseE(unit, hits)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, ESpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1001 and pred.HitCount >= hits then
+        Control.CastSpell(HK_E, pred.CastPos)
+    end 
+end
 
 class "Orianna"
 
@@ -1173,6 +1461,8 @@ function Velkoz:UseE(unit)
         end
     end
 end
+
+
 
 class "Neeko"
 
