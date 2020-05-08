@@ -3,11 +3,11 @@ require "DamageLib"
 require "2DGeometry"
 
 local EnemyHeroes = {}
-
+local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 20.00
+    local Version = 50.00
     
     local Files = {
         Lua = {
@@ -98,6 +98,17 @@ function GetEnemyHeroes()
 		local Hero = Game.Hero(i)
 		if Hero.isEnemy then
 			table.insert(EnemyHeroes, Hero)
+			PrintChat(Hero.name)
+		end
+	end
+	--PrintChat("Got Enemy Heroes")
+end
+
+function GetAllyHeroes()
+	for i = 1, Game.HeroCount() do
+		local Hero = Game.Hero(i)
+		if Hero.isAlly then
+			table.insert(AllyHeroes, Hero)
 			PrintChat(Hero.name)
 		end
 	end
@@ -314,6 +325,7 @@ function Manager:LoadLucian()
 	end
 end
 
+
 function Manager:LoadDraven()
 	Draven:Spells()
 	Draven:Menu()
@@ -415,14 +427,8 @@ local attackedfirst = 0
 local Q = 1
 local R = 1
 local WasInRange = false
-local ComboCard = "Gold"
-local LockGold = false
-local LockBlue = false
 local OneTick
-local BuffOnStick = false
 local attacked = 0
-local LastHitSpot = myHero.pos
-local Direction = myHero.pos
 
 function Riven:Menu()
     self.Menu = MenuElement({type = MENU, id = "Riven", name = "Riven"})
@@ -495,7 +501,7 @@ function Riven:Tick()
     Q = myHero:GetSpellData(_Q).ammo+1
     if Q == 1 or not target or GetDistance(target.pos, myHero.pos) > _G.SDK.Data:GetAutoAttackRange(myHero) or not self.Menu.ToggleFightKey:Value() or self.Menu.FleeKey:Value() then
     	_G.SDK.Orbwalker:SetMovement(true)
-    elseif target then
+    elseif target and GetDistance(target.pos, myHero.pos) < _G.SDK.Data:GetAutoAttackRange(myHero) then
     	if self.Menu.ComboMode.UseQFast:Value() and self.Menu.ComboMode.UseQ:Value() and self.Menu.ToggleFightKey:Value() and not self.Menu.FleeKey:Value() then 
     		_G.SDK.Orbwalker:SetMovement(false)
     	end
@@ -954,9 +960,6 @@ local WasInRange = false
 local ComboCard = "Gold"
 local LockGold = false
 local LockBlue = false
-local BuffOnStick = false
-local LastHitSpot = myHero.pos
-local Direction = myHero.pos
 
 function TwistedFate:Menu()
     self.Menu = MenuElement({type = MENU, id = "TwistedFate", name = "TwistedFate"})
@@ -1159,9 +1162,6 @@ local LastESpot = myHero.pos
 local LastE2Spot = myHero.pos
 local attackedfirst = 0
 local WasInRange = false
-local BuffOnStick = false
-local LastHitSpot = myHero.pos
-local Direction = myHero.pos
 
 function MasterYi:Menu()
 	self.Menu = MenuElement({type = MENU, id = "MasterYi", name = "MasterYi"})
@@ -1739,7 +1739,7 @@ end
 
 function MissFortune:UseR(unit, hits)
         local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
-        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300 and (pred.HitCount >= hits or target.health < self:GetRDmg(target)*0.8) then
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300 and target.health < self:GetRDmg(target)*0.8 then
         	--PrintChat("Casting R")
         	_G.SDK.Orbwalker:SetMovement(false)
         	_G.SDK.Orbwalker:SetAttack(false)
@@ -1810,6 +1810,9 @@ end
 function Lucian:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	target = GetTarget(1400)
+	if myHero.activeSpell.name == "LucianE" then
+		DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+	end
 	local hasPassive = _G.SDK.BuffManager:HasBuff(myHero, "LucianPassiveBuff")
 	if hasPassive then
 		DoubleShot = true
@@ -2125,7 +2128,6 @@ local QCastTime = 0
 local attackedfirst = 0
 local WasInRange = false
 local QRecast = false
-local BuffOnStick = false
 local LastHitSpot = myHero.pos
 local Direction = myHero.pos
 
@@ -2941,9 +2943,6 @@ local LastESpot = myHero.pos
 local LastE2Spot = myHero.pos
 local attackedfirst = 0
 local WasInRange = false
-local BuffOnStick = false
-local LastHitSpot = myHero.pos
-local Direction = myHero.pos
 
 function Teemo:Menu()
 	self.Menu = MenuElement({type = MENU, id = "Teemo", name = "Teemo"})
@@ -2986,6 +2985,7 @@ function Teemo:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	--PrintChat(myHero:GetSpellData(_E).name)
 	--PrintChat(myHero:GetSpellData(_R).toggleState)
+	--PrintChat(myHero.activeSpell.name)
 	ActiveSpell = myHero.activeSpell.name
 	target = GetTarget(1400)
 	self:KS()
@@ -3090,7 +3090,7 @@ function Teemo:OnPostAttackTick(args)
 	attackedfirst = 1
 	if target then
 		local Qrange = 680 + target.boundingRadius + myHero.boundingRadius
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and ActiveSpell ~= "BlindingDart" then
 			Control.CastSpell(HK_Q, target)
 		end
 	end
@@ -3968,7 +3968,7 @@ function Aphelios:Draw()
 		local endtime = Game.Timer()
 		if myHero.activeSpell.valid then
 			local attacktargetpos = myHero.activeSpell.placementPos
-			local vectargetpos = Vector(attacktargetpos.x,attacktargetpos.y,attacktargetpos.z);
+			local vectargetpos = Vector(attacktargetpos.x,attacktargetpos.y,attacktargetpos.z)
 			Draw.Circle(vectargetpos, 225, 1, Draw.Color(255, 0, 191, 255))
 		end
 		Draw.Text(MainHand, 25, 770, 900, Draw.Color(0xFF32CD32))
