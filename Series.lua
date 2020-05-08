@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 50.00
+    local Version = 51.00
     
     local Files = {
         Lua = {
@@ -2080,15 +2080,9 @@ function Lucian:OnPostAttackTick(args)
 		local range = 500 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, range) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" then
-			if _G.SDK.Orbwalker:CanAttack() then
-					--PrintChat("can attack")
-					--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.75)
-			else
-				--PrintChat("Casting Q")
-				Control.CastSpell(HK_Q, target)
-				--DelayAction(function() self:QClick() end, 0.30)
-				--self:QClick()
-			end
+			Control.CastSpell(HK_Q, target)
+			--DelayAction(function() self:QClick() end, 0.30)
+			--self:QClick()
 			--PrintChat(myHero.attackSpeed)
 			if myHero.attackSpeed < 1.40 then
 				--PrintChat("cat")
