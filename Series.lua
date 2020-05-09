@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 51.00
+    local Version = 52.00
     
     local Files = {
         Lua = {
@@ -466,23 +466,6 @@ function Riven:Spells()
     RSpellData = {speed = 1600, range = 900, delay = 0.25, angle = 75, radius = 0, collision = {}, type = "conic"}
 end
 
-function Riven:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Riven:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
-end
 
 function Riven:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -981,23 +964,6 @@ function TwistedFate:Spells()
     QSpellData = {speed = 1000, range = 1450, delay = 0.25, radius = 200, collision = {}, type = "linear"}
 end
 
-function TwistedFate:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function TwistedFate:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
-end
 
 function TwistedFate:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -1186,23 +1152,6 @@ function MasterYi:Spells()
 	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
 end
 
-function MasterYi:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function MasterYi:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	--GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-	end
-end
 
 function MasterYi:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -1397,22 +1346,6 @@ function MissFortune:Spells()
     RSpellData = {speed = 2800, range = 1300, delay = 0.25, angle = 40, radius = 0, collision = {}, type = "conic"}
 end
 
-function MissFortune:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function MissFortune:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-    end
-end
 
 
 function MissFortune:Tick()
@@ -1789,24 +1722,6 @@ function Lucian:Spells()
 	RSpellData = {speed = 2800, range = 1200, delay = 0, radius = 110, collision = {}, type = "linear"}
 end
 
-function Lucian:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Lucian:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	--GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-	end
-end
-
-
 function Lucian:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	target = GetTarget(1400)
@@ -2081,8 +1996,8 @@ function Lucian:OnPostAttackTick(args)
 		--PrintChat(range)
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, range) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" then
 			Control.CastSpell(HK_Q, target)
-			--DelayAction(function() self:QClick() end, 0.30)
-			--self:QClick()
+				--DelayAction(function() self:QClick() end, 0.30)
+				--self:QClick()
 			--PrintChat(myHero.attackSpeed)
 			if myHero.attackSpeed < 1.40 then
 				--PrintChat("cat")
@@ -2155,23 +2070,6 @@ function Zoe:Spells()
 	Q2SpellData = {speed = 1200, range = 3000, delay = 0, radius = 100, collision = {"minion"}, type = "circular"}
 end
 
-function Zoe:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Zoe:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	--GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-	end
-end
 
 function Zoe:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -2454,22 +2352,6 @@ function Draven:Spells()
 	ESpellData = {speed = 1400, range = 1050, delay = 0.25, radius = 100, collision = {}, type = "linear"}
 end
 
-function Draven:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Draven:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	--GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-	end
-end
 
 function Draven:Tick()
 	--PrintChat(" ")
@@ -2957,24 +2839,6 @@ function Teemo:Spells()
 	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
 end
 
-function Teemo:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Teemo:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	--GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-	end
-end
-
 function Teemo:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	--PrintChat(myHero:GetSpellData(_E).name)
@@ -3156,24 +3020,6 @@ function Fizz:Spells()
 	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
 	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
 	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
-end
-
-function Fizz:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Fizz:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	--GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-	end
 end
 
 
@@ -3536,24 +3382,6 @@ function Quinn:Spells()
 	QSpellData = {speed = 1300, range = 1025, delay = 0.25, radius = 70, collision = {"minion"}, type = "linear"}
 end
 
-function Quinn:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Quinn:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	--GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-		_G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-	end
-end
-
 function Quinn:GotBuff(unit)
 	for i = 0, unit.buffCount do
 		local buff = unit:GetBuff(i)
@@ -3913,21 +3741,6 @@ function Aphelios:Spells()
 	RAllSpell = {speed = 1000, range = 1300, delay = 0.25, radius = 110, collision = {}, type = "linear"}
 end
 
-function Aphelios:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-
-function Aphelios:LoadScript()
-	self:Spells()
-	self:Menu()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-	if _G.SDK then
-		_G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-		_G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-	end
-end
 
 function Aphelios:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -4608,18 +4421,6 @@ function Pyke:Spells()
 	spellDataR = {speed = 3000, range = 750, delay = 0.75, radius = 250, collision = {""}, type = "circular"}
 end
 
-function Pyke:__init()
-	DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Pyke:LoadScript()
-	self:Spells()
-	self:Menu()
-	--
-	GetEnemyHeroes()
-	Callback.Add("Tick", function() self:Tick() end)
-	Callback.Add("Draw", function() self:Draw() end)
-end
 
 
 function Pyke:Tick()
