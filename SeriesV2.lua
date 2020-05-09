@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 22.00
+    local Version = 23.00
     
     local Files = {
         Lua = {
@@ -392,24 +392,6 @@ end
 function Vayne:Spells()
 end
 
-function Vayne:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Vayne:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
-end
-
 function Vayne:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
     target = GetTarget(1400)
@@ -533,30 +515,28 @@ function Vayne:GetStunSpot(unit)
             --Draw.Circle(ESpot, 30, 1, Draw.Color(255, 0, 191, 255))
             if MapPosition:inWall(ESSpot) then
                 local FlashDirection = Vector((unit.pos-ESSpot):Normalized())
-
-
                 local FlashSpot = unit.pos - Direction * 400
                 local MinusDist = GetDistance(FlashSpot, myHero.pos)
                 if MinusDist > 400 then
                     FlashSpot = unit.pos - Direction * (800-MinusDist)
+                    MinusDist = GetDistance(FlashSpot, myHero.pos)
                 end
-                local QSpot = unit.pos - Direction * 300
                 if MinusDist < 700 then
                     if self.Menu.EFlashKey:Value() then
                         if IsReady(_E) and Flash and IsReady(Flash) then
                             Control.CastSpell(HK_E, unit)
-                            DelayAction(function() Control.CastSpell(FlashSpell, QSpot) end, 0.05)
+                            DelayAction(function() Control.CastSpell(FlashSpell, FlashSpot) end, 0.05)
                         end                          
                     end
                 end
-
                 local QSpot = unit.pos - Direction * 300
                 local MinusDistQ = GetDistance(QSpot, myHero.pos)
                 if MinusDistQ > 300 then
                     QSpot = unit.pos - Direction * (600-MinusDistQ)
+                    MinusDistQ = GetDistance(QSpot, myHero.pos)
                 end
                 if MinusDistQ < 470 then
-                    if self.Menu.ComboMode.UseQStun:Value() and Mode() == "Combo" then
+                    if (self.Menu.ComboMode.UseQStun:Value() and Mode() == "Combo") or self.Menu.EFlashKey:Value() then
                         if IsReady(_Q) and IsReady(_E) then
                             Control.CastSpell(HK_Q, QSpot)
                         end                          
@@ -583,14 +563,11 @@ function Vayne:DrawStunSpot()
                 Draw.Circle(TargetAdded, 30, 1, Draw.Color(255, 0, 191, 255))
                 Draw.Circle(ESSpot, 30, 1, Draw.Color(255, 0, 191, 255))
                 local FlashDirection = Vector((target.pos-ESSpot):Normalized())
-
-
                 local FlashSpot = target.pos - Direction * 400
                 local MinusDist = GetDistance(FlashSpot, myHero.pos)
                 if MinusDist > 400 then
                     FlashSpot = target.pos - Direction * (800-MinusDist)
                 end
-                local QSpot = target.pos - Direction * 300
                 if MinusDist < 700 then
                     Draw.Circle(FlashSpot, 30, 1, Draw.Color(255, 0, 255, 255))
                 end
@@ -853,23 +830,6 @@ function Orianna:Spells()
     QSpellData = {speed = 1400, range = 2000, delay = 0.10, radius = 100, collision = {}, type = "linear"}
 end
 
-function Orianna:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Orianna:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
-end
 
 function Orianna:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -1397,24 +1357,6 @@ function Velkoz:Spells()
     RSpellData = {speed = 3000, range = 700, delay = 0.25, radius = 300, collision = {}, type = "circular"}
 end
 
-function Velkoz:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Velkoz:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
-end
-
 function Velkoz:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
     target = GetTarget(1400)
@@ -1710,23 +1652,6 @@ function Neeko:Spells()
     QSpellData = {speed = 1300, range = 800, delay = 0.10, radius = 225, collision = {}, type = "circular"}
 end
 
-function Neeko:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Neeko:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
-end
 
 function Neeko:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -1926,24 +1851,6 @@ function Viktor:Spells()
     ESpellData = {speed = 1350, range = 500, delay = 0.25, radius = 70, collision = {}, type = "linear"}
     WSpellData = {speed = 3000, range = 800, delay = 0.5, radius = 300, collision = {}, type = "circular"}
     RSpellData = {speed = 3000, range = 700, delay = 0.25, radius = 300, collision = {}, type = "circular"}
-end
-
-function Viktor:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Viktor:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
 end
 
 function Viktor:Tick()
@@ -2246,23 +2153,6 @@ function Jayce:Spells()
     Q2SpellData = {speed = 1890, range = 1470, delay = 0.1515, radius = 70, collision = {"minion"}, type = "linear"}
 end
 
-function Jayce:__init()
-    DelayAction(function() self:LoadScript() end, 1.05)
-end
-
-function Jayce:LoadScript()
-    self:Spells()
-    self:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() self:Tick() end)
-    Callback.Add("Draw", function() self:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) self:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) self:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) self:OnPostAttack(...) end)
-    end
-end
 
 function Jayce:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
