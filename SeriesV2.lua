@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 26.00
+    local Version = 27.00
     
     local Files = {
         Lua = {
@@ -851,7 +851,7 @@ function Ezreal:Logic()
         end
         local QRange = 1250
         local WRange = 1250
-        local QdmgCheck = target.health >= getdmg("Q", target, myHero)
+        local QdmgCheck = target.health >= getdmg("Q", target, myHero) or not self:CanUse(_Q, Mode())
         local AAdmgCheck = target.health >= getdmg("AA", target, myHero)
         if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
             self:UseQ(target)
@@ -878,10 +878,13 @@ end
 function Ezreal:UseQ(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
     if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
-        if self:CanUse(_W, Mode()) and ValidTarget(target, 1250) then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        local QdmgCheck = target.health >= getdmg("Q", target, myHero)
+        local AAdmgCheck = target.health >= getdmg("AA", target, myHero) or GetDistance(unit) > AARange
+        if self:CanUse(_W, Mode()) and ValidTarget(target, 1250) and QdmgCheck and AAdmgCheck then
             self:UseW(unit)
         end
-        if not self:CanUse(_W, Mode()) then
+        if not self:CanUse(_W, Mode()) or not QdmgCheck or not AAdmgCheck then
             Control.CastSpell(HK_Q, pred.CastPos)
         end
     end 
