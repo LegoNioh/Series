@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 31.00
+    local Version = 40.00
     
     local Files = {
         Lua = {
@@ -723,6 +723,7 @@ local attacked = 0
 
 function Ezreal:Menu()
     self.Menu = MenuElement({type = MENU, id = "Ezreal", name = "Ezreal"})
+    self.Menu:MenuElement({id = "UltKey", name = "Manual R Key", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
@@ -731,6 +732,7 @@ function Ezreal:Menu()
     self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Auto Use Q", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseQMana", name = "Q: Min Mana %", value = 20, min = 1, max = 100, step = 1})
     self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
     self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
@@ -739,17 +741,21 @@ end
 
 function Ezreal:Spells()
     QSpellData = {speed = 2000, range = 1150, delay = 0.1515, radius = 70, collision = {"minion"}, type = "linear"}
+    RSpellData = {speed = 2000, range = 3000, delay = 1.00, radius = 320, collision = {}, type = "linear"}
     WSpellData = {speed = 1200, range = 1150, delay = 0.1515, radius = 70, collision = {}, type = "linear"}
 end
 
 function Ezreal:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(1400)
+    target = GetTarget(2000)
     CastingQ = myHero.activeSpell.name == "EzrealQ"
     CastingW = myHero.activeSpell.name == "EzrealW"
     CastingE = myHero.activeSpell.name == "EzrealE"
     CastingR = myHero.activeSpell.name == "EzrealR"
     --PrintChat(myHero.activeSpell.name)
+    if self.Menu.UltKey:Value() then
+        self:ManualRCast()
+    end
     self:Logic()
     self:Auto()
     if EnemyLoaded == false then
@@ -772,12 +778,31 @@ function Ezreal:Draw()
     end
 end
 
+function Ezreal:ManualRCast()
+    if target then
+        if ValidTarget(target, 3000) then
+            self:UseR(target)
+        end
+    else
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy, 550) then
+                if ValidTarget(target, 3000) then
+                    self:UseR(target)
+                end
+            end
+        end
+    end
+end
 
 function Ezreal:Auto()
-    --PrintChat("ksing")
-    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
+    if Mode() ~= "Combo" and Mode() ~= "Harass" then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy) then
+                if self:CanUse(_Q, "Auto") and ValidTarget(enemy, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+                    self:UseQAuto(enemy)
+                end
+            end
         end
     end
 end 
@@ -794,7 +819,8 @@ function Ezreal:CanUse(spell, mode)
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
             return true
         end
-        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
+        local ManaPercent = myHero.mana / myHero.maxMana * 100
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() and ManaPercent > self.Menu.AutoMode.UseQMana:Value() then
             return true
         end
         if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
@@ -875,6 +901,13 @@ end
 function Ezreal:OnPreAttack(args)
 end
 
+function Ezreal:UseQAuto(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+        Control.CastSpell(HK_Q, pred.CastPos)
+    end 
+end
+
 function Ezreal:UseQ(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
     if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
@@ -894,6 +927,13 @@ function Ezreal:UseW(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
     if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
             Control.CastSpell(HK_W, pred.CastPos)
+    end 
+end
+
+function Ezreal:UseR(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 3000 then
+            Control.CastSpell(HK_R, pred.CastPos)
     end 
 end
 
