@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 23.00
+    local Version = 25.00
     
     local Files = {
         Lua = {
@@ -235,6 +235,10 @@ function Manager:__init()
         DelayAction(function() self:LoadNeeko() end, 1.05)
     elseif myHero.charName == "Vayne" then
         DelayAction(function() self:LoadVayne() end, 1.05)
+    elseif myHero.charName == "Azir" then
+        DelayAction(function() self:LoadAzir() end, 1.05)
+    elseif myHero.charName == "Ezreal" then
+        DelayAction(function() self:LoadEzreal() end, 1.05)
     elseif myHero.charName == "Orianna" then
         DelayAction(function() self:LoadOrianna() end, 1.05)
     end
@@ -308,16 +312,16 @@ function Manager:LoadOrianna()
     end
 end
 
-function Manager:LoadViktor()
-    Viktor:Spells()
-    Viktor:Menu()
+function Manager:LoadAzir()
+    Azir:Spells()
+    Azir:Menu()
     --
     --GetEnemyHeroes()
-    Callback.Add("Tick", function() Viktor:Tick() end)
-    Callback.Add("Draw", function() Viktor:Draw() end)
+    Callback.Add("Tick", function() Azir:Tick() end)
+    Callback.Add("Draw", function() Azir:Draw() end)
     if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Viktor:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Viktor:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Azir:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Azir:OnPostAttackTick(...) end)
     end
 end
 
@@ -334,6 +338,559 @@ function Manager:LoadViktor()
     end
 end
 
+function Manager:LoadEzreal()
+    Ezreal:Spells()
+    Ezreal:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Ezreal:Tick() end)
+    Callback.Add("Draw", function() Ezreal:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Ezreal:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Ezreal:OnPostAttackTick(...) end)
+    end
+end
+
+class "Azir"
+
+local Soldiers = {} 
+
+local EnemyLoaded = false
+local casted = 0
+
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+
+local CastedQ = false
+local TickQ = false
+local CastedW = false
+local TickW = false
+
+local WasInRange = false
+local attacked = 0
+
+function Azir:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Azir", name = "Azir"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQAgro", name = "Use Q Agressively", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Auto Use Q", value = true})
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Azir:Spells()
+    QSpellData = {speed = 2000, range = 1150, delay = 0.1515, radius = 70, collision = {"minion"}, type = "linear"}
+    WSpellData = {speed = 1200, range = 1150, delay = 0.1515, radius = 70, collision = {}, type = "linear"}
+end
+
+function Azir:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(1400)
+    self:ProcessSpells()
+    CastingQ = myHero.activeSpell.name == "AzirQ"
+    CastingW = myHero.activeSpell.name == "AzirWSpawnSoldier"
+    CastingR = myHero.activeSpell.name == "AzirR"
+    --PrintChat(myHero:GetSpellData(_Q).ammo)
+    if TickW then
+        PrintChat("Tick W")
+        if CastingW then
+            PrintChat("Adding W Solider")
+            local PlacePos = myHero.activeSpell.placementPos
+            if GetDistance(myHero.activeSpell.placementPos) > 560 then
+                local Direction = Vector((myHero.pos-myHero.activeSpell.placementPos):Normalized())
+                PlacePos = myHero.pos - Direction * 500
+            end
+            table.insert(Soldiers, 1, {CastTime = Game.Timer(), SourceSpell = "W", Pos = PlacePos, StartPos = PlacePos, Turret = false, TurretEnterTime = 0, TurretTime = 0, TurretTimeStore = 0})
+        end
+        TickW = false
+    end
+    if TickQ then
+        PrintChat("Tick Q")
+        self:ScanForW()
+        TickQ = false
+    end
+    self:Logic()
+    --self:Auto()
+    self:CleanW()
+    --PrintChat(#Soldiers)
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Azir:CleanW()
+    for i = #Soldiers, 1, -1 do
+        local Man = Soldiers[i]
+        local SoldierUnderTurret = IsUnderEnemyTurret(Man.Pos)
+        if SoldierUnderTurret then
+            if Man.Turret == false then
+                Man.TurretEnterTime = Game.Timer()
+                Man.Turret = true 
+            else
+                Man.TurretTime = Game.Timer() - Man.TurretEnterTime
+            end
+        else
+            if Man.Turret == true then
+                Man.TurretTimeStore = Man.TurretTimeStore + Man.TurretTime
+                Man.TurretTime = 0
+            end
+            Man.Turret = false
+        end
+        if (Game.Timer()-Man.CastTime + Man.TurretTimeStore + Man.TurretTime) > 10 or GetDistance(myHero.pos, Man.Pos) > 1490 then
+            table.remove(Soldiers, i)
+        end
+    end
+end
+
+function Azir:ScanForW()
+    for j = #Soldiers, 1, -1 do
+        --table.remove(Soldiers, j)
+        --PrintChat("Removed Solider")
+    end
+    local count = Game.MissileCount()
+    for i = count, 1, -1 do
+        local missile = Game.Missile(i)
+        local data = missile.missileData
+        if data then
+            if data.name == "AzirSoldierMissile" then
+                --PrintChat(data.endPos)
+                local CastTime = Game.Timer()
+                GotW = "Q"
+                PrintChat("Comparing Soldiers")
+                for j = #Soldiers, 1, -1 do
+                    local Soldier = Soldiers[j]
+                    if GetDistance(data.startPos, Soldier.StartPos) < 30 then
+                        CastTime = Soldier.CastTime
+                        PrintChat("Moving Soldier")
+                        Soldiers[j] = {CastTime = CastTime, SourceSpell = "Q", Pos = data.endPos, StartPos = data.startPos, Turret = false, TurretEnterTime = 0, TurretTime = 0, TurretTimeStore = 0}
+                        break
+                    end
+                end
+                --table.insert(Soldiers, 1, {CastTime = Game.Timer(), SourceSpell = "Q", Pos = data.endPos, StartPos = data.startPos})
+            end
+        end
+    end
+end
+
+function Azir:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 740, 1, Draw.Color(255, 0, 191, 255))
+        for i = 1, #Soldiers do
+            --PrintChat("Soldier")
+            Draw.Circle(Vector(Soldiers[i].Pos), 330, 1, Draw.Color(255, 0, 191, 255))
+        end
+    end
+end
+
+
+function Azir:Auto()
+    --PrintChat("ksing")
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Azir:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+function Azir:ProcessSpells()
+    if myHero:GetSpellData(_Q).currentCd == 0 then
+        CastedQ = false
+    else
+        if CastedQ == false then
+            TickQ = true
+        end
+        CastedQ = true
+    end
+    if myHero:GetSpellData(_W).currentCd == 0 then
+        CastedW = false
+    else
+        if CastedW == false then
+            --GotBall = "ECast"
+            TickW = true
+        end
+        CastedW = true
+    end
+end
+
+
+function Azir:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local QRange = 740
+        local WRange = 560
+        local WRadius = 300
+        local WCheck = 830
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WCheck) then
+            Control.CastSpell(HK_W, target)
+        end
+
+
+        if GetDistance(target.pos) > AARange then
+            PrintChat("Greater than AA Range")
+            self:SoldierOrb(target)
+        else
+            _G.SDK.Orbwalker:SetAttack(true)
+            local SOrbTarget = self:GetSoldierTarget()
+            if SOrbTarget then
+                PrintChat("Forcing Target")
+                _G.SDK.Orbwalker.ForceTarget = SOrbTarget
+            elseif #Soldiers > 0 then
+                self:CastQ(target)   
+            end
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+
+function Azir:SoldierOrb(unit)
+    local ManTarget = self:GetSoldierTarget()
+    if ManTarget then
+        if _G.SDK then
+            _G.SDK.Orbwalker:SetAttack(false)
+        end
+        PrintChat("Got ManTarget")
+        if _G.SDK.Data:HeroCanAttack() and myHero.attackData.state == 1 then
+            PrintChat("attacking Soldier Orb")
+            Control.Attack(ManTarget)
+        end
+    elseif #Soldiers > 0 then
+        PrintChat("Checking Q")
+        self:CastQ(unit)        
+    end
+end
+
+function Azir:CastQ(unit)
+    local QRange = 740
+    local NextSpot = GetUnitPositionNext(unit)
+    if NextSpot and self:CanUse(_Q, Mode()) and ValidTarget(unit, QRange) then
+        local UnitDirection = Vector((unit.pos-NextSpot):Normalized())
+        local PredSpot = unit.pos + UnitDirection * 200
+        Control.CastSpell(HK_Q, PredSpot)
+    elseif self:CanUse(_Q, Mode()) and ValidTarget(unit, QRange) then
+        Control.CastSpell(HK_Q, unit)
+    end   
+end
+
+function Azir:GetSoldierTarget()
+    local SoliderTarget = nil
+    local MaxMen = 0
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) and #Soldiers > 0 then
+            local NoMen = 0
+            for i = #Soldiers, 1, -1 do
+                local Man = Soldiers[i]
+                if Man.Pos then
+                    if GetDistance(enemy.pos, Man.Pos) < 330 and GetDistance(Man.Pos) < 740 then
+                        NoMen = NoMen + 1
+                    else
+                        if self.Menu.ComboMode.UseQAgro:Value() then
+                            self:CastQ(enemy)
+                        end
+                    end
+                end
+            end
+            if NoMen >= MaxMen and NoMen > 0 then
+                if SoliderTarget == nil or SoliderTarget.health > enemy.health or NoMen > MaxMen or SoliderTarget == nil then
+                    SoliderTarget = enemy
+                    MaxMen = NoMen
+                end
+            end
+        end
+    end                
+    return SoliderTarget
+end
+
+function Azir:OnPostAttack(args)
+end
+
+function Azir:OnPostAttackTick(args)
+end
+
+function Azir:OnPreAttack(args)
+end
+
+function Azir:UseQ(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+            Control.CastSpell(HK_Q, pred.CastPos)
+    end 
+end
+
+function Azir:UseW(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+            Control.CastSpell(HK_W, pred.CastPos)
+    end 
+end
+
+
+class "Ezreal"
+
+local EnemyLoaded = false
+local casted = 0
+
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+
+local WasInRange = false
+local attacked = 0
+
+function Ezreal:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Ezreal", name = "Ezreal"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Auto Use Q", value = true})
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Ezreal:Spells()
+    QSpellData = {speed = 2000, range = 1150, delay = 0.1515, radius = 70, collision = {"minion"}, type = "linear"}
+    WSpellData = {speed = 1200, range = 1150, delay = 0.1515, radius = 70, collision = {}, type = "linear"}
+end
+
+function Ezreal:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(1400)
+    CastingQ = myHero.activeSpell.name == "EzrealQ"
+    CastingW = myHero.activeSpell.name == "EzrealW"
+    CastingE = myHero.activeSpell.name == "EzrealE"
+    CastingR = myHero.activeSpell.name == "EzrealR"
+    --PrintChat(myHero.activeSpell.name)
+    self:Logic()
+    self:Auto()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Ezreal:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 1150, 1, Draw.Color(255, 0, 191, 255))
+    end
+end
+
+
+function Ezreal:Auto()
+    --PrintChat("ksing")
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Ezreal:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+function Ezreal:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local QRange = 1250
+        local WRange = 1250
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            self:UseQ(target)
+        end
+        if self:CanUse(_W, Mode()) and ValidTarget(target, AARange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            self:UseW(target)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+
+
+function Ezreal:OnPostAttack(args)
+end
+
+function Ezreal:OnPostAttackTick(args)
+end
+
+function Ezreal:OnPreAttack(args)
+end
+
+function Ezreal:UseQ(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+        if self:CanUse(_W, Mode()) and ValidTarget(target, 1250) then
+            self:UseW(unit)
+        end
+        if not self:CanUse(_W, Mode()) then
+            Control.CastSpell(HK_Q, pred.CastPos)
+        end
+    end 
+end
+
+function Ezreal:UseW(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
+    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+            Control.CastSpell(HK_W, pred.CastPos)
+    end 
+end
 
 class "Vayne"
 
@@ -471,6 +1028,8 @@ function Vayne:Draw()
 
         if target then
             self:DrawStunSpot()
+
+
             local unit = target
             local NextSpot = GetUnitPositionNext(unit)
             local PredictedPos = unit.pos
