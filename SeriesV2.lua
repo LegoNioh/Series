@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 25.00
+    local Version = 26.00
     
     local Files = {
         Lua = {
@@ -851,10 +851,12 @@ function Ezreal:Logic()
         end
         local QRange = 1250
         local WRange = 1250
+        local QdmgCheck = target.health >= getdmg("Q", target, myHero)
+        local AAdmgCheck = target.health >= getdmg("AA", target, myHero)
         if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
             self:UseQ(target)
         end
-        if self:CanUse(_W, Mode()) and ValidTarget(target, AARange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+        if QdmgCheck and AAdmgCheck and self:CanUse(_W, Mode()) and ValidTarget(target, AARange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
             self:UseW(target)
         end
     else
