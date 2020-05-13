@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 52.00
+    local Version = 55.00
     
     local Files = {
         Lua = {
@@ -737,6 +737,8 @@ function Jax:Menu()
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseE", name = "Use Auto E", value = true})
     self.Menu.AutoMode:MenuElement({id = "UseE2", name = "Use Auto E2", value = true})
+    self.Menu:MenuElement({id = "ManualMode", name = "ManualQ", type = MENU})
+    self.Menu.ManualMode:MenuElement({id = "UseE", name = "Use E in Manual Q", value = true})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
@@ -846,19 +848,19 @@ function Jax:ManualQCast()
     local QRange = 700
     if target then
         if ValidTarget(target, QRange) and not myHero.pathing.isDashing and IsReady(_Q) then
-            Control.CastSpell(HK_Q, target)
-            if self:CanUse(_E, "Combo") then
+            if self:CanUse(_E, "Manual") then
                 Control.CastSpell(HK_E)
             end
+            Control.CastSpell(HK_Q, target)
         end
     else
         for i, enemy in pairs(EnemyHeroes) do
             if enemy and not enemy.dead and ValidTarget(enemy, QRange) then
                 if not myHero.pathing.isDashing and IsReady(_Q) then
-                    Control.CastSpell(HK_Q, enemy)
-                    if self:CanUse(_E, "Combo") and not EBuff then
+                    if self:CanUse(_E, "Manual") and not EBuff then
                         Control.CastSpell(HK_E)
                     end
+                    Control.CastSpell(HK_Q, enemy)
                 end
             end
         end
@@ -895,23 +897,8 @@ function Jax:CanUse(spell, mode)
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
             return true
         end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
-            return true
-        end
-        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
-            return true
-        end
     elseif spell == _R then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
-            return true
-        end
-        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
             return true
         end
     elseif spell == _W then
@@ -931,7 +918,10 @@ function Jax:CanUse(spell, mode)
         if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
             return true
         end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+        if mode == "Manual" and IsReady(spell) and self.Menu.ManualMode.UseE:Value() and not EBuff then
+            return true
+        end
+        if mode == "Manual2" and IsReady(spell) and self.Menu.ManualMode.UseE2:Value() and EBuff then
             return true
         end
         if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() and not EBuff then
@@ -941,9 +931,6 @@ function Jax:CanUse(spell, mode)
             return true
         end
         if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
-            return true
-        end
-        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
             return true
         end
     end
