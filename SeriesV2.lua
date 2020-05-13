@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 55.00
+    local Version = 60.00
     
     local Files = {
         Lua = {
@@ -1562,7 +1562,8 @@ end
 function Ezreal:UseQAuto(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
     if pred.CastPos and pred.HitChance > self.Menu.AutoMode.UseQHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
-        if CanQ == true then
+        local Collision = _G.PremiumPrediction:IsColliding(myHero, pred.CastPos, QSpellData, {"minion"})
+        if CanQ == true and not Collision then
             Control.CastSpell(HK_Q, pred.CastPos)
             Qtick = true
             CanQ = false
