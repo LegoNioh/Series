@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 50.00
+    local Version = 51.00
     
     local Files = {
         Lua = {
@@ -847,12 +847,18 @@ function Jax:ManualQCast()
     if target then
         if ValidTarget(target, QRange) and not myHero.pathing.isDashing and IsReady(_Q) then
             Control.CastSpell(HK_Q, target)
+            if self:CanUse(_E, "Combo") then
+                Control.CastSpell(HK_E)
+            end
         end
     else
         for i, enemy in pairs(EnemyHeroes) do
             if enemy and not enemy.dead and ValidTarget(enemy, QRange) then
                 if not myHero.pathing.isDashing and IsReady(_Q) then
                     Control.CastSpell(HK_Q, enemy)
+                    if self:CanUse(_E, "Combo") and not EBuff then
+                        Control.CastSpell(HK_E)
+                    end
                 end
             end
         end
@@ -965,6 +971,9 @@ function Jax:Logic()
         local EAARange = _G.SDK.Data:GetAutoAttackRange(target)
         if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and WasInRange == true and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() and GetDistance(target.pos) > AARange+50 then
             Control.CastSpell(HK_Q, target)
+            if self:CanUse(_E, "Combo") and not EBuff then
+                Control.CastSpell(HK_E)
+            end
         end
         if not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
             if ValidTarget(target, ERange) and (self:CanUse(_E, "Combo2") or self:CanUse(_E, "Combo")) then
@@ -1542,7 +1551,7 @@ function Ezreal:Logic()
         local QdmgCheck = target.health >= getdmg("Q", target, myHero) or not self:CanUse(_Q, Mode())
         local AAdmgCheck = target.health >= getdmg("AA", target, myHero)
         if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
-            self:UseQGam(target)
+            self:UseQ(target)
         end
         if QdmgCheck and AAdmgCheck and self:CanUse(_W, Mode()) and ValidTarget(target, AARange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
             self:UseW(target)
@@ -1574,27 +1583,6 @@ function Ezreal:UseQAuto(unit)
     end 
 end
 
-function Ezreal:UseQGam(unit)
-    local QSpellDataGam = {Delay = 0.15, Radius = 30, Range = 1150, Speed = 2000, Collision = false, Type = _G.SPELLTYPE_LINE};
-    local pred = _G.GamsteronPrediction:GetPrediction(unit, QSpellDataGam, myHero)
-    if pred.CastPosition and pred.Hitchance >= _G.HITCHANCE_NORMAL and myHero.pos:DistanceTo(pred.CastPosition) < 1150 then
-        PrintChat(pred.Hitchance)
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        local QdmgCheck = unit.health >= getdmg("Q", unit, myHero)
-        local AAdmgCheck = unit.health >= getdmg("AA", unit, myHero) or GetDistance(unit.pos) > AARange
-        local Collision = _G.GamsteronPrediction:GetCollision(myHero, unit.pos, pred.CastPosition, 2000, 0.15, 30, {1})
-        if self:CanUse(_W, Mode()) and ValidTarget(unit, 1250) and QdmgCheck and AAdmgCheck and not Collision then
-            self:UseW(unit)
-        end
-        if not self:CanUse(_W, Mode()) or not QdmgCheck or not AAdmgCheck then
-            if CanQ == true and not Collision then
-                Control.CastSpell(HK_Q, pred.CastPosition)
-                Qtick = true
-                CanQ = false
-            end
-        end
-    end 
-end
 
 function Ezreal:UseQ(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
