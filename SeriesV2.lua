@@ -1,4 +1,5 @@
 require "PremiumPrediction"
+require "GamsteronPrediction"
 require "DamageLib"
 require "2DGeometry"
 require "MapPositionGOS"
@@ -8,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 40.00
+    local Version = 45.00
     
     local Files = {
         Lua = {
@@ -165,6 +166,16 @@ function GotBuff(unit, buffname)
     return 0
 end
 
+function BuffActive(unit, buffname)
+    for i = 0, unit.buffCount do
+        local buff = unit:GetBuff(i)
+        if buff.name == buffname and buff.count > 0 then 
+            return true
+        end
+    end
+    return false
+end
+
 function IsReady(spell)
     return myHero:GetSpellData(spell).currentCd == 0 and myHero:GetSpellData(spell).level > 0 and myHero:GetSpellData(spell).mana <= myHero.mana and Game.CanUseSpell(spell) == 0
 end
@@ -185,6 +196,25 @@ function Mode()
     else
         return GOS.GetMode()
     end
+end
+
+function GetItemSlot(unit, id)
+    for i = ITEM_1, ITEM_7 do
+        if unit:GetItemData(i).itemID == id then
+            return i
+        end
+    end
+    return 0
+end
+
+function IsFacing(unit)
+    local V = Vector((unit.pos - myHero.pos))
+    local D = Vector(unit.dir)
+    local Angle = 180 - math.deg(math.acos(V*D/(V:Len()*D:Len())))
+    if math.abs(Angle) < 80 then 
+        return true  
+    end
+    return false
 end
 
 function SetMovement(bool)
@@ -229,6 +259,8 @@ function Manager:__init()
         DelayAction(function() self:LoadJayce() end, 1.05)
     elseif myHero.charName == "Viktor" then
         DelayAction(function() self:LoadViktor() end, 1.05)
+    elseif myHero.charName == "Tryndamere" then
+        DelayAction(function() self:LoadTryndamere() end, 1.05)
     elseif myHero.charName == "Velkoz" then
         DelayAction(function() self:LoadVelkoz() end, 1.05)
     elseif myHero.charName == "Neeko" then
@@ -259,6 +291,19 @@ function Manager:LoadVayne()
     end
 end
 
+function Manager:LoadTryndamere()
+    Tryndamere:Spells()
+    Tryndamere:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Tryndamere:Tick() end)
+    Callback.Add("Draw", function() Tryndamere:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Tryndamere:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Tryndamere:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Tryndamere:OnPostAttack(...) end)
+    end
+end
 
 function Manager:LoadJayce()
     Jayce:Spells()
@@ -350,6 +395,306 @@ function Manager:LoadEzreal()
         _G.SDK.Orbwalker:OnPostAttackTick(function(...) Ezreal:OnPostAttackTick(...) end)
     end
 end
+
+class "Tryndamere"
+
+local EnemyLoaded = false
+local casted = 0
+local Qtick = true
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+local Item_HK = {}
+local WasInRange = false
+local attacked = 0
+local CanQ = true 
+local QtickTime = 0
+
+function Tryndamere:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Tryndamere", name = "Tryndamere"})
+    self.Menu:MenuElement({id = "EKey", name = "Manual E Key", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 1, max = 100, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseQFury", name = "Q Min Fury", value = 50, min = 1, max = 100, step = 5})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 1, max = 100, step = 1})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Use Auto Q", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 1, max = 100, step = 1})
+    self.Menu.AutoMode:MenuElement({id = "UseQFury", name = "Q Min Fury", value = 50, min = 1, max = 100, step = 5})
+    self.Menu.AutoMode:MenuElement({id = "UseR", name = "Use Auto R", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 1, max = 100, step = 1})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Tryndamere:Spells()
+    ESpellData = {speed = 1200, range = 885, delay = 0.1515, radius = 70, collision = {}, type = "linear"}
+end
+
+
+function Tryndamere:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+    end
+end
+
+
+function Tryndamere:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(2000)
+    CastingW = myHero.activeSpell.name == "TryndamereW"
+    --PrintChat(myHero.activeSpell.name)
+    --PrintChat(myHero.activeSpell.speed)
+    if self.Menu.EKey:Value() then
+        self:ManualECast()
+    end
+    self:UpdateItems()
+    self:Logic()
+    self:Auto()
+    self:Items2()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+
+function Tryndamere:UpdateItems()
+    Item_HK[ITEM_1] = HK_ITEM_1
+    Item_HK[ITEM_2] = HK_ITEM_2
+    Item_HK[ITEM_3] = HK_ITEM_3
+    Item_HK[ITEM_4] = HK_ITEM_4
+    Item_HK[ITEM_5] = HK_ITEM_5
+    Item_HK[ITEM_6] = HK_ITEM_6
+    Item_HK[ITEM_7] = HK_ITEM_7
+end
+
+function Tryndamere:Items1()
+    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+        end
+    end
+    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+        end
+    end
+    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
+        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
+        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
+        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+        end
+    end
+end
+
+function Tryndamere:Items2()
+    if GetItemSlot(myHero, 3139) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+            end
+        end
+    end
+    if GetItemSlot(myHero, 3140) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+            end
+        end
+    end
+end
+
+
+function Tryndamere:ManualECast()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local ERange = 660 + AARange
+    if target then
+        if ValidTarget(target, ERange) then
+            self:UseE(target)
+        end
+    else
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy, ERange) then
+                if not myHero.pathing.isDashing and IsReady(_E) then
+                    self:UseE(enemy)
+                end
+            end
+        end
+    end
+end
+
+function Tryndamere:Auto()
+    if Mode() ~= "Combo" and Mode() ~= "Harass" then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy) then
+                local EAARange = _G.SDK.Data:GetAutoAttackRange(enemy)
+                local HealthPercent = (myHero.health / myHero.maxHealth) * 100
+                if self:CanUse(_Q, "Auto") and ValidTarget(enemy, EAARange) then
+                    if self.Menu.AutoMode.UseQFury:Value() >= myHero.mana and self.Menu.AutoMode.UseQHealth:Value() >= HealthPercent and not BuffActive(myHero, "UndyingRage") then 
+                        Control.CastSpell(HK_Q)
+                    end
+                end
+                if self:CanUse(_R, "Auto") and ValidTarget(enemy, EAARange) then
+                    if self.Menu.AutoMode.UseRHealth:Value() >= HealthPercent then 
+                        if self.Menu.AutoMode.UseQHealth:Value() < HealthPercent or self.Menu.AutoMode.UseQFury:Value() < myHero.mana or not self:CanUse(_Q, "Auto") then
+                            Control.CastSpell(HK_R)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end 
+
+
+function Tryndamere:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+function Tryndamere:Logic()
+    if target == nil then return end
+    --PrintChat(target.activeSpell.target)
+    if myHero.handle == target.activeSpell.target then
+        --PrintChat(target.activeSpellSlot)
+        --PrintChat("At me!")
+    end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        --PrintChat("Logic")
+        self:Items1()
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        local WRange = 850
+        local EAARange = _G.SDK.Data:GetAutoAttackRange(target)
+        local HealthPercent = (myHero.health / myHero.maxHealth) * 100
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, EAARange) then
+            if self.Menu.ComboMode.UseQFury:Value() >= myHero.mana and self.Menu.AutoMode.UseQHealth:Value() >= HealthPercent and not BuffActive(myHero, "UndyingRage") then 
+                Control.CastSpell(HK_Q)
+            end
+        end
+        if self:CanUse(_R, Mode()) and ValidTarget(target, EAARange) then
+            if self.Menu.ComboMode.UseRHealth:Value() >= HealthPercent then 
+                if self.Menu.ComboMode.UseQHealth:Value() < HealthPercent or self.Menu.ComboMode.UseQFury:Value() < myHero.mana or not self:CanUse(_Q, Mode()) then
+                    Control.CastSpell(HK_R)
+                end
+            end
+        end
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and not CastingW and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            --PrintChat("Checking facing")
+            if self.Menu.ComboMode.UseW:Value() and not IsFacing(target) then 
+                Control.CastSpell(HK_W)
+            end
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+function Tryndamere:OnPostAttack(args)
+end
+
+function Tryndamere:OnPostAttackTick(args)
+end
+
+function Tryndamere:OnPreAttack(args)
+end
+
+function Tryndamere:UseE(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+        if not myHero.pathing.isDashing and IsReady(_E) then
+            Control.CastSpell(HK_E, pred.CastPos)
+        end
+    end 
+end
+
 
 class "Azir"
 
@@ -712,7 +1057,7 @@ class "Ezreal"
 
 local EnemyLoaded = false
 local casted = 0
-
+local Qtick = true
 local CastingQ = false
 local CastingW = false
 local CastingE = false
@@ -720,18 +1065,23 @@ local CastingR = false
 
 local WasInRange = false
 local attacked = 0
+local CanQ = true 
+local QtickTime = 0
 
 function Ezreal:Menu()
     self.Menu = MenuElement({type = MENU, id = "Ezreal", name = "Ezreal"})
     self.Menu:MenuElement({id = "UltKey", name = "Manual R Key", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQHitChance", name = "Q Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWHitChance", name = "W Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Auto Use Q", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseQHitChance", name = "Q Hit Chance (0.50)", value = 0.50, min = 0, max = 1.0, step = 0.05})
     self.Menu.AutoMode:MenuElement({id = "UseQMana", name = "Q: Min Mana %", value = 20, min = 1, max = 100, step = 1})
     self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
     self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
@@ -740,7 +1090,7 @@ function Ezreal:Menu()
 end
 
 function Ezreal:Spells()
-    QSpellData = {speed = 2000, range = 1150, delay = 0.1515, radius = 70, collision = {"minion"}, type = "linear"}
+    QSpellData = {speed = 2000, range = 1150, delay = 0.1515, radius = 30, collision = {}, type = "linear"}
     RSpellData = {speed = 2000, range = 3000, delay = 1.00, radius = 320, collision = {}, type = "linear"}
     WSpellData = {speed = 1200, range = 1150, delay = 0.1515, radius = 70, collision = {}, type = "linear"}
 end
@@ -753,6 +1103,15 @@ function Ezreal:Tick()
     CastingE = myHero.activeSpell.name == "EzrealE"
     CastingR = myHero.activeSpell.name == "EzrealR"
     --PrintChat(myHero.activeSpell.name)
+    --PrintChat(myHero.activeSpell.speed)
+    if Qtick == true then
+        QtickTime = Game.Timer()
+        Qtick = false
+    else
+        if Game.Timer() - QtickTime > 0.25 then
+            CanQ = true
+        end
+    end
     if self.Menu.UltKey:Value() then
         self:ManualRCast()
     end
@@ -880,7 +1239,7 @@ function Ezreal:Logic()
         local QdmgCheck = target.health >= getdmg("Q", target, myHero) or not self:CanUse(_Q, Mode())
         local AAdmgCheck = target.health >= getdmg("AA", target, myHero)
         if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
-            self:UseQ(target)
+            self:UseQGam(target)
         end
         if QdmgCheck and AAdmgCheck and self:CanUse(_W, Mode()) and ValidTarget(target, AARange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
             self:UseW(target)
@@ -903,29 +1262,61 @@ end
 
 function Ezreal:UseQAuto(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
-        Control.CastSpell(HK_Q, pred.CastPos)
+    if pred.CastPos and pred.HitChance > self.Menu.AutoMode.UseQHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+        if CanQ == true then
+            Control.CastSpell(HK_Q, pred.CastPos)
+            Qtick = true
+            CanQ = false
+        end
+    end 
+end
+
+function Ezreal:UseQGam(unit)
+    local QSpellDataGam = {Delay = 0.15, Radius = 30, Range = 1150, Speed = 2000, Collision = false, Type = _G.SPELLTYPE_LINE};
+    local pred = _G.GamsteronPrediction:GetPrediction(unit, QSpellDataGam, myHero)
+    if pred.CastPosition and pred.Hitchance >= _G.HITCHANCE_NORMAL and myHero.pos:DistanceTo(pred.CastPosition) < 1150 then
+        PrintChat(pred.Hitchance)
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        local QdmgCheck = unit.health >= getdmg("Q", unit, myHero)
+        local AAdmgCheck = unit.health >= getdmg("AA", unit, myHero) or GetDistance(unit.pos) > AARange
+        local Collision = _G.GamsteronPrediction:GetCollision(myHero, unit.pos, pred.CastPosition, 2000, 0.15, 30, {1})
+        if self:CanUse(_W, Mode()) and ValidTarget(unit, 1250) and QdmgCheck and AAdmgCheck and not Collision then
+            self:UseW(unit)
+        end
+        if not self:CanUse(_W, Mode()) or not QdmgCheck or not AAdmgCheck then
+            if CanQ == true and not Collision then
+                Control.CastSpell(HK_Q, pred.CastPosition)
+                Qtick = true
+                CanQ = false
+            end
+        end
     end 
 end
 
 function Ezreal:UseQ(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+        PrintChat(pred.HitChance)
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
         local QdmgCheck = unit.health >= getdmg("Q", unit, myHero)
         local AAdmgCheck = unit.health >= getdmg("AA", unit, myHero) or GetDistance(unit.pos) > AARange
-        if self:CanUse(_W, Mode()) and ValidTarget(unit, 1250) and QdmgCheck and AAdmgCheck then
+        local Collision = _G.PremiumPrediction:IsColliding(myHero, pred.CastPos, QSpellData, {"minion"})
+        if self:CanUse(_W, Mode()) and ValidTarget(unit, 1250) and QdmgCheck and AAdmgCheck and not Collision then
             self:UseW(unit)
         end
         if not self:CanUse(_W, Mode()) or not QdmgCheck or not AAdmgCheck then
-            Control.CastSpell(HK_Q, pred.CastPos)
+            if CanQ == true and not Collision then
+                Control.CastSpell(HK_Q, pred.CastPos)
+                Qtick = true
+                CanQ = false
+            end
         end
     end 
 end
 
 function Ezreal:UseW(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseWHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
             Control.CastSpell(HK_W, pred.CastPos)
     end 
 end
