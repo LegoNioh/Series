@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 60.00
+    local Version = 65.00
     
     local Files = {
         Lua = {
@@ -1575,7 +1575,7 @@ end
 function Ezreal:UseQ(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
     if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
-        PrintChat(pred.HitChance)
+        --PrintChat(pred.HitChance)
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
         local QdmgCheck = unit.health >= getdmg("Q", unit, myHero)
         local AAdmgCheck = unit.health >= getdmg("AA", unit, myHero) or GetDistance(unit.pos) > AARange
