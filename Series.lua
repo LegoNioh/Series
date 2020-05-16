@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 60.00
+    local Version = 70.00
     
     local Files = {
         Lua = {
@@ -44,6 +44,12 @@ do
             print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
+            print("Version Changes: Added Lucian Auto Q On Minions") 
+            print("Version Changes: Added Fizz")
+			print("Version Changes: Added Fizz Last Hit") 
+			print("Version Changes: Fixed FPS drops on Lucian Auto Q")
+			print("Version Changes: Added Quinn")
+			print("Version Changes: Lots of Quinn changes...")  
         end
     
     end
@@ -4417,6 +4423,7 @@ function Pyke:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQHitChance", name = "Q Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
     self.Menu.ComboMode:MenuElement({id = "UseQShort", name = "Use Short Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQMan", name = "Auto Finish manual Casted Qs", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "E Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
@@ -4432,7 +4439,7 @@ function Pyke:Spells()
     QScanSpellData = {speed = 1700, range = 1100, delay = 0.25, radius = 55, collision = {}, type = "linear"}
     RSpellData = {speed = 3000, range = 750, delay = 0.75, radius = 250, collision = {""}, type = "circular"}
     ESpellData = {speed = 1000, range = 550, delay = 0.25, radius = 100, collision = {""}, type = "linear"}
-    AOEeSpellData = {speed = 1000, range = 550, delay = 0.25, radius = 100, collision = {""}, type = "circular"}
+    AOEeSpellData = {speed = 1000, range = 550, delay = 0.25, radius = 100, collision = {""}, type = "linear"}
 end
 
 function Pyke:Tick()
@@ -4441,24 +4448,18 @@ function Pyke:Tick()
     CastingQ = myHero.activeSpell.name == "PykeQ" or myHero.activeSpell.name == "PykeQRange" or myHero.activeSpell.name == "PykeQMelee"
     FinishQ = myHero.activeSpell.name == "PykeQRange" or myHero.activeSpell.name == "PykeQMelee"
     ChargingQ = myHero.activeSpell.name == "PykeQ"
-
-    local ChargeTime = Game.Timer() - QCastTime
-    if ChargingQ and ChargeTime > 3.25 then
-    	QCastTime = Game.Timer()
-    	ChargeTime = 0
-    end
-    if ChargeTime > 0.1 and ChargingQ == false and Control.IsKeyDown(HK_Q) then
-		--PrintChat(ChargeTime)
-    	Control.KeyUp(HK_Q)
-    end
-    if FinishQ == true and IsReady(_Q) and Control.IsKeyDown(HK_Q) then
-    	--PrintChat("Release Key")
-    	Control.KeyUp(HK_Q)
-    end
     CastingW = myHero.activeSpell.name == "PykeW"
     CastingE = myHero.activeSpell.name == "PykeE"
     CastingR = myHero.activeSpell.name == "PykeR"
+    --PrintChat(myHero:GetSpellData(_Q).name)
     --PrintChat(myHero.activeSpell.name)
+    if IsReady(_Q) and not ChargingQ then
+    	local ChargeTime = Game.Timer() - QCastTime
+    	if Control.IsKeyDown(HK_Q) and ChargeTime > 0.1 then
+            Control.KeyUp(HK_Q)
+        end
+    	QCastTime = Game:Timer() + 0.10
+    end
     if Rtick == true then
         RtickTime = Game.Timer()
         Rtick = false
@@ -4498,7 +4499,7 @@ function Pyke:Auto()
     for i, enemy in pairs(EnemyHeroes) do
         if enemy and not enemy.dead and ValidTarget(enemy) then
 
-		    if ChargingQ == true then
+		    if ChargingQ == true and (Mode() == "Combo" or self.Menu.ComboMode.UseQMan:Value()) then
 		    	--PrintChat("ChargingQ")
 				local ChargeTime = Game.Timer() - QCastTime
 				local DynamicQRange = 400
@@ -4514,8 +4515,10 @@ function Pyke:Auto()
 				end
 				local DynamicQSpellData = {speed = 1700, range = DynamicQRange, delay = 0.25, radius = 55, collision = {"minion"}, type = "linear"}
 			    local pred = _G.PremiumPrediction:GetPrediction(myHero, enemy, DynamicQSpellData)
-		        if pred.CastPos and  pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and GetDistance(pred.CastPos) < 1200 then
+		        if pred.CastPos and  pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and GetDistance(pred.CastPos) < 1200 and Control.IsKeyDown(HK_Q) then
 		                Control.CastSpell(HK_Q, pred.CastPos)
+		                --PrintChat(ChargeTime)
+		                --PrintChat("Casting Q auto 2")
 		        end 	
 			end
             if (self:CanUse(_R, "KS") or (Mode() == "Combo" and self:CanUse(_R, "Combo"))) and ValidTarget(enemy, RRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and self:UltKillCheck(enemy) then
@@ -4617,13 +4620,13 @@ function Pyke:Logic()
         if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
             local pred = _G.PremiumPrediction:GetPrediction(myHero, target, QScanSpellData)
             if pred.CastPos and  pred.HitChance > 0 and GetDistance(pred.CastPos) < 1200 then
-                QCastTime = Game:Timer()
+                QCastTime = Game:Timer() + 0.10
                 --PrintChat("Q")
                 Control.KeyDown(HK_Q)
             end
         end
-        if self:CanUse(_E, Mode()) and not self:CanUse(_Q, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
-            self:UseAOEe(target)
+        if self:CanUse(_E, Mode()) and not self:CanUse(_Q, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingE and not CastingR and not _G.SDK.Attack:IsActive() then
+            self:UseE(target)
         end
     else
         WasInRange = false
@@ -4667,11 +4670,7 @@ end
 function Pyke:UseE(unit)
         local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
         if pred.CastPos and  pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value() and GetDistance(pred.CastPos) < 650 then
-                local UnitDist = GetDistance(myHero.pos, unit.pos)
-                local SpotDist = GetDistance(myHero.pos, pred.CastPos)
-                local CastDist = SpotDist - UnitDist
-                local CastSpot = myHero.pos:Extended(pred.CastPos, CastDist)
-                Control.CastSpell(HK_E, CastSpot)
+                Control.CastSpell(HK_E, pred.CastPos)
         end 
 end
 
