@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 70.00
+    local Version = 75.00
     
     local Files = {
         Lua = {
@@ -1688,6 +1688,7 @@ local EnemyLoaded = false
 local QCastTime = Game:Timer()
 local RCastTime = Game:Timer()
 local Casted = 0
+local UsedE = false
 local CanQclick = true
 local attackedfirst = 0
 local WasInRange = false
@@ -1725,8 +1726,14 @@ end
 function Lucian:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	target = GetTarget(1400)
-	if myHero.activeSpell.name == "LucianE" then
+	--PrintChat(myHero.activeSpell.name)
+	if myHero.pathing.isDashing then
+		UsedE = true
+		--PrintChat("Casting E")
+	elseif UsedE == true then
+		--PrintChat("rest E")
 		DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+		UsedE = false
 	end
 	local hasPassive = _G.SDK.BuffManager:HasBuff(myHero, "LucianPassiveBuff")
 	if hasPassive then
