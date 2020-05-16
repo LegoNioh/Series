@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 52.00
+    local Version = 60.00
     
     local Files = {
         Lua = {
@@ -44,12 +44,6 @@ do
             print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
         else
             print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
-            print("Version Changes: Added Lucian Auto Q On Minions") 
-            print("Version Changes: Added Fizz")
-			print("Version Changes: Added Fizz Last Hit") 
-			print("Version Changes: Fixed FPS drops on Lucian Auto Q")
-			print("Version Changes: Added Quinn")
-			print("Version Changes: Lots of Quinn changes...")  
         end
     
     end
@@ -4393,227 +4387,292 @@ end
 
 class "Pyke"
 
-
-local ETravel = true
-local StunCharge = false
-local QDown = false
 local EnemyLoaded = false
-local QCastTime = Game:Timer()
-local RCastTime = Game:Timer()
+local casted = 0
+
+local RRange = 750
+local QRange = 1100
+local ERange = 550
+
+local FinishQ = true
+local ChargingQ = false
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+
+local WasInRange = false
+local attacked = 0
+
+local QCastTime = 0
+
+local Rtick = true
+local CanR = true 
+local RtickTime = 0
 
 function Pyke:Menu()
-	self.Menu = MenuElement({type = MENU, id = "Pyke", name = "Pyke"})
-	self.Menu:MenuElement({id = "ComboKS", name = "Only KS in combo mode?", value = false})
-
+    self.Menu = MenuElement({type = MENU, id = "Pyke", name = "Pyke"})
+    self.Menu:MenuElement({id = "UltKey", name = "Manual R Key", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQHitChance", name = "Q Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
+    self.Menu.ComboMode:MenuElement({id = "UseQShort", name = "Use Short Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "E Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRHitChance", name = "R Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
+    self.Menu:MenuElement({id = "KSMode", name = "Auto KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseR", name = "Use R in KS", value = true})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
 
 function Pyke:Spells()
-	PykeW = {range = 400}
-	PykeE = {range = 1000, width = 80, speed = 1500, delay = 0.01,collision = true, aoe = false, type = "line"}
-	self.e = {Type = _G.SPELLTYPE_LINE, Range = 1000, Radius = 40, Speed = 1500, Collision = true, MaxCollision = 1, CollisionTypes = {0, 2, 3}}
-	spellData = {speed = 1500, range = 1000, delay = 0.51, radius = 75, collision = {"minion"}, type = "linear"}
-	spellDataQ = {speed = 1700, range = 1100, delay = 0.25, radius = 55, collision = {"minion"}, type = "linear"}
-	spellDataQ2 = {speed = 2700, range = 1100, delay = 0.10, radius = 25, collision = {"minion"}, type = "linear"}
-	spellDataQ3 = {speed = 1700, range = 400, delay = 0.25, radius = 55, collision = {""}, type = "linear"}
-	spellDataW = {speed = 2000, range = 1000, delay = 0.51, radius = 325, collision = {""}, type = "linear"}
-	spellDataE = {speed = 1000, range = 550, delay = 0.25, radius = 100, collision = {""}, type = "linear"}
-	spellDataE2 = {speed = 1000, range = 550, delay = 1.25, radius = 100, collision = {""}, type = "linear"}
-	spellDataR = {speed = 3000, range = 750, delay = 0.75, radius = 250, collision = {""}, type = "circular"}
+    QSpellData = {speed = 1700, range = 1100, delay = 0.25, radius = 55, collision = {"minion"}, type = "linear"}
+    QScanSpellData = {speed = 1700, range = 1100, delay = 0.25, radius = 55, collision = {}, type = "linear"}
+    RSpellData = {speed = 3000, range = 750, delay = 0.75, radius = 250, collision = {""}, type = "circular"}
+    ESpellData = {speed = 1000, range = 550, delay = 0.25, radius = 100, collision = {""}, type = "linear"}
+    AOEeSpellData = {speed = 1000, range = 550, delay = 0.25, radius = 100, collision = {""}, type = "circular"}
 end
 
-
-
 function Pyke:Tick()
-	if myHero.dead or Game.IsChatOpen() == true then return end
-	target = GetTarget(1400)	
-	self:KS()
-	self:Combo()
-	if EnemyLoaded == false then
-		local CountEnemy = 0
-		for i, enemy in pairs(EnemyHeroes) do
-			CountEnemy = CountEnemy + 1
-		end
-		if CountEnemy < 1 then
-			GetEnemyHeroes()
-		else
-			EnemyLoaded = true
-			PrintChat("Enemy Loaded")
-		end
-	end
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(2000)
+    CastingQ = myHero.activeSpell.name == "PykeQ" or myHero.activeSpell.name == "PykeQRange" or myHero.activeSpell.name == "PykeQMelee"
+    FinishQ = myHero.activeSpell.name == "PykeQRange" or myHero.activeSpell.name == "PykeQMelee"
+    ChargingQ = myHero.activeSpell.name == "PykeQ"
+
+    local ChargeTime = Game.Timer() - QCastTime
+    if ChargingQ and ChargeTime > 3.25 then
+    	QCastTime = Game.Timer()
+    	ChargeTime = 0
+    end
+    if ChargeTime > 0.1 and ChargingQ == false and Control.IsKeyDown(HK_Q) then
+		--PrintChat(ChargeTime)
+    	Control.KeyUp(HK_Q)
+    end
+    if FinishQ == true and IsReady(_Q) and Control.IsKeyDown(HK_Q) then
+    	--PrintChat("Release Key")
+    	Control.KeyUp(HK_Q)
+    end
+    CastingW = myHero.activeSpell.name == "PykeW"
+    CastingE = myHero.activeSpell.name == "PykeE"
+    CastingR = myHero.activeSpell.name == "PykeR"
+    --PrintChat(myHero.activeSpell.name)
+    if Rtick == true then
+        RtickTime = Game.Timer()
+        Rtick = false
+    else
+        if Game.Timer() - RtickTime > 0.25 then
+            CanR = true
+        end
+    end
+
+    self:Logic()
+    self:Auto()
+
+
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
 end
 
 function Pyke:Draw()
-	if QDown == true then
-				local CastedTime = Game:Timer() - QCastTime
-				local DistanceCastTime = CastedTime-0.5
-				local Qdistance = 400
-				if DistanceCastTime > 0 then
-					Qdistance = 400 + 150* (DistanceCastTime/0.1)
-				end
-				if Qdistance > 1100 then
-					Qdistance = 1100
-				end
-				Draw.Circle(myHero.pos, Qdistance, 1, Draw.Color(255, 0, 191, 255))
-	end
-	Draw.Circle(myHero.pos, 55, 1, Draw.Color(255, 0, 191, 255))
-	--local UltDamge = self:GetUltDamage()
-	--for i, enemy in pairs(EnemyHeroes) do
-		--if enemy and not enemy.dead then
-			--if enemy.health < UltDamge then
-				--Draw.Text("R Can Kill", 37, enemy.pos2D.x-45, enemy.pos2D.y+10, Draw.Color(0xFFA80505))
-			--end
-		--end
-	--end
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 1150, 1, Draw.Color(255, 0, 191, 255))
+    end
 end
+
+
+function Pyke:Auto()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+
+		    if ChargingQ == true then
+		    	--PrintChat("ChargingQ")
+				local ChargeTime = Game.Timer() - QCastTime
+				local DynamicQRange = 400
+				if ChargeTime > 0.5 then
+					DynamicQRange = 400 + (150 * ((ChargeTime-0.5)/0.1))
+				else
+					if not self.Menu.ComboMode.UseQShort:Value() then
+						DynamicQRange = 0
+					end
+				end
+				if DynamicQRange > 1100 then
+					DynamicQRange = 1100
+				end
+				local DynamicQSpellData = {speed = 1700, range = DynamicQRange, delay = 0.25, radius = 55, collision = {"minion"}, type = "linear"}
+			    local pred = _G.PremiumPrediction:GetPrediction(myHero, enemy, DynamicQSpellData)
+		        if pred.CastPos and  pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and GetDistance(pred.CastPos) < 1200 then
+		                Control.CastSpell(HK_Q, pred.CastPos)
+		        end 	
+			end
+            if (self:CanUse(_R, "KS") or (Mode() == "Combo" and self:CanUse(_R, "Combo"))) and ValidTarget(enemy, RRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and self:UltKillCheck(enemy) then
+                self:UseR(enemy)
+            end
+        end
+    end
+end 
 
 function Pyke:GetUltDamage()
-	local LvL = myHero.levelData.lvl
-	if not LvL then
-		LvL = 1
-	end
-	local LevelDamage = ({250, 250, 250, 250, 250, 250, 290, 330, 370, 400, 430, 450, 470, 490, 510, 530, 540, 550})[LvL]
-	local HeroDamage = myHero.bonusDamage * 0.8
-	local HeroPen = myHero.armorPen * 1.5
-	local TotalDamage = LevelDamage + HeroDamage + HeroPen
-	return TotalDamage
+    local LvL = myHero.levelData.lvl
+    if not LvL then
+        LvL = 1
+    end
+    local LevelDamage = ({250, 250, 250, 250, 250, 250, 290, 330, 370, 400, 430, 450, 470, 490, 510, 530, 540, 550})[LvL]
+    local HeroDamage = myHero.bonusDamage * 0.8
+    local HeroPen = myHero.armorPen * 1.5
+    local TotalDamage = LevelDamage + HeroDamage + HeroPen
+    return TotalDamage
 end
 
-function Pyke:KS()
-	local UltDamge = self:GetUltDamage()
-	for i, enemy in pairs(EnemyHeroes) do
-		if enemy and not enemy.dead and ValidTarget(enemy, 1100) then
-			if Mode() == "Combo" or not self.Menu.ComboKS:Value() then
-				if enemy.health < UltDamge and IsReady(_R) and Game:Timer() - RCastTime > 0.75 and ValidTarget(enemy, 750) then
-					self:UseR(enemy)
-				end
-			end
-			if Mode() == "Combo" and QDown == true then
-				local CastedTime = Game:Timer() - QCastTime
-				local DistanceCastTime = CastedTime-0.5
-				local Qdistance = 400
-				local Qspeed = 1700
-				if DistanceCastTime > 0.1 then
-					Qdistance = 400 + 150 * (DistanceCastTime/0.1)
-				end
-				if Qdistance > 1100 then
-					Qdistance = 1100
-				end
-				spellDataQ.range = Qdistance
-				--PrintChat(Qradius)
-				if target.health > UltDamge or not IsReady(_R) or GetDistance(target.pos) > 750 then
-					if ValidTarget(target, 1100) then
-						local pred = _G.PremiumPrediction:GetPrediction(myHero, target, spellDataQ)
-						if Qdistance <= 400 then
-							local pred = _G.PremiumPrediction:GetPrediction(myHero, target, spellDataQ3)
-						end
-						--PrintChat("pred Target")
-						--PrintChat(pred.HitChance)
-						if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < Qdistance then
-			    			Control.CastSpell(HK_Q, pred.CastPos)
-		    				--PrintChat("Fire Target")
-		    			elseif enemy and ValidTarget(enemy, 1100) then
-			    			--PrintChat("pred enemy")
-		    				--PrintChat(pred.HitChance)
-							local pred = _G.PremiumPrediction:GetPrediction(myHero, enemy, spellDataQ)
-							if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < Qdistance then
-				    			Control.CastSpell(HK_Q, pred.CastPos)
-			    				--PrintChat("Fire enemy")
-							end 
-						end
-					elseif enemy and ValidTarget(enemy, 1100) then
-						if enemy.health > UltDamge or not IsReady(_R) or GetDistance(enemy.pos) > 750 then
-							local pred = _G.PremiumPrediction:GetPrediction(myHero, enemy, spellDataQ3)
-							if Qdistance <= 400 then
-								local pred = _G.PremiumPrediction:GetPrediction(myHero, enemy, spellDataQ3)
-							end
-							--PrintChat("pred enemy")
-							--PrintChat(pred.HitChance)
-							if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < Qdistance then
-				    			Control.CastSpell(HK_Q, pred.CastPos)
-			    				--PrintChat("Fire enemy")
-							end 
-						end
-					end
-				end
-			end
-		end
-	end
-end	
-function Pyke:Combo()
-	if target == nil then return end
-	if Mode() == "Combo" and target and ValidTarget(target, 2000) then
-			if IsReady(_Q) then
-				if GetDistance(target.pos) < 1100 then
-					if QDown == false then
-						local pred = _G.PremiumPrediction:GetPrediction(myHero, target, spellDataQ2)
-						if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < 1100 then
-							Control.KeyDown(HK_Q)
-							QCastTime = Game:Timer()
-							QDown = true
-						end
-						--PrintChat(QCastTime)
-						--PrintChat(myHero:GetSpellData(0).castTime)
-					end
-				end
-				if GetDistance(target.pos) < 400 then
-					if QDown == false then
-						local pred = _G.PremiumPrediction:GetPrediction(myHero, target, spellDataQ3)
-						if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < 400 then
-							Control.KeyDown(HK_Q)
-							QCastTime = Game:Timer()
-							QDown = true
-						end
-						--PrintChat(QCastTime)
-						--PrintChat(myHero:GetSpellData(0).castTime)
-					end
-				end
-			else
-				if QDown == true then
-					Control.KeyUp(HK_Q)
-					QDown = false
-				end
-				if IsReady(_E) then
-					if GetDistance(target.pos) < 300 then
-						self:UseE2(target)
-					elseif GetDistance(target.pos) < 550 then
-						self:UseE(target)
-					end
-				end
-			end
-	end		
+function Pyke:UltKillCheck(unit)
+    local Rdmg = self:GetUltDamage()
+    if unit.health < Rdmg and unit.health > 0 then
+        return true
+    else
+        return false
+    end
+end
+
+function Pyke:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        local ManaPercent = myHero.mana / myHero.maxMana * 100
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() and ManaPercent > self.Menu.AutoMode.UseQMana:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+function Pyke:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            local pred = _G.PremiumPrediction:GetPrediction(myHero, target, QScanSpellData)
+            if pred.CastPos and  pred.HitChance > 0 and GetDistance(pred.CastPos) < 1200 then
+                QCastTime = Game:Timer()
+                --PrintChat("Q")
+                Control.KeyDown(HK_Q)
+            end
+        end
+        if self:CanUse(_E, Mode()) and not self:CanUse(_Q, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            self:UseAOEe(target)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+
+
+function Pyke:OnPostAttack(args)
+end
+
+function Pyke:OnPostAttackTick(args)
+end
+
+function Pyke:OnPreAttack(args)
 end
 
 function Pyke:UseQ(unit)
-		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, spellDataQ)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < 1100 then
-		    	Control.CastSpell(HK_Q, pred.CastPos)
-		end 
+        local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+        if pred.CastPos and  pred.HitChance > 0 and GetDistance(pred.CastPos) < 1200 then
+                Control.CastSpell(HK_Q, pred.CastPos)
+        end 
 end
 
 function Pyke:UseR(unit)
-		local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, spellDataR)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < 750 then
-		    	Control.CastSpell(HK_R, pred.CastPos)
-		    	RCastTime = Game:Timer()
-		end 
+        local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
+        if pred.CastPos and  pred.HitChance > self.Menu.ComboMode.UseRHitChance:Value() and GetDistance(pred.CastPos) < 850 and CanR == true then
+                Control.CastSpell(HK_R, pred.CastPos)
+                CanR = false
+                Rtick = true
+        end 
+end
+
+function Pyke:UseAOEe(unit)
+        local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, AOEeSpellData)
+        if pred.CastPos and  pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value() and GetDistance(pred.CastPos) < 650 then
+                Control.CastSpell(HK_E, CastSpot)
+        end 
 end
 
 function Pyke:UseE(unit)
-		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, spellDataE)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < 550 then
-				local UnitDist = GetDistance(myHero.pos, unit.pos)
-				local SpotDist = GetDistance(myHero.pos, pred.CastPos)
-				local CastDist = SpotDist - UnitDist
-				local CastSpot = myHero.pos:Extended(pred.CastPos, CastDist)
-		    	Control.CastSpell(HK_E, CastSpot)
-		end 
-end
-
-function Pyke:UseE2(unit)
-		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, spellDataE2)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and GetDistance(pred.CastPos) < 550 then
-		    	Control.CastSpell(HK_E, pred.CastPos)
-		end 
+        local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+        if pred.CastPos and  pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value() and GetDistance(pred.CastPos) < 650 then
+                local UnitDist = GetDistance(myHero.pos, unit.pos)
+                local SpotDist = GetDistance(myHero.pos, pred.CastPos)
+                local CastDist = SpotDist - UnitDist
+                local CastSpot = myHero.pos:Extended(pred.CastPos, CastDist)
+                Control.CastSpell(HK_E, CastSpot)
+        end 
 end
 
 function OnLoad()
