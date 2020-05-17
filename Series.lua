@@ -1732,7 +1732,9 @@ function Lucian:Tick()
 		--PrintChat("Casting E")
 	elseif UsedE == true then
 		--PrintChat("rest E")
-		DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+		if hasPassive then
+			DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+		end
 		UsedE = false
 	end
 	local hasPassive = _G.SDK.BuffManager:HasBuff(myHero, "LucianPassiveBuff")
@@ -1935,12 +1937,12 @@ function Lucian:QClick()
 	else
 		local Direction = Vector((myHero.pos-target.pos):Normalized())
 		spot = myHero.pos- Direction*100
-		PrintChat("using hero spot")
+		--PrintChat("using hero spot")
 	end
 	Draw.Circle(mousePos, 50, 1, Draw.Color(255, 0, 191, 255))
 	Control.RightClick(spot:To2D())
 	--Control.RightClick(target.pos:To2D())
-	PrintChat("Q click")
+	--PrintChat("Q click")
 	--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
 	--DelayAction(function() 	Control.Attack(target) PrintChat("Attacking Q attack click") end, 0.15)
 	DelayAction(function() 	Control.RightClick(target.pos:To2D()) end, 0.05)
