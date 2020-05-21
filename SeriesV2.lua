@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 70.00
+    local Version = 100.00
     
     local Files = {
         Lua = {
@@ -263,8 +263,6 @@ function Manager:__init()
         DelayAction(function() self:LoadTryndamere() end, 1.05)
     elseif myHero.charName == "Jax" then
         DelayAction(function() self:LoadJax() end, 1.05)
-    elseif myHero.charName == "Velkoz" then
-        DelayAction(function() self:LoadVelkoz() end, 1.05)
     elseif myHero.charName == "Neeko" then
         DelayAction(function() self:LoadNeeko() end, 1.05)
     elseif myHero.charName == "Vayne" then
@@ -275,11 +273,26 @@ function Manager:__init()
         DelayAction(function() self:LoadRumble() end, 1.05)
     elseif myHero.charName == "Ezreal" then
         DelayAction(function() self:LoadEzreal() end, 1.05)
+    elseif myHero.charName == "Corki" then
+        DelayAction(function() self:LoadCorki() end, 1.05)
     elseif myHero.charName == "Orianna" then
         DelayAction(function() self:LoadOrianna() end, 1.05)
     end
 end
 
+function Manager:LoadCorki()
+    Corki:Spells()
+    Corki:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Corki:Tick() end)
+    Callback.Add("Draw", function() Corki:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Corki:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Corki:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Corki:OnPostAttack(...) end)
+    end
+end
 
 function Manager:LoadVayne()
     Vayne:Spells()
@@ -335,18 +348,6 @@ function Manager:LoadNeeko()
     end
 end
 
-function Manager:LoadVelkoz()
-    Velkoz:Spells()
-    Velkoz:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Velkoz:Tick() end)
-    Callback.Add("Draw", function() Velkoz:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Velkoz:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Velkoz:OnPostAttackTick(...) end)
-    end
-end
 
 function Manager:LoadOrianna()
     Orianna:Spells()
@@ -454,6 +455,7 @@ function Rumble:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "OverHeatQ", name = "Allow Q to Overheat", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWurf", name = "Use Urf W", value = true})
     self.Menu.ComboMode:MenuElement({id = "OverHeatW", name = "Allow W to Overheat", value = false})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "E Hit Chance (0.15)", value = 0.10, min = 0, max = 1.0, step = 0.05})
@@ -794,6 +796,11 @@ function Rumble:Logic()
                 if myHero.mana < 90 or self.Menu.ComboMode.OverHeatE:Value() or target.health < Edmg*1.5 then
                     self:UseE(target, true)
                 end
+            end
+        end
+        if self:CanUse(_W, Mode()) and not CastingE and not CastingR and Rdown == false then
+            if self.Menu.ComboMode.UseWurf:Value() then
+                Control.CastSpell(HK_W)
             end
         end
     else
@@ -2570,6 +2577,225 @@ function Vayne:UseE(unit, hits)
     end 
 end
 
+class "Corki"
+
+local EnemyLoaded = false
+local casted = 0
+local Qtick = true
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+local QRange = 850
+local ERange = 600
+local RRange = 1300
+local WasInRange = false
+local attacked = 0
+local CanQ = true 
+local QtickTime = 0
+
+function Corki:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Corki", name = "Corki"})
+    self.Menu:MenuElement({id = "UltKey", name = "Manual R Key", key = string.byte("T"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQHitChance", name = "Q Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRHitChance", name = "R Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Auto Use Q", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseQHitChance", name = "Q Hit Chance (0.50)", value = 0.50, min = 0, max = 1.0, step = 0.05})
+    self.Menu.AutoMode:MenuElement({id = "UseQMana", name = "Q: Min Mana %", value = 20, min = 1, max = 100, step = 1})
+    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+end
+
+function Corki:Spells()
+    QSpellData = {speed = 1000, range = 825, delay = 0.50, radius = 125, collision = {}, type = "circular"}
+    RSpellData = {speed = 2000, range = 1300, delay = 1.00, radius = 40, collision = {"minion"}, type = "linear"}
+    BRSpellData = {speed = 2000, range = 1500, delay = 1.00, radius = 40, collision = {"minion"}, type = "linear"}
+end
+
+function Corki:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(2000)
+    CastingQ = myHero.activeSpell.name == "PhosphorusBomb"
+    CastingW = myHero.activeSpell.name == "CorkiW"
+    CastingE = myHero.activeSpell.name == "CorkiE"
+    CastingR = myHero.activeSpell.name == "MissileBarrageMissile" or myHero.activeSpell.name == "MissileBarrageMissile2"
+    if CastingQ or CastingR then 
+        --PrintChat(myHero.activeSpell.name)
+    end
+    --PrintChat(myHero.hudAmmo)
+    --PrintChat(myHero.activeSpell.speed)
+    if self.Menu.UltKey:Value() then
+        self:ManualRCast()
+    end
+    self:Logic()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+function Corki:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        Draw.Circle(myHero.pos, 1150, 1, Draw.Color(255, 0, 191, 255))
+    end
+end
+
+function Corki:ManualRCast()
+    if target then
+        if ValidTarget(target, 3000) then
+            self:UseR(target)
+        end
+    else
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy, 550) then
+                if ValidTarget(target, 3000) then
+                    self:UseR(target)
+                end
+            end
+        end
+    end
+end
+
+function Corki:Auto()
+    if Mode() ~= "Combo" and Mode() ~= "Harass" then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy) then
+            end
+        end
+    end
+end 
+
+function Corki:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        local ManaPercent = myHero.mana / myHero.maxMana * 100
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() and ManaPercent > self.Menu.AutoMode.UseQMana:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+
+function Corki:Logic()
+    if target == nil then return end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            self:UseQ(target, 1)
+        end
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            Control.CastSpell(HK_E)
+        end
+        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+            self:UseR(target)
+        end
+    else
+        WasInRange = false
+    end     
+end
+
+
+
+function Corki:OnPostAttack(args)
+end
+
+function Corki:OnPostAttackTick(args)
+end
+
+function Corki:OnPreAttack(args)
+end
+
+
+function Corki:UseQ(unit, hits)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < QRange and pred.HitCount >= hits then
+        Control.CastSpell(HK_Q, pred.CastPos)
+    end 
+end
+
+
+function Corki:UseR(unit)
+    local SmallRocket = _G.SDK.BuffManager:HasBuff(myHero, "corkimissilebarragenc")
+    if SmallRocket == false then
+        local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, BRSpellData)
+        if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value()and myHero.pos:DistanceTo(pred.CastPos) < 1500 then
+            Control.CastSpell(HK_R, pred.CastPos)
+        end
+    else
+        local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+        if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value()and myHero.pos:DistanceTo(pred.CastPos) < 1300 then
+            Control.CastSpell(HK_R, pred.CastPos)
+        end  
+    end
+end
+
 class "Orianna"
 
 local EnemyLoaded = false
@@ -2902,7 +3128,7 @@ function Orianna:Auto()
                         end
                     end
                 end
-                if GetDistance(enemy.pos, CurrentSpot) < 325 then
+                if GetDistance(enemy.pos, CurrentSpot) < 270 then
                     Rhits = Rhits + 1
                     local Rdamage = getdmg("R", enemy, myHero)
                     if self:CanUse(_R, "Auto") then
@@ -3020,7 +3246,7 @@ function Orianna:Logic()
                     Control.CastSpell(HK_W)
                 end
             end
-            if self:CanUse(_R, Mode()) and GetDistance(target.pos, CurrentSpot) < 325 then
+            if self:CanUse(_R, Mode()) and GetDistance(target.pos, CurrentSpot) < 270 then
                 if Mode() == "Combo" and Rhits >= self.Menu.ComboMode.UseRmin:Value() then
                     Control.CastSpell(HK_R)
                 elseif Mode() == "Harass" and Rhits >= self.Menu.HarassMode.UseRmin:Value() then
@@ -3105,305 +3331,6 @@ function Orianna:UseW(card)
 end
 
 
-class "Velkoz"
-
-local EnemyLoaded = false
-local casted = 0
-local LastCalledTime = 0
-local LastESpot = myHero.pos
-local LastE2Spot = myHero.pos
-local PickingCard = false
-local TargetAttacking = false
-local attackedfirst = 0
-local CastingQ = false
-local LastDirect = 0
-local CastingW = false
-local CastingR = false
-local ReturnMouse = mousePos
-local Q = 1
-local Edown = false
-local R = 1
-local WasInRange = false
-local OneTick
-local attacked = 0
-
-function Velkoz:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Velkoz", name = "Velkoz"})
-    self.Menu:MenuElement({id = "FleeKey", name = "Disengage Key", key = string.byte("T"), value = false})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEDef", name = "Use Defensive E in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEAtt", name = "Use Offensive E in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEAttHits", name = "Min enemies for Offensive E", value = 1, min = 1, max = 5, step = 1})
-    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Harass", value = false})
-
-    self.Menu:MenuElement({id = "FleeMode", name = "Flee", type = MENU})
-    self.Menu.FleeMode:MenuElement({id = "UseQ", name = "Use Q to Flee", value = true})
-    self.Menu.FleeMode:MenuElement({id = "UseE", name = "Use E to Flee", value = true})
-
-    self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
-    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
-
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-end
-
-function Velkoz:Spells()
-    ESpellData = {speed = 1350, range = 500, delay = 0.25, radius = 70, collision = {}, type = "linear"}
-    WSpellData = {speed = 3000, range = 800, delay = 0.5, radius = 300, collision = {}, type = "circular"}
-    RSpellData = {speed = 3000, range = 700, delay = 0.25, radius = 300, collision = {}, type = "circular"}
-end
-
-function Velkoz:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(1400)
-    CastingQ = myHero.activeSpell.name == "VelkozPowerTransfer"
-    CastingW = myHero.activeSpell.name == "VelkozGravitonField"
-    CastingR = myHero.activeSpell.name == "VelkozChaosStorm"
-    --PrintChat(myHero.activeSpell.name)
-    --PrintChat(myHero:GetSpellData(_R).name)
-    if Mode() == "LaneClear" then
-
-    else
-        self:Logic()
-    end
-    if not IsReady(_E) then
-        Edown = false
-    end
-    if Edown == true then
-        _G.SDK.Orbwalker:SetMovement(false)
-    else
-        _G.SDK.Orbwalker:SetMovement(true)
-    end
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
-
-function Velkoz:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        Draw.Circle(myHero.pos, 300, 1, Draw.Color(255, 0, 191, 255))
-        if target then
-        end
-    end
-end
-
-function Velkoz:KS()
-    --PrintChat("ksing")
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-        end
-    end
-end 
-
-function Velkoz:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseQ:Value() then
-            return true
-        end
-        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
-            return true
-        end
-        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseR:Value() then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-    elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
-            return true
-        end
-        if mode == "Flee" and IsReady(spell) and self.Menu.FleeMode.UseE:Value() then
-            return true
-        end
-    end
-    return false
-end
-
-
-function Velkoz:DelayEscapeClick(delay)
-    if Game.Timer() - LastCalledTime > delay then
-        LastCalledTime = Game.Timer()
-        Control.RightClick(mousePos:To2D())
-    end
-end
-
-
-function Velkoz:Logic()
-    if target == nil then return end
-    if Mode() == "Combo" or Mode() == "Harass" and target then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
-        local ERange = 1025
-        local QRange = 600
-        local WRange = 800
-        local RRange = 700
-        local TargetNextSpot = GetUnitPositionNext(target)
-        if TargetNextSpot then
-            TargetAttacking = GetDistance(myHero.pos, target.pos) > GetDistance(myHero.pos, TargetNextSpot)
-        else
-            TargetAttacking = false
-        end
-
-        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and Edown == false and not CastingQ and not CastingW then
-            if target.pathing.isDashing and TargetAttacking and self.Menu.ComboMode.UseEDef:Value() then
-                Control.CastSpell(HK_W, myHero)
-            elseif GetDistance(myHero.pos, target.pos) < 300 and self.Menu.ComboMode.UseEDef:Value() then
-                Control.CastSpell(HK_W, myHero)
-            elseif self.Menu.ComboMode.UseEAtt:Value() then
-                self:UseW(target, self.Menu.ComboMode.UseEAttHits:Value(), TargetAttacking)
-            end
-        end
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingR then
-            self:UseE(target)
-        end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and Edown == false and not CastingQ and not CastingW and not CastingR then
-            Control.CastSpell(HK_Q, target)
-        end
-        local RDmg = getdmg("R", target, myHero, 1, myHero:GetSpellData(_R).level)
-        local RDmgTick = getdmg("R", target, myHero, 2, myHero:GetSpellData(_R).level)
-        local RDmgTotal = RDmg + RDmgTick*2
-        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange) and Edown == false and not CastingQ and not CastingW and not CastingR and target.health < RDmgTotal and myHero:GetSpellData(_R).name == "VelkozChaosStorm"then
-            Control.CastSpell(HK_R, target)
-            --LastDirect = Game.Timer() + 1
-        end
-        if self:CanUse(_R, Mode()) and ValidTarget(target) and Edown == false and not CastingQ and not CastingW and not CastingR and myHero:GetSpellData(_R).name == "VelkozChaosStormGuide" and (myHero.attackData.state == 3 or GetDistance(myHero.pos, target.pos) > AARange) then
-            self:DirectR(target.pos)
-        end
-    else
-        WasInRange = false
-    end     
-end
-
-function Velkoz:DirectR(spot)
-    if LastDirect - Game.Timer() < 0 then
-        Control.CastSpell(HK_R, target)
-        LastDirect = Game.Timer() + 1
-    end
-end
-
-function Velkoz:UseE2(ECastPos, unit, pred)
-            if Control.IsKeyDown(HK_E) then
-                Control.SetCursorPos(pred.CastPos)
-                Control.KeyUp(HK_E)
-                DelayAction(function() Control.SetCursorPos(ReturnMouse) end, 0.01)
-                DelayAction(function() Edown = false end, 0.50)   
-            end
-end
-
-function Velkoz:OnPostAttackTick(args)
-    if target then
-    end
-    attackedfirst = 1
-    attacked = 1
-end
-
-function Velkoz:OnPreAttack(args)
-    if self:CanUse(_E, Mode()) and target then
-    end
-end
-
-
-function Velkoz:UseR1(unit, hits)
-    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
-    --PrintChat("trying E")
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 701 and pred.HitCount >= hits then
-            Control.CastSpell(HK_R, pred.CastPos)
-            --Casted = 1
-    end 
-end
-
-function Velkoz:UseW(unit, hits, attacking)
-    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
-    --PrintChat("trying E")
-    if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 801 and pred.HitCount >= hits then
-        if attacking == true then
-            local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
-            local Wspot = pred.CastPos - Direction*100
-            Control.CastSpell(HK_W, Wspot)
-        else
-            local Direction = Vector((pred.CastPos-myHero.pos):Normalized())
-            local Wspot = pred.CastPos + Direction*100
-            if GetDistance(myHero.pos, Wspot) > 800 then
-                Control.CastSpell(HK_W, pred.CastPos)
-            else
-                Control.CastSpell(HK_W, Wspot)
-            end
-        end
-            --Casted = 1
-    end 
-end
-
-function Velkoz:UseE(unit)
-    if GetDistance(unit.pos, myHero.pos) < 1025 then
-        --PrintChat("Using E")
-        local Direction = Vector((myHero.pos-unit.pos):Normalized())
-        local Espot = myHero.pos - Direction*480
-        if GetDistance(myHero.pos, unit.pos) < 480 then
-            Espot = unit.pos
-        end
-        --Control.SetCursorPos(Espot)
-        --Control.CastSpell(HK_E, unit)
-        local pred = _G.PremiumPrediction:GetPrediction(Espot, unit, ESpellData)
-        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and Espot:DistanceTo(pred.CastPos) < 501 then
-            if Control.IsKeyDown(HK_E) and Edown == true then
-                --_G.SDK.Orbwalker:SetMovement(false)
-                --PrintChat("E down")
-                self:UseE2(Espot, unit, pred)
-            elseif Edown == false then
-                --_G.SDK.Orbwalker:SetMovement(true)
-                ReturnMouse = mousePos
-                --PrintChat("Pressing E")
-                Control.SetCursorPos(Espot)
-                Control.KeyDown(HK_E)
-                Edown = true
-            end
-        end
-    end
-end
 
 
 
