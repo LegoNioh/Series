@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 110.00
+    local Version = 120.00
     
     local Files = {
         Lua = {
@@ -117,7 +117,7 @@ local function GetWaypoints(unit) -- get unit's waypoints
     table.insert(waypoints, unit.pos)
     local PathStart = pathData.pathIndex
     local PathEnd = pathData.pathCount
-    if PathStart and PathEnd and PathStart >= 0 and PathEnd <= 20 and path.hasMovePath then
+    if PathStart and PathEnd and PathStart >= 0 and PathEnd <= 20 and pathData.hasMovePath then
         for i = pathData.pathIndex, pathData.pathCount do
             table.insert(waypoints, unit:GetPath(i))
         end
