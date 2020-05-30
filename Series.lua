@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 76.00
+    local Version = 80.00
     
     local Files = {
         Lua = {
@@ -118,8 +118,10 @@ end
 local function GetWaypoints(unit) -- get unit's waypoints
     local waypoints = {}
     local pathData = unit.pathing
-    table.insert(waypoints, unit.pos)
-    if pathData.hasMovePath and pathData.pathCount > 0 then
+    table.insert(waypoints, unit.pos) 
+    local PathStart = pathData.pathIndex
+    local PathEnd = pathData.pathCount
+    if PathStart and PathEnd and PathStart >= 0 and PathEnd <= 20 and pathData.hasMovePath then
         for i = pathData.pathIndex, pathData.pathCount do
             table.insert(waypoints, unit:GetPath(i))
         end
@@ -472,9 +474,6 @@ function Riven:Tick()
     --PrintChat(myHero:GetSpellData(_Q).ammo)
     --PrintChat(myHero:GetSpellData(_R).name)
     target = GetTarget(1400)
-    if myHero.pathing.isDashing then
-    	--PrintChat("Dashing")
-    end
     --self:KS()
     if myHero:GetSpellData(_R).name == "RivenFengShuiEngine" then
     	R = 1
@@ -618,7 +617,7 @@ function Riven:Escape()
 	if self:CanUse(_E, "Flee") then
 		Control.CastSpell(HK_E, mousePos)
 	end
-	if self:CanUse(_Q, "Flee") and not myHero.pathing.isDashing then
+	if self:CanUse(_Q, "Flee") and not (myHero.pathing and myHero.pathing.isDashing) then
 		Control.CastSpell(HK_Q)
 	end
 end
@@ -656,8 +655,7 @@ function Riven:Logic()
         	if R == 1 and self:CanUse(_R, Mode()) and self:CanKill(target) and not self:CanUse(_E, Mode()) then
 				Control.CastSpell(HK_R)
         	end
-            Control.CastSpell(HK_W)
-        end
+         end
         if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and (Q == 1 or GetDistance(target.pos, myHero.pos) > 270) and (not self:CanUse(_Q, Mode()) or GetDistance(target.pos, myHero.pos) > 270) then
         	if R == 1 and self:CanUse(_R, Mode()) and self:CanKill(target) then
 				Control.CastSpell(HK_R)
@@ -705,7 +703,7 @@ function Riven:GetInRange(unit)
 					Control.CastSpell(HK_E, unit.pos)
 				end 
 			end
-		elseif self:CanUse(_Q, Mode()) and self.Menu.ComboMode.GapUseQ:Value() and not myHero.pathing.isDashing then
+		elseif self:CanUse(_Q, Mode()) and self.Menu.ComboMode.GapUseQ:Value() and not (myHero.pathing and myHero.pathing.isDashing) then
 			if Q == 1 and GetDistance(unit.pos, myHero.pos) < 810 then
 				local Damages = self:GetDamages(unit, 1)
 				if Damages.Totaldmg > unit.health then
@@ -1131,6 +1129,7 @@ local WasInRange = false
 
 function MasterYi:Menu()
 	self.Menu = MenuElement({type = MENU, id = "MasterYi", name = "MasterYi"})
+	self.Menu:MenuElement({id = "UrfMode", name = "UrfMode", value = true})
 	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
 	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
@@ -1255,7 +1254,7 @@ function MasterYi:Logic()
 			WasInRange = true
 		end
 		local Qrange = 600
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and (GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius or self.Menu.UrfMode:Value()) then
 			if self:CanUse(_E, Mode()) then
 				Control.CastSpell(HK_E)
 			end
@@ -1688,6 +1687,8 @@ local EnemyLoaded = false
 local QCastTime = Game:Timer()
 local RCastTime = Game:Timer()
 local Casted = 0
+local QCasted = false
+local AAData = 1
 local UsedE = false
 local CanQclick = true
 local attackedfirst = 0
@@ -1727,7 +1728,7 @@ function Lucian:Tick()
 	if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
 	target = GetTarget(1400)
 	--PrintChat(myHero.activeSpell.name)
-	if myHero.pathing.isDashing then
+	if (myHero.pathing and myHero.pathing.isDashing) then
 		UsedE = true
 		--PrintChat("Casting E")
 	elseif UsedE == true then
@@ -1736,6 +1737,19 @@ function Lucian:Tick()
 			DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
 		end
 		UsedE = false
+	end
+	--PrintChat(myHero.attackData.state)
+	if myHero.activeSpell.name == "LucianQ" then
+		--PrintChat("Casting Q")
+		QCasted = true
+	else
+		--PrintChat("Not Casting Q")
+		if QCasted == true then
+			if target then
+				Control.Attack(target)
+			end
+		end
+		QCasted = false
 	end
 	local hasPassive = _G.SDK.BuffManager:HasBuff(myHero, "LucianPassiveBuff")
 	if hasPassive then
@@ -1851,21 +1865,11 @@ function Lucian:Logic()
 		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 630 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinionCombo:Value() then
 			self:GetQMinion(target)
 		end
-		if myHero.activeSpell.name == "LucianQ" then
-			--_G.SDK.Orbwalker:SetMovement(false)
-			--_G.SDK.Orbwalker:SetAttack(false)
-			if CanQclick == true then
-				--DelayAction(function() self:QClick() end, 0.10)
-				--self:QClick()
-				CanQclick = false
-			end
-			--self:QClick()
+		--PrintChat(myHero.attackData.state)
+		if myHero.attackData.state == 1 then
+			--PrintChat("CanAttack ")
 		else
-			if CanQclick == false then
-				--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
-				--_G.SDK.Orbwalker:__OnAutoAttackReset()
-			end
-			CanQclick = true
+			--PrintChat("Can't Attack")
 		end
 		if self:CanUse(_E, Mode()) and myHero:GetSpellData(_R).toggleState == 1 then
 			if GetDistance(target.pos) > 520 then
@@ -1894,6 +1898,24 @@ function Lucian:Logic()
 			end
 		end
 			--PrintChat(myHero.activeSpell.name)
+
+
+		local Qrange = 500 + myHero.boundingRadius + target.boundingRadius
+		--PrintChat(range)
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" then
+			Control.CastSpell(HK_Q, target)
+			--DelayAction(function() self:QClick() end, 0.30)
+			--self:QClick()
+			--PrintChat(myHero.attackSpeed)
+			--DelayAction(function() 	Control.RightClick(mousePos:To2D()) end, 0.05)
+			--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+			if myHero.attackSpeed < 1.40 then
+				--PrintChat("cat")
+				--DelayAction(function() Control.Move(mousePos) end, 0.75)
+			end
+			Casted = 1
+		end
+
 		if self:CanUse(_W, Mode()) and ValidTarget(target, 900) and not DoubleShot and Casted == 0 and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" then
 			if GetDistance(target.pos, myHero.pos) > 600 or not self:CanUse(_Q, Mode()) then
 				self:UseW(target)
@@ -1930,22 +1952,22 @@ end
 
 function Lucian:QClick()
 	local NextSpot = GetUnitPositionNext(myHero)
-	local spot = myHero.pos
+	local spot = mousePos
 	if NextSpot then
 		local Direction = Vector((myHero.pos-NextSpot):Normalized())
 		spot = myHero.pos - Direction*100
 	else
 		local Direction = Vector((myHero.pos-target.pos):Normalized())
-		spot = myHero.pos- Direction*100
+		--spot = myHero.pos- Direction*100
+		--spot = mousePos
 		--PrintChat("using hero spot")
 	end
 	Draw.Circle(mousePos, 50, 1, Draw.Color(255, 0, 191, 255))
-	Control.RightClick(spot:To2D())
-	--Control.RightClick(target.pos:To2D())
-	--PrintChat("Q click")
-	--DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
-	--DelayAction(function() 	Control.Attack(target) PrintChat("Attacking Q attack click") end, 0.15)
-	DelayAction(function() 	Control.RightClick(target.pos:To2D()) end, 0.05)
+	--Control.RightClick(spot:To2D())
+	if target then
+		Control.Attack(target)
+	end
+	--DelayAction(function() 	Control.RightClick(target.pos:To2D()) end, 0.05)
 end
 
 function Lucian:GetQMinion(unit)
@@ -2001,19 +2023,7 @@ function Lucian:OnPostAttackTick(args)
 	attackedfirst = 1
 	if target and Mode() == "Combo" then
 		--PrintChat(target.boundingRadius)
-		local range = 500 + myHero.boundingRadius + target.boundingRadius
-		--PrintChat(range)
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, range) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" then
-			Control.CastSpell(HK_Q, target)
-				--DelayAction(function() self:QClick() end, 0.30)
-				--self:QClick()
-			--PrintChat(myHero.attackSpeed)
-			if myHero.attackSpeed < 1.40 then
-				--PrintChat("cat")
-				--DelayAction(function() Control.Move(mousePos) end, 0.75)
-			end
-			Casted = 1
-		end
+
 	end
 end
 
@@ -2410,7 +2420,7 @@ function Draven:Logic()
 		if self:CanUse(_E, Mode()) and ValidTarget(target, 550) and not AxeOrbSetMove then
 			self:UseE(target)
 		end
-		if self:CanUse(_W, Mode()) and ValidTarget(target, 750) and GetDistance(target.pos) > 500 then
+		if self:CanUse(_W, Mode()) then
 			Control.CastSpell(HK_W)
 		end
 		if self:CanUse(_R, Mode()) and ValidTarget(target, 3000) and target.health < self:GetRDmg(target, true) * 1.8 and not SecondRBuff then
@@ -4530,7 +4540,7 @@ function Pyke:Auto()
 		                --PrintChat("Casting Q auto 2")
 		        end 	
 			end
-            if (self:CanUse(_R, "KS") or (Mode() == "Combo" and self:CanUse(_R, "Combo"))) and ValidTarget(enemy, RRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and self:UltKillCheck(enemy) then
+            if (self:CanUse(_R, "KS") or (Mode() == "Combo" and self:CanUse(_R, "Combo"))) and ValidTarget(enemy, RRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not (myHero.pathing and myHero.pathing.isDashing) and self:UltKillCheck(enemy) then
                 self:UseR(enemy)
             end
         end
@@ -4626,7 +4636,7 @@ function Pyke:Logic()
         if GetDistance(target.pos) < AARange then
             WasInRange = true
         end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not myHero.pathing.isDashing and not _G.SDK.Attack:IsActive() then
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not CastingQ and not CastingW and not CastingE and not CastingR and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
             local pred = _G.PremiumPrediction:GetPrediction(myHero, target, QScanSpellData)
             if pred.CastPos and  pred.HitChance > 0 and GetDistance(pred.CastPos) < 1200 then
                 QCastTime = Game:Timer() + 0.10
