@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 90.00
+    local Version = 91.00
     
     local Files = {
         Lua = {
@@ -1903,7 +1903,7 @@ function Lucian:Logic()
 		end
 			--PrintChat(myHero.activeSpell.name)
 		if _G.SDK.Attack:IsActive() then
-			PrintChat("Attack ACttive")
+			--PrintChat("Attack ACttive")
 		end
 
 		local Qrange = 500 + myHero.boundingRadius + target.boundingRadius
