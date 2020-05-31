@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 80.00
+    local Version = 90.00
     
     local Files = {
         Lua = {
@@ -1702,6 +1702,7 @@ function Lucian:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "Use2", name = "Use E Before W", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseQMinionCombo", name = "Q on minions in Combo (No FPS Drops)", value = false})
@@ -1884,7 +1885,7 @@ function Lucian:Logic()
 					end
 				end 
 			else
-				if myHero.attackData.state == STATE_WINDDOWN and not DoubleShot and not self:CanUse(_W, Mode()) and not self:CanUse(_Q, Mode()) then
+				if myHero.attackData.state == STATE_WINDDOWN and not DoubleShot and (self.Menu.ComboMode.Use2:Value() or not self:CanUse(_W, Mode())) and not self:CanUse(_Q, Mode()) and not _G.SDK.Attack:IsActive() then
 					local CloseMouse = mousePos 
 					CloseMouse = myHero.pos:Extended(mousePos, 100)
 					Control.CastSpell(HK_E, CloseMouse)
@@ -1894,15 +1895,20 @@ function Lucian:Logic()
 					elseif _G.SDK then
 						DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
 					end
+					if self.Menu.ComboMode.Use2:Value() then
+						Casted = 1
+					end
 				end
 			end
 		end
 			--PrintChat(myHero.activeSpell.name)
-
+		if _G.SDK.Attack:IsActive() then
+			PrintChat("Attack ACttive")
+		end
 
 		local Qrange = 500 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and not _G.SDK.Attack:IsActive() then
 			Control.CastSpell(HK_Q, target)
 			--DelayAction(function() self:QClick() end, 0.30)
 			--self:QClick()
@@ -1916,9 +1922,11 @@ function Lucian:Logic()
 			Casted = 1
 		end
 
-		if self:CanUse(_W, Mode()) and ValidTarget(target, 900) and not DoubleShot and Casted == 0 and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" then
+		if self:CanUse(_W, Mode()) and ValidTarget(target, 900) and not DoubleShot and Casted == 0 and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" and not _G.SDK.Attack:IsActive() then
 			if GetDistance(target.pos, myHero.pos) > 600 or not self:CanUse(_Q, Mode()) then
-				self:UseW(target)
+				if not self.Menu.ComboMode.Use2:Value() or not self:CanUse(_E, Mode()) then
+					self:UseW(target)
+				end
 			end
 		end
 		--PrintChat(self:GetRDmg(target))
