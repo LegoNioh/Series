@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 150.00
+    local Version = 160.00
     
     local Files = {
         Lua = {
@@ -444,7 +444,7 @@ local CastingW = false
 local CastingE = false
 local Direction = nil
 local CastingR = false
-local QRange = 575
+local ERange = 575
 local WasInRange = false
 local attacked = 0
 
