@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 140.00
+    local Version = 150.00
     
     local Files = {
         Lua = {
@@ -569,7 +569,8 @@ function Taric:Logic()
             WasInRange = true
         end
         if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingE and not CastingR and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            self:UseE(target)
+            --self:UseE(target)
+            Control.CastSpell(HK_E, target.pos)
         end
     else
         WasInRange = false
