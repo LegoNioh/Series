@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 160.00
+    local Version = 200.00
     
     local Files = {
         Lua = {
@@ -1107,6 +1107,14 @@ function Tryndamere:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 0, max = 100, step = 1})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
+    self.Menu.HarassMode:MenuElement({id = "UseQFury", name = "Q Min Fury", value = 50, min = 0, max = 100, step = 5})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 0, max = 100, step = 1})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Use Auto Q", value = true})
     self.Menu.AutoMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
@@ -1273,6 +1281,9 @@ function Tryndamere:CanUse(spell, mode)
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
             return true
         end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
         if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
             return true
         end
@@ -1280,12 +1291,21 @@ function Tryndamere:CanUse(spell, mode)
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
             return true
         end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
+            return true
+        end
     elseif spell == _W then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
             return true
         end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
     elseif spell == _E then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
             return true
         end
         if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
@@ -1318,8 +1338,12 @@ function Tryndamere:Logic()
             WasInRange = true
         end
         local WRange = 850
+        local ERange = 660
         local EAARange = _G.SDK.Data:GetAutoAttackRange(target)
         local HealthPercent = (myHero.health / myHero.maxHealth) * 100
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingW and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            self:UseE(target)
+        end
         if self:CanUse(_Q, Mode()) and ValidTarget(target, EAARange*2) then
             if self.Menu.ComboMode.UseQFury:Value() >= myHero.mana and self.Menu.ComboMode.UseQHealth:Value() >= HealthPercent and not RBuff then 
                 Control.CastSpell(HK_Q)
