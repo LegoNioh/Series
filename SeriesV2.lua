@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 210.00
+    local Version = 220.00
     
     local Files = {
         Lua = {
@@ -1100,14 +1100,16 @@ function Tryndamere:Menu()
     self.Menu = MenuElement({type = MENU, id = "Tryndamere", name = "Tryndamere"})
     self.Menu:MenuElement({id = "EKey", name = "Manual E Key", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
-    self.Menu.ComboMode:MenuElement({id = "UseQFury", name = "Q Min Fury", value = 50, min = 0, max = 100, step = 5})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEFast", name = "Use Fast E", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 0, max = 100, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQHealth", name = "(Q) Min Health %:", value = 10, min = 0, max = 100, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseQFury", name = "(Q) Min Fury:", value = 50, min = 0, max = 100, step = 5})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEGapClose", name = "(E) GapClose: Use E to Get in Range", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseESticky", name = "(E) Sticky: Save E to Stick to Attacked Targets", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEFast", name = "(E) Fast: No Prediction E", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "(R) Min Health %:", value = 10, min = 0, max = 100, step = 1})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.HarassMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
@@ -1343,7 +1345,13 @@ function Tryndamere:Logic()
         local EAARange = _G.SDK.Data:GetAutoAttackRange(target)
         local HealthPercent = (myHero.health / myHero.maxHealth) * 100
         if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingW and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            self:UseE(target)
+            if self.Menu.ComboMode.UseESticky:Value() then
+                if GetDistance(target.pos) > AARange and (WasInRange or self.Menu.ComboMode.UseEGapClose:Value()) then 
+                    self:UseE(target)
+                end
+            else
+                self:UseE(target)
+            end
         end
         if self:CanUse(_Q, Mode()) and ValidTarget(target, EAARange*2) then
             if self.Menu.ComboMode.UseQFury:Value() >= myHero.mana and self.Menu.ComboMode.UseQHealth:Value() >= HealthPercent and not RBuff then 
@@ -1383,26 +1391,26 @@ function Tryndamere:UltCalcs(unit)
     local CheckDmg= 0
     if unit.activeSpell.target == myHero.handle and unit.activeSpell.isChanneling == false then
         --PrintChat(unit.activeSpell.name)
-        PrintChat(unit.totalDamage)
+        --PrintChat(unit.totalDamage)
         --PrintChat(myHero.critChance)
         CheckDmg = unit.totalDamage + (unit.totalDamage*unit.critChance)
     else
         --PrintChat("Spell")
         if unit.activeSpell.name == unit:GetSpellData(_Q).name then
-            PrintChat(Qdmg)
+            --PrintChat(Qdmg)
             CheckDmg = Qdmg
         elseif unit.activeSpell.name == unit:GetSpellData(_W).name then
-            PrintChat("W")
+            --PrintChat("W")
             CheckDmg = Wdmg
         elseif unit.activeSpell.name == unit:GetSpellData(_E).name then
-            PrintChat("E")
+            --PrintChat("E")
             CheckDmg = Edmg
         elseif unit.activeSpell.name == unit:GetSpellData(_R).name then
-            PrintChat("R")
+            --PrintChat("R")
             CheckDmg = Rdmg
         end
     end
-    PrintChat(CheckDmg)
+    --PrintChat(CheckDmg)
     return CheckDmg * 1.2
     --[[
 
@@ -1611,7 +1619,7 @@ function Jax:Auto()
                 if ValidTarget(enemy, 300) and (self:CanUse(_E, "Auto2") or self:CanUse(_E, "Auto")) then
                     Control.CastSpell(HK_E)
                 elseif ValidTarget(enemy, EAARange) and self:CanUse(_E, "Auto") then
-                    PrintChat("Looking For Auto Attacks")
+                    --PrintChat("Looking For Auto Attacks")
                     if myHero.handle == enemy.activeSpell.target and not EBuff then
                         if not enemy.activeSpell.isChanneling then
                             Control.CastSpell(HK_E)
