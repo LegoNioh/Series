@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 200.00
+    local Version = 210.00
     
     local Files = {
         Lua = {
@@ -1105,6 +1105,7 @@ function Tryndamere:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseQFury", name = "Q Min Fury", value = 50, min = 0, max = 100, step = 5})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEFast", name = "Use Fast E", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 0, max = 100, step = 1})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
@@ -1433,10 +1434,14 @@ function Tryndamere:OnPreAttack(args)
 end
 
 function Tryndamere:UseE(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
-    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
-        if not (myHero.pathing and myHero.pathing.isDashing) and IsReady(_E) then
-            Control.CastSpell(HK_E, pred.CastPos)
+    if self.Menu.ComboMode.UseEFast:Value() then
+        Control.CastSpell(HK_E, unit)
+    else
+        local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+        if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) < 1150 then
+            if not (myHero.pathing and myHero.pathing.isDashing) and IsReady(_E) then
+                Control.CastSpell(HK_E, pred.CastPos)
+            end
         end
     end 
 end
