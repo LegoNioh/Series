@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 220.00
+    local Version = 230.00
     
     local Files = {
         Lua = {
@@ -1327,7 +1327,10 @@ end
 
 
 function Tryndamere:Logic()
-    if target == nil then return end
+    if target == nil then 
+        WasInRange = false
+        return 
+    end
     --PrintChat(target.activeSpell.target)
     if myHero.handle == target.activeSpell.target then
         --PrintChat(target.activeSpellSlot)
@@ -1349,7 +1352,7 @@ function Tryndamere:Logic()
                 if GetDistance(target.pos) > AARange and (WasInRange or self.Menu.ComboMode.UseEGapClose:Value()) then 
                     self:UseE(target)
                 end
-            else
+            elseif WasInRange or self.Menu.ComboMode.UseEGapClose:Value() then
                 self:UseE(target)
             end
         end
@@ -1373,7 +1376,7 @@ function Tryndamere:Logic()
             end
         end
     else
-        WasInRange = false
+        --WasInRange = false
     end     
 end
 
