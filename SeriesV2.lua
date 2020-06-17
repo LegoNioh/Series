@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 230.00
+    local Version = 240.00
     
     local Files = {
         Lua = {
@@ -156,6 +156,16 @@ function GetTarget(range)
     else
         return _G.GOS:GetTarget(range,"AD")
     end
+end
+
+function GetBuffExpire(unit, buffname)
+    for i = 0, unit.buffCount do
+        local buff = unit:GetBuff(i)
+        if buff.name == buffname and buff.count > 0 then 
+            return buff.expireTime
+        end
+    end
+    return nil
 end
 
 function GotBuff(unit, buffname)
@@ -1100,9 +1110,11 @@ function Tryndamere:Menu()
     self.Menu = MenuElement({type = MENU, id = "Tryndamere", name = "Tryndamere"})
     self.Menu:MenuElement({id = "EKey", name = "Manual E Key", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q on Low HP", value = false})
     self.Menu.ComboMode:MenuElement({id = "UseQHealth", name = "(Q) Min Health %:", value = 10, min = 0, max = 100, step = 1})
     self.Menu.ComboMode:MenuElement({id = "UseQFury", name = "(Q) Min Fury:", value = 50, min = 0, max = 100, step = 5})
+    self.Menu.ComboMode:MenuElement({id = "UseQUlt", name = "(Q) Use At the End of Ult", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQUltHealth", name = "(Q) At end of Ult Min Health %:", value = 10, min = 0, max = 100, step = 1})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEGapClose", name = "(E) GapClose: Use E to Get in Range", value = true})
@@ -1110,6 +1122,7 @@ function Tryndamere:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseEFast", name = "(E) Fast: No Prediction E", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "(R) Min Health %:", value = 10, min = 0, max = 100, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "RInfo", name = "(R) Ignores Min % if there is Incoming Damage", type = MENU})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
     self.Menu.HarassMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
@@ -1119,11 +1132,14 @@ function Tryndamere:Menu()
     self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
     self.Menu.HarassMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 0, max = 100, step = 1})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Use Auto Q", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Use Auto Q", value = false})
     self.Menu.AutoMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
     self.Menu.AutoMode:MenuElement({id = "UseQFury", name = "Q Min Fury", value = 50, min = 0, max = 100, step = 5})
+    self.Menu.AutoMode:MenuElement({id = "UseQUlt", name = "(Q) Use At the End of Ult", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseQUltHealth", name = "(Q) At end of Ult Min Health %:", value = 10, min = 0, max = 100, step = 1})
     self.Menu.AutoMode:MenuElement({id = "UseR", name = "Use Auto R", value = true})
     self.Menu.AutoMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 0, max = 100, step = 1})
+    self.Menu.AutoMode:MenuElement({id = "RInfo2", name = "(R) Ignores Min % if there is Incoming Damage", type = MENU})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
@@ -1147,7 +1163,7 @@ function Tryndamere:Tick()
     CastingW = myHero.activeSpell.name == "TryndamereW"
     --PrintChat(myHero.activeSpell.name)
     --PrintChat(myHero.activeSpell.speed)
-    RBuff = BuffActive(myHero, "UndyingRage")
+    RBuff = GetBuffExpire(myHero, "UndyingRage")
     if self.Menu.EKey:Value() then
         self:ManualECast()
     end
@@ -1251,27 +1267,32 @@ function Tryndamere:ManualECast()
 end
 
 function Tryndamere:Auto()
-    if Mode() ~= "Combo" and Mode() ~= "Harass" then
+    local HealthPercent = (myHero.health / myHero.maxHealth) * 100
+    if self:CanUse(_Q, "AutoUlt") then
+        if self.Menu.AutoMode.UseQUltHealth:Value() >= HealthPercent and RBuff ~= nil and RBuff - Game.Timer() < 0.3 then 
+            Control.CastSpell(HK_Q)
+        end
+    end
+    --if Mode() ~= "Combo" and Mode() ~= "Harass" then
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
         for i, enemy in pairs(EnemyHeroes) do
             if enemy and not enemy.dead and ValidTarget(enemy) then
-                local EAARange = _G.SDK.Data:GetAutoAttackRange(enemy)
-                local HealthPercent = (myHero.health / myHero.maxHealth) * 100
-                if self:CanUse(_Q, "Auto") and ValidTarget(enemy, EAARange*2) then
-                    if self.Menu.AutoMode.UseQFury:Value() >= myHero.mana and self.Menu.AutoMode.UseQHealth:Value() >= HealthPercent and not RBuff then
+                local EAARange = _G.SDK.Data:GetAutoAttackRange(enemy)   
+                if self:CanUse(_Q, "Auto") and ValidTarget(enemy, 1500) then
+                    if self.Menu.AutoMode.UseQFury:Value() >= myHero.mana and self.Menu.AutoMode.UseQHealth:Value() >= HealthPercent and RBuff == nil then
                         Control.CastSpell(HK_Q)
                     end
                 end
-                if self:CanUse(_R, "Auto") and ValidTarget(enemy, EAARange) then
-                    if self.Menu.AutoMode.UseRHealth:Value() >= HealthPercent then 
-                        if self.Menu.AutoMode.UseQHealth:Value() < HealthPercent or self.Menu.AutoMode.UseQFury:Value() < myHero.mana or not self:CanUse(_Q, "Auto") then
-                            Control.CastSpell(HK_R)
-                        end
+                if self:CanUse(_R, "Auto") and ValidTarget(enemy, 1500) then
+                    local IncDamage = self:UltCalcs(target)
+                    --PrintChat(IncDamage)
+                    if self.Menu.AutoMode.UseRHealth:Value() >= HealthPercent or myHero.health <= IncDamage then 
+                        Control.CastSpell(HK_R)
                     end
                 end
             end
         end
-    end
+    --end
 end 
 
 
@@ -1287,11 +1308,20 @@ function Tryndamere:CanUse(spell, mode)
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
             return true
         end
+        if mode == "AutoUlt" and IsReady(spell) and self.Menu.AutoMode.UseQUlt:Value() then
+            return true
+        end
+        if mode == "Ult" and IsReady(spell) and self.Menu.ComboMode.UseQUlt:Value() then
+            return true
+        end
         if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
             return true
         end
     elseif spell == _R then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
             return true
         end
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
@@ -1357,16 +1387,19 @@ function Tryndamere:Logic()
             end
         end
         if self:CanUse(_Q, Mode()) and ValidTarget(target, EAARange*2) then
-            if self.Menu.ComboMode.UseQFury:Value() >= myHero.mana and self.Menu.ComboMode.UseQHealth:Value() >= HealthPercent and not RBuff then 
+            if self.Menu.ComboMode.UseQFury:Value() >= myHero.mana and self.Menu.ComboMode.UseQHealth:Value() >= HealthPercent and RBuff == nil then 
+                Control.CastSpell(HK_Q)
+            end
+        end
+        if self:CanUse(_Q, "Ult") and ValidTarget(target) then
+            if self.Menu.ComboMode.UseQUltHealth:Value() >= HealthPercent and RBuff and RBuff - Game.Timer() < 0.3 then 
                 Control.CastSpell(HK_Q)
             end
         end
         local IncDamage = self:UltCalcs(target)
         if self:CanUse(_R, Mode()) and ValidTarget(target, EAARange*2) then
             if self.Menu.ComboMode.UseRHealth:Value() >= HealthPercent or myHero.health <= IncDamage then 
-                if self.Menu.ComboMode.UseQHealth:Value() < HealthPercent or self.Menu.ComboMode.UseQFury:Value() < myHero.mana or not self:CanUse(_Q, Mode()) then
-                    Control.CastSpell(HK_R)
-                end
+                Control.CastSpell(HK_R)
             end
         end
         if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and not CastingW and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
