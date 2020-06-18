@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 240.00
+    local Version = 250.00
     
     local Files = {
         Lua = {
@@ -1424,24 +1424,24 @@ function Tryndamere:UltCalcs(unit)
     --PrintChat(unit.activeSpellSlot)
     --PrintChat("Break------")
     --PrintChat(unit:GetSpellData(_Q).name)
-    local CheckDmg= 0
-    if unit.activeSpell.target == myHero.handle and unit.activeSpell.isChanneling == false then
+    local CheckDmg = 0
+    if unit.activeSpell.target == myHero.handle and unit.activeSpell.isChanneling == false and unit.totalDamage and unit.critChance then
         --PrintChat(unit.activeSpell.name)
         --PrintChat(unit.totalDamage)
         --PrintChat(myHero.critChance)
         CheckDmg = unit.totalDamage + (unit.totalDamage*unit.critChance)
     else
         --PrintChat("Spell")
-        if unit.activeSpell.name == unit:GetSpellData(_Q).name then
+        if unit.activeSpell.name == unit:GetSpellData(_Q).name and Qdmg then
             --PrintChat(Qdmg)
             CheckDmg = Qdmg
-        elseif unit.activeSpell.name == unit:GetSpellData(_W).name then
+        elseif unit.activeSpell.name == unit:GetSpellData(_W).name and Wdmg then
             --PrintChat("W")
             CheckDmg = Wdmg
-        elseif unit.activeSpell.name == unit:GetSpellData(_E).name then
+        elseif unit.activeSpell.name == unit:GetSpellData(_E).name and Edmg then
             --PrintChat("E")
             CheckDmg = Edmg
-        elseif unit.activeSpell.name == unit:GetSpellData(_R).name then
+        elseif unit.activeSpell.name == unit:GetSpellData(_R).name and Rdmg then
             --PrintChat("R")
             CheckDmg = Rdmg
         end
