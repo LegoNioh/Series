@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 400.00
+    local Version = 401.00
     
     local Files = {
         Lua = {
@@ -1156,13 +1156,13 @@ function Tryndamere:Draw()
         Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
 
 
-        InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
+        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
         if self.Menu.ComboMode.UseESticky:Value() then
             Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
         else
             Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
         end
     end
 end
