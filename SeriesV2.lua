@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 250.00
+    local Version = 400.00
     
     local Files = {
         Lua = {
@@ -1093,6 +1093,7 @@ end
 class "Tryndamere"
 
 local EnemyLoaded = false
+local TargetTime = 0
 local casted = 0
 local Qtick = true
 local CastingQ = false
@@ -1118,7 +1119,7 @@ function Tryndamere:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEGapClose", name = "(E) GapClose: Use E to Get in Range", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseESticky", name = "(E) Sticky: Save E to Stick to Attacked Targets", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseESticky", name = "(E) Sticky: Save E to Stick to Attacked Targets", key = string.byte("A"), toggle = true, value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEFast", name = "(E) Fast: No Prediction E", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "(R) Min Health %:", value = 10, min = 0, max = 100, step = 1})
@@ -1153,6 +1154,16 @@ function Tryndamere:Draw()
     if self.Menu.Draw.UseDraws:Value() then
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
         Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+
+
+        InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
+        if self.Menu.ComboMode.UseESticky:Value() then
+            Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+            InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        else
+            Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+            InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        end
     end
 end
 
@@ -1358,7 +1369,9 @@ end
 
 function Tryndamere:Logic()
     if target == nil then 
-        WasInRange = false
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
         return 
     end
     --PrintChat(target.activeSpell.target)
@@ -1368,8 +1381,9 @@ function Tryndamere:Logic()
     end
     if Mode() == "Combo" or Mode() == "Harass" and target then
         --PrintChat("Logic")
+        TargetTime = Game.Timer()
         self:Items1()
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero) + target.boundingRadius
         if GetDistance(target.pos) < AARange then
             WasInRange = true
         end
@@ -1409,7 +1423,9 @@ function Tryndamere:Logic()
             end
         end
     else
-        --WasInRange = false
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
     end     
 end
 
