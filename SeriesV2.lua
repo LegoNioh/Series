@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 401.00
+    local Version = 403.00
     
     local Files = {
         Lua = {
@@ -77,6 +77,27 @@ local function IsUnderEnemyTurret(pos)
         end
     end
 end
+
+function GetNearestTurret(pos)
+    --local turrets = _G.SDK.ObjectManager:GetTurrets(5000)
+    local BestDistance = 0
+    local BestTurret = nil
+    for i = 1, Game.TurretCount() do
+        local turret = Game.Turret(i)
+        if turret.isAlly then
+            local Distance = GetDistance(turret.pos, pos)
+            if turret and (Distance < BestDistance or BestTurret == nil) then
+                --PrintChat("Set Best Turret")
+                BestTurret = turret
+                BestDistance = Distance
+            end
+        end     
+    end   
+    return BestTurret
+end
+
+
+
 
 function GetDistanceSqr(Pos1, Pos2)
     local Pos2 = Pos2 or myHero.pos
@@ -1094,6 +1115,7 @@ class "Tryndamere"
 
 local EnemyLoaded = false
 local TargetTime = 0
+local Dashed = true
 local casted = 0
 local Qtick = true
 local CastingQ = false
@@ -1106,6 +1128,8 @@ local attacked = 0
 local RBuff = false
 local CanQ = true 
 local QtickTime = 0
+local ClosestTurret = nil
+local attacks = 0
 
 function Tryndamere:Menu()
     self.Menu = MenuElement({type = MENU, id = "Tryndamere", name = "Tryndamere"})
@@ -1126,12 +1150,11 @@ function Tryndamere:Menu()
     self.Menu.ComboMode:MenuElement({id = "RInfo", name = "(R) Ignores Min % if there is Incoming Damage", type = MENU})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
-    self.Menu.HarassMode:MenuElement({id = "UseQFury", name = "Q Min Fury", value = 50, min = 0, max = 100, step = 5})
     self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
     self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseDashBack", name = "DashBack: Dash Back after attacking", key = string.byte("J"), toggle = true, value = true})
+    self.Menu.HarassMode:MenuElement({id = "DashBackAttacks", name = "No Of Attacks Before DashBack", value = 1, min = 0, max = 5, step = 1})
     self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseRHealth", name = "R Min Health %", value = 10, min = 0, max = 100, step = 1})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Use Auto Q", value = false})
     self.Menu.AutoMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
@@ -1179,6 +1202,9 @@ function Tryndamere:Tick()
         self:ManualECast()
     end
     --PrintChat(myHero.activeSpellSlot)
+    if Mode() ~= "Harass" then
+        Dashed = true
+    end
     self:UpdateItems()
     self:Logic()
     self:Auto()
@@ -1349,6 +1375,9 @@ function Tryndamere:CanUse(spell, mode)
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
             return true
         end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
             return true
         end
@@ -1366,6 +1395,30 @@ function Tryndamere:CanUse(spell, mode)
 end
 
 
+
+function Tryndamere:DashBack()
+    if self.Menu.HarassMode.UseDashBack:Value() then
+        --PrintChat("Dash Backing")
+        if Dashed == true then
+            attacks = self.Menu.HarassMode.DashBackAttacks:Value()
+            ClosestTurret = GetNearestTurret(myHero.pos)
+            Dashed = false
+            --PrintChat("Attacks Set/Turret Set/Dashed = False")
+        end
+        if attacks <= 0 then
+            --PrintChat("Attacks Less than 0")
+            if ClosestTurret then
+                --PrintChat("CLosest Turret")
+            end
+            if self:CanUse(_E, "Force") and target and ValidTarget(target, ERange) and ClosestTurret and not CastingW and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+                Direction = Vector((myHero.pos-ClosestTurret.pos):Normalized())
+                Spot = myHero.pos - Direction * 660
+                Control.CastSpell(HK_E, Spot)
+                Dashed = true
+            end
+        end
+    end
+end
 
 function Tryndamere:Logic()
     if target == nil then 
@@ -1391,7 +1444,9 @@ function Tryndamere:Logic()
         local ERange = 660
         local EAARange = _G.SDK.Data:GetAutoAttackRange(target)
         local HealthPercent = (myHero.health / myHero.maxHealth) * 100
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingW and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+        if Mode() =="Harass" and self.Menu.HarassMode.UseDashBack:Value() then
+            self:DashBack()
+        elseif self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingW and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
             if self.Menu.ComboMode.UseESticky:Value() then
                 if GetDistance(target.pos) > AARange and (WasInRange or self.Menu.ComboMode.UseEGapClose:Value()) then 
                     self:UseE(target)
@@ -1485,6 +1540,7 @@ function Tryndamere:UltCalcs(unit)
 end
 
 function Tryndamere:OnPostAttack(args)
+    attacks = attacks - 1
 end
 
 function Tryndamere:OnPostAttackTick(args)
