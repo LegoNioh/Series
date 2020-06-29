@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 403.00
+    local Version = 405.00
     
     local Files = {
         Lua = {
@@ -1130,6 +1130,9 @@ local CanQ = true
 local QtickTime = 0
 local ClosestTurret = nil
 local attacks = 0
+local PossibleSpots = {}
+local WAround = 0
+local InsertedTime = Game.Timer()
 
 function Tryndamere:Menu()
     self.Menu = MenuElement({type = MENU, id = "Tryndamere", name = "Tryndamere"})
@@ -1155,6 +1158,9 @@ function Tryndamere:Menu()
     self.Menu.HarassMode:MenuElement({id = "UseDashBack", name = "DashBack: Dash Back after attacking", key = string.byte("J"), toggle = true, value = true})
     self.Menu.HarassMode:MenuElement({id = "DashBackAttacks", name = "No Of Attacks Before DashBack", value = 1, min = 0, max = 5, step = 1})
     self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
+    self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
+    self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable MeleeHelper", value = true})
+    self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Use Auto Q", value = false})
     self.Menu.AutoMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
@@ -1166,6 +1172,12 @@ function Tryndamere:Menu()
     self.Menu.AutoMode:MenuElement({id = "RInfo2", name = "(R) Ignores Min % if there is Incoming Damage", type = MENU})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+    self.Menu.Draw:MenuElement({id = "MeleeHelperSpot", name = "Draw Melee Helper Spot", value = false})
+    self.Menu.Draw:MenuElement({id = "MeleeHelperDistance", name = "Draw Melee Helper Mouse Distance", value = false})
+    self.Menu.Draw:MenuElement({id = "WScan", name = "Draw Potentential Hidden Enemies", value = false})
+    self.Menu.Draw:MenuElement({id = "DashBack", name = "Draw If DashBack Is On", value = false})
+    self.Menu.Draw:MenuElement({id = "ESticky", name = "Draw If StickyE Is On", value = false})
+    self.Menu.Draw:MenuElement({id = "AArange", name = "Draw AA Range", value = false})
 end
 
 function Tryndamere:Spells()
@@ -1176,20 +1188,200 @@ end
 function Tryndamere:Draw()
     if self.Menu.Draw.UseDraws:Value() then
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
-
-
+        if self.Menu.Draw.AArange:Value() then 
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+        end
+        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperDistance:Value() then
+            Draw.Circle(target.pos, self.Menu.OrbMode.MeleeHelperMouseDistance:Value(), 1, Draw.Color(255, 0, 0, 0))
+        end
+        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperSpot:Value() then
+            local MeleeSpot = self:DrawMeleeHelper()
+            if MeleeSpot then
+                Draw.Circle(MeleeSpot, 25, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(MeleeSpot, 35, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(MeleeSpot, 45, 1, Draw.Color(255, 0, 100, 255))
+            end
+        end
+        if self.Menu.Draw.WScan:Value() then
+            self:WScan()
+        end
         --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
-        if self.Menu.ComboMode.UseESticky:Value() then
-            Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        else
-            Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        if self.Menu.Draw.DashBack:Value() then
+            if self.Menu.HarassMode.UseDashBack:Value() then
+                Draw.Text("Dash Back On", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-120, Draw.Color(255, 0, 255, 0))
+            else
+                Draw.Text("Dash Back Off", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-120, Draw.Color(255, 255, 0, 0))
+            end
+        end
+
+        if self.Menu.Draw.ESticky:Value() then
+            if self.Menu.ComboMode.UseESticky:Value() then
+                Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            else
+                Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            end
         end
     end
 end
 
+function Tryndamere:DrawMeleeHelper()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local MoveSpot = nil
+    if self.Menu.OrbMode.UseMeleeHelper:Value() and target and Mode() == "Combo" and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange then
+        local MouseDirection = Vector((target.pos-mousePos):Normalized())
+        local MouseDistance = GetDistance(mousePos, target.pos)
+        local MouseSpotDistance = AARange - target.boundingRadius
+        if IsFacing(target) then
+            MouseSpotDistance = AARange - 10
+            --PrintChat("Facing")
+        end
+        local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
+        MoveSpot = MouseSpot
+        return MoveSpot
+        --PrintChat("Forcing")
+    else
+        return nil
+    end
+end
+
+function Tryndamere:MeleeHelper()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local MoveSpot = nil
+    if self.Menu.OrbMode.UseMeleeHelper:Value() and target and Mode() == "Combo" and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange then
+        local MouseDirection = Vector((target.pos-mousePos):Normalized())
+        local MouseDistance = GetDistance(mousePos, target.pos)
+        local MouseSpotDistance = AARange - target.boundingRadius
+        if IsFacing(target) then
+            MouseSpotDistance = AARange - 10
+            --PrintChat("Facing")
+        end
+        local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
+        MoveSpot = MouseSpot
+        _G.SDK.Orbwalker.ForceMovement = MoveSpot
+        --PrintChat("Forcing")
+    else
+        _G.SDK.Orbwalker.ForceMovement = nil
+    end
+    if MoveSpot and GetDistance(MoveSpot) < 50 then
+        _G.SDK.Orbwalker:SetMovement(false)
+        --PrintChat("False")
+    else
+        _G.SDK.Orbwalker:SetMovement(true)
+    end
+end
+
+function Tryndamere:WScan()
+    local spell = _W
+    --PrintChat(Game.CanUseSpell(spell))
+    --PrintChat(WAround)
+    if myHero:GetSpellData(spell).level > 0 then
+        if Game.CanUseSpell(spell) == 0 or Game.CanUseSpell(spell) == 32 and WAround == 0 then
+            if FoundETarget == false then
+                --PrintChat("Found New E Target")
+                local TargetDirection = Vector((myHero.pos-mousePos):Normalized())
+                for i = 0, 360, 1 do
+                    local NewTargetDirection = TargetDirection:Rotated(0,math.rad(i),0)
+                    local TargetSpot = myHero.pos - NewTargetDirection * 800
+                    if MapPosition:inBush(TargetSpot) then
+                        --Draw.Circle(TargetSpot, 150, 1, Draw.Color(255, 255, 100, 255))
+                        table.insert(PossibleSpots, {Spot = TargetSpot, Insterted = Game.Timer()})
+                    end
+                end
+                InsertedTime = Game.Timer()
+            end
+            FoundETarget = true
+        end
+        if Game.CanUseSpell(spell) == 8 or Game.CanUseSpell(spell) == 40 then
+            FoundETarget = false
+        end
+    end
+    self:ClearSpots()
+    if #PossibleSpots > 0 and WAround == 0 then
+        for i = 1, #PossibleSpots do
+            Draw.Circle(PossibleSpots[i].Spot, 50, 1, Draw.Color(255, 255, 100, 255))
+        end
+    end
+end
+
+function Tryndamere:ClearSpots()
+    if #PossibleSpots > 0 then
+        for i = #PossibleSpots, 1, -1 do
+            if Game.Timer() - PossibleSpots[i].Insterted > 1.5 then
+                table.remove(PossibleSpots,i)
+            end
+        end
+    end
+end
+
+--[[function Q2(pr)
+    for i= -math.pi*.5 ,math.pi*.5 ,math.pi*.09 do
+        local one = 25.79618 * math.pi/180
+        local an = myHero.pos + Vector(Vector(pr)-myHero.pos):Rotated(0, i*one, 0);
+        local block, list = Q1:__GetCollision(myHero, an, 5);
+        if not block then
+            --Draw.Circle(an); Debug for pos
+            if myHero:GetSpellData(slot).name == "VelkozQ" then
+                Control.CastSpell(HK_Q, an);
+                else
+                if qb ~= 0 then
+                    local TA = VectorExtendA(Vector(qb.pos.x, qb.pos.y,qb.pos.z), sPos, 1100);
+                    local TB = VectorExtendB(Vector(qb.pos.x, qb.pos.y,qb.pos.z), sPos, 1100);
+                    local TC = Line(Point(TA), Point(TB));
+                    if TC:__distance(Point(pr)) < 200 then
+                        Control.CastSpell(HK_Q);
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+function Vayne:GetStunSpot(unit)
+    local Adds = {Vector(100,0,0), Vector(66,0,66), Vector(0,0,100), Vector(-66,0,66), Vector(-100,0,0), Vector(66,0,-66), Vector(0,0,-100), Vector(-66,0,-66)}
+    local Xadd = Vector(100,0,0)
+    for i = 1, #Adds do
+        local TargetAdded = Vector(unit.pos + Adds[i])
+        local Direction = Vector((unit.pos-TargetAdded):Normalized())
+        --Draw.Circle(TargetAdded, 30, 1, Draw.Color(255, 0, 191, 255))
+        for i=1, 5 do
+            local ESSpot = unit.pos + Direction * (87*i) 
+            --Draw.Circle(ESpot, 30, 1, Draw.Color(255, 0, 191, 255))
+            if MapPosition:inWall(ESSpot) then
+                local FlashDirection = Vector((unit.pos-ESSpot):Normalized())
+                local FlashSpot = unit.pos - Direction * 400
+                local MinusDist = GetDistance(FlashSpot, myHero.pos)
+                if MinusDist > 400 then
+                    FlashSpot = unit.pos - Direction * (800-MinusDist)
+                    MinusDist = GetDistance(FlashSpot, myHero.pos)
+                end
+                if MinusDist < 700 then
+                    if self.Menu.EFlashKey:Value() then
+                        if IsReady(_E) and Flash and IsReady(Flash) then
+                            Control.CastSpell(HK_E, unit)
+                            DelayAction(function() Control.CastSpell(FlashSpell, FlashSpot) end, 0.05)
+                        end                          
+                    end
+                end
+                local QSpot = unit.pos - Direction * 300
+                local MinusDistQ = GetDistance(QSpot, myHero.pos)
+                if MinusDistQ > 300 then
+                    QSpot = unit.pos - Direction * (600-MinusDistQ)
+                    MinusDistQ = GetDistance(QSpot, myHero.pos)
+                end
+                if MinusDistQ < 470 then
+                    if (self.Menu.ComboMode.UseQStun:Value() and Mode() == "Combo") or self.Menu.EFlashKey:Value() then
+                        if IsReady(_Q) and IsReady(_E) then
+                            Control.CastSpell(HK_Q, QSpot)
+                        end                          
+                    end
+                end
+            end
+        end
+    end
+end--]]
 
 function Tryndamere:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
@@ -1205,6 +1397,7 @@ function Tryndamere:Tick()
     if Mode() ~= "Harass" then
         Dashed = true
     end
+    self:MeleeHelper()
     self:UpdateItems()
     self:Logic()
     self:Auto()
@@ -1312,9 +1505,13 @@ function Tryndamere:Auto()
     end
     --if Mode() ~= "Combo" and Mode() ~= "Harass" then
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        local Wenemies = 0
         for i, enemy in pairs(EnemyHeroes) do
             if enemy and not enemy.dead and ValidTarget(enemy) then
-                local EAARange = _G.SDK.Data:GetAutoAttackRange(enemy)   
+                local EAARange = _G.SDK.Data:GetAutoAttackRange(enemy)
+                if GetDistance(enemy.pos) < 870 then
+                    Wenemies = Wenemies + 1
+                end   
                 if self:CanUse(_Q, "Auto") and ValidTarget(enemy, 1500) then
                     if self.Menu.AutoMode.UseQFury:Value() >= myHero.mana and self.Menu.AutoMode.UseQHealth:Value() >= HealthPercent and RBuff == nil then
                         Control.CastSpell(HK_Q)
@@ -1329,6 +1526,7 @@ function Tryndamere:Auto()
                 end
             end
         end
+        WAround = Wenemies
     --end
 end 
 
@@ -1582,13 +1780,30 @@ function Jax:Menu()
     self.Menu = MenuElement({type = MENU, id = "Jax", name = "Jax"})
     self.Menu:MenuElement({id = "QKey", name = "Manual Q Key", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE2", name = "Use E2 in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQAA", name = "(Q) Use in AA Range", value = false})
+    self.Menu.ComboMode:MenuElement({id = "UseQE", name = "(QE) Use E During Q Jump", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWAA", name = "(W) Reset AA", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWQ", name = "(WQ) Empower Q with W", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEBlock", name = "(E1) Start E To Block Targets Attacks", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEStun", name = "(E1) Start E if In Stun Range", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE2Stun", name = "(E2) End E To Stun Target", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) Enabled", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseQAA", name = "(Q) Use in AA Range", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseQE", name = "(QE) Use E During Q Jump", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) Enabled", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseWAA", name = "(W) Reset AA", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseWQ", name = "(WQ) Empower Q with W", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Enabled", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseEBlock", name = "(E1) Start E To Block Targets Attacks", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseEStun", name = "(E1) Start E if In Stun Range", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseE2Stun", name = "(E2) End E To Stun Target", value = true})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu.AutoMode:MenuElement({id = "UseE", name = "Use Auto E", value = true})
-    self.Menu.AutoMode:MenuElement({id = "UseE2", name = "Use Auto E2", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseE", name = "(E) Start E To Block All Attacks", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseE2", name = "(E) Auto End E to Stun", value = false})
     self.Menu:MenuElement({id = "ManualMode", name = "ManualQ", type = MENU})
     self.Menu.ManualMode:MenuElement({id = "UseE", name = "Use E in Manual Q", value = true})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
@@ -1724,7 +1939,7 @@ function Jax:Auto()
         for i, enemy in pairs(EnemyHeroes) do
             if enemy and not enemy.dead and ValidTarget(enemy) then
                 local EAARange = _G.SDK.Data:GetAutoAttackRange(enemy)
-                if ValidTarget(enemy, 300) and (self:CanUse(_E, "Auto2") or self:CanUse(_E, "Auto")) then
+                if ValidTarget(enemy, 300) and (self:CanUse(_E, "Auto2")) and EBuff then
                     Control.CastSpell(HK_E)
                 elseif ValidTarget(enemy, EAARange) and self:CanUse(_E, "Auto") then
                     --PrintChat("Looking For Auto Attacks")
@@ -1749,8 +1964,14 @@ function Jax:CanUse(spell, mode)
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
             return true
         end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
     elseif spell == _R then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseR:Value() then
             return true
         end
     elseif spell == _W then
@@ -1761,25 +1982,25 @@ function Jax:CanUse(spell, mode)
             return true
         end
     elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() and not EBuff then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
             return true
         end
-        if mode == "Combo2" and IsReady(spell) and self.Menu.ComboMode.UseE2:Value() and EBuff then
+        if mode == "Combo2" and IsReady(spell) and self.Menu.ComboMode.UseE2:Value() then
             return true
         end
         if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
             return true
         end
-        if mode == "Manual" and IsReady(spell) and self.Menu.ManualMode.UseE:Value() and not EBuff then
+        if mode == "Manual" and IsReady(spell) and self.Menu.ManualMode.UseE:Value() then
             return true
         end
-        if mode == "Manual2" and IsReady(spell) and self.Menu.ManualMode.UseE2:Value() and EBuff then
+        if mode == "Manual2" and IsReady(spell) and self.Menu.ManualMode.UseE2:Value() then
             return true
         end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() and not EBuff then
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
             return true
         end
-        if mode == "Auto2" and IsReady(spell) and self.Menu.AutoMode.UseE2:Value() and EBuff then
+        if mode == "Auto2" and IsReady(spell) and self.Menu.AutoMode.UseE2:Value() then
             return true
         end
         if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
@@ -1808,16 +2029,20 @@ function Jax:Logic()
         local QRange = 700
         local ERange = 300
         local EAARange = _G.SDK.Data:GetAutoAttackRange(target)
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and WasInRange == true and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and GetDistance(target.pos) > AARange+50 then
-            Control.CastSpell(HK_Q, target)
-            if self:CanUse(_E, "Combo") and not EBuff then
-                Control.CastSpell(HK_E)
-            end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            if self.Menu.ComboMode.UseQAA:Value() then
+                Control.CastSpell(HK_Q, target)
+            elseif GetDistance(target.pos) > AARange then
+                Control.CastSpell(HK_Q, target)
+                if self.Menu.ComboMode.UseQE:Value() and not EBuff and IsReady(_E) then
+                    Control.CastSpell(HK_E)
+                end
+            end 
         end
         if not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if ValidTarget(target, ERange) and (self:CanUse(_E, "Combo2") or self:CanUse(_E, "Combo")) then
+            if ValidTarget(target, ERange) then
                 Control.CastSpell(HK_E)
-            elseif ValidTarget(target, EAARange) and self:CanUse(_E, "Combo") then
+            elseif ValidTarget(target, EAARange) and self:CanUse(_E, "Combo") and self.Menu.ComboMode.UseEBlock:Value() then
                 PrintChat("Looking For Auto Attacks")
                 if myHero.handle == target.activeSpell.target and not EBuff then
                     if not target.activeSpell.isChanneling then
