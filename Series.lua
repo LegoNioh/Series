@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 91.00
+    local Version = 92.00
     
     local Files = {
         Lua = {
@@ -91,6 +91,16 @@ end
 
 function GetDistance(Pos1, Pos2)
 	return math.sqrt(GetDistanceSqr(Pos1, Pos2))
+end
+
+function IsFacing(unit)
+    local V = Vector((unit.pos - myHero.pos))
+    local D = Vector(unit.dir)
+    local Angle = 180 - math.deg(math.acos(V*D/(V:Len()*D:Len())))
+    if math.abs(Angle) < 80 then 
+        return true  
+    end
+    return false
 end
 
 function GetEnemyHeroes()
@@ -1141,8 +1151,13 @@ function MasterYi:Menu()
 	self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
 	self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
 	self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use smart E in Harass", value = false})
+	self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
+    self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable MeleeHelper", value = true})
+    self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
 	self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
 	self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+	self.Menu.Draw:MenuElement({id = "MeleeHelperSpot", name = "Draw Melee Helper Spot", value = false})
+    self.Menu.Draw:MenuElement({id = "MeleeHelperDistance", name = "Draw Melee Helper Mouse Distance", value = false})
 end
 
 function MasterYi:Spells()
@@ -1165,6 +1180,7 @@ function MasterYi:Tick()
 		_G.SDK.Orbwalker:SetMovement(true)
 		_G.SDK.Orbwalker:SetAttack(true)
 	end
+	self:MeleeHelper()
 	self:KS()
 	self:Logic()
 	if EnemyLoaded == false then
@@ -1189,8 +1205,68 @@ function MasterYi:Draw()
 		if target then
 			AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
 			Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
+
 		end
+
+		if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperDistance:Value() then
+            Draw.Circle(target.pos, self.Menu.OrbMode.MeleeHelperMouseDistance:Value(), 1, Draw.Color(255, 0, 0, 0))
+        end
+        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperSpot:Value() then
+            local MeleeSpot = self:DrawMeleeHelper()
+            if MeleeSpot then
+                Draw.Circle(MeleeSpot, 25, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(MeleeSpot, 35, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(MeleeSpot, 45, 1, Draw.Color(255, 0, 100, 255))
+            end
+        end
 	end
+end
+
+
+function MasterYi:DrawMeleeHelper()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local MoveSpot = nil
+    if self.Menu.OrbMode.UseMeleeHelper:Value() and target and Mode() == "Combo" and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange then
+        local MouseDirection = Vector((target.pos-mousePos):Normalized())
+        local MouseDistance = GetDistance(mousePos, target.pos)
+        local MouseSpotDistance = AARange - target.boundingRadius
+        if IsFacing(target) then
+            MouseSpotDistance = AARange - 10
+            --PrintChat("Facing")
+        end
+        local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
+        MoveSpot = MouseSpot
+        return MoveSpot
+        --PrintChat("Forcing")
+    else
+        return nil
+    end
+end
+
+function MasterYi:MeleeHelper()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local MoveSpot = nil
+    if self.Menu.OrbMode.UseMeleeHelper:Value() and target and Mode() == "Combo" and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange then
+        local MouseDirection = Vector((target.pos-mousePos):Normalized())
+        local MouseDistance = GetDistance(mousePos, target.pos)
+        local MouseSpotDistance = AARange - target.boundingRadius
+        if IsFacing(target) then
+            MouseSpotDistance = AARange - 10
+            --PrintChat("Facing")
+        end
+        local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
+        MoveSpot = MouseSpot
+        _G.SDK.Orbwalker.ForceMovement = MoveSpot
+        --PrintChat("Forcing")
+    else
+        _G.SDK.Orbwalker.ForceMovement = nil
+    end
+    if MoveSpot and GetDistance(MoveSpot) < 50 then
+        _G.SDK.Orbwalker:SetMovement(false)
+        --PrintChat("False")
+    else
+        _G.SDK.Orbwalker:SetMovement(true)
+    end
 end
 
 function MasterYi:KS()
@@ -1246,6 +1322,35 @@ function MasterYi:CanUse(spell, mode)
 	return false
 end
 
+function MasterYi:IsTargetedBy(unit)
+
+    local targeted = false
+    if unit.activeSpell.target == myHero.handle and unit.activeSpell.isChanneling == false and unit.totalDamage and unit.critChance then
+    	if unit.totalDamage + (unit.totalDamage*unit.critChance) > myHero.health then
+    		targeted = true
+    	end
+    elseif unit.activeSpell.target == myHero.handle then
+        --PrintChat("Spell")
+        if unit.activeSpell.name == unit:GetSpellData(_Q).name then
+            --PrintChat(Qdmg)
+            targeted = true
+        elseif unit.activeSpell.name == unit:GetSpellData(_W).name then
+            --PrintChat("W")
+            targeted = true
+        elseif unit.activeSpell.name == unit:GetSpellData(_E).name then
+            --PrintChat("E")
+            targeted = true
+        elseif unit.activeSpell.name == unit:GetSpellData(_R).name then
+            --PrintChat("R")
+            targeted = true
+        end
+    end
+    if targeted == true then
+    	--PrintChat("Targetted")
+    end
+    return targeted
+end
+
 function MasterYi:Logic()
 	if target == nil then return end
 	if Mode() == "Combo" or Mode() == "Harass" and target then
@@ -1254,7 +1359,7 @@ function MasterYi:Logic()
 			WasInRange = true
 		end
 		local Qrange = 600
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and (GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius or self.Menu.UrfMode:Value()) then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and (GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius or self.Menu.UrfMode:Value() or self:IsTargetedBy(target)) and not _G.SDK.Attack:IsActive() then
 			if self:CanUse(_E, Mode()) then
 				Control.CastSpell(HK_E)
 			end
@@ -1806,8 +1911,8 @@ end
 function Lucian:KS()
 	--PrintChat("ksing")
 	for i, enemy in pairs(EnemyHeroes) do
-		if enemy and not enemy.dead and ValidTarget(enemy, 900) then
-			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > 600 and GetDistance(enemy.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinion:Value() then
+		if enemy and not enemy.dead and ValidTarget(enemy, 1000) then
+			if self:CanUse(_Q, "KS") and GetDistance(enemy.pos, myHero.pos) > 600 and GetDistance(enemy.pos, myHero.pos) < 1000 and self.Menu.ComboMode.UseQMinion:Value() then
 				--PrintChat("ksing 2")
 				self:GetQMinion(enemy)
 			end
@@ -1863,7 +1968,7 @@ function Lucian:Logic()
 				--Control.Attack(enemy)
 			end
 		end
-		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 630 and GetDistance(target.pos, myHero.pos) < 900 and self.Menu.ComboMode.UseQMinionCombo:Value() then
+		if self:CanUse(_Q, Mode()) and GetDistance(target.pos, myHero.pos) > 630 and GetDistance(target.pos, myHero.pos) < 1000 and self.Menu.ComboMode.UseQMinionCombo:Value() then
 			self:GetQMinion(target)
 		end
 		--PrintChat(myHero.attackData.state)
@@ -1906,7 +2011,7 @@ function Lucian:Logic()
 			--PrintChat("Attack ACttive")
 		end
 
-		local Qrange = 500 + myHero.boundingRadius + target.boundingRadius
+		local Qrange = 1000 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and not _G.SDK.Attack:IsActive() then
 			Control.CastSpell(HK_Q, target)
@@ -3650,7 +3755,7 @@ function Quinn:CanUse(spell, mode)
 end
 
 function Quinn:Logic()
-	if LockedTarget  and LockedTarget .dead then
+	if LockedTarget  and LockedTarget.dead then
 		WasInRange = false
 		LockedTarget = nil 
 		LastDist = 10000
