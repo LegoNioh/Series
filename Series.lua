@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 92.00
+    local Version = 93.00
     
     local Files = {
         Lua = {
@@ -1143,6 +1143,7 @@ function MasterYi:Menu()
 	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
 	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+	self.Menu.ComboMode:MenuElement({id = "UseQAvoid", name = "Use Q To Avoid Spells", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
@@ -1359,7 +1360,7 @@ function MasterYi:Logic()
 			WasInRange = true
 		end
 		local Qrange = 600
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and (GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius or self.Menu.UrfMode:Value() or self:IsTargetedBy(target)) and not _G.SDK.Attack:IsActive() then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and (GetDistance(target.pos, myHero.pos) > AARange + target.boundingRadius or self.Menu.UrfMode:Value() or (self:IsTargetedBy(target) and self.Menu.ComboMode.UseQAvoid:Value()) and not _G.SDK.Attack:IsActive() then
 			if self:CanUse(_E, Mode()) then
 				Control.CastSpell(HK_E)
 			end
