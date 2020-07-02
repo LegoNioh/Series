@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 405.00
+    local Version = 550.00
     
     local Files = {
         Lua = {
@@ -1158,9 +1158,6 @@ function Tryndamere:Menu()
     self.Menu.HarassMode:MenuElement({id = "UseDashBack", name = "DashBack: Dash Back after attacking", key = string.byte("J"), toggle = true, value = true})
     self.Menu.HarassMode:MenuElement({id = "DashBackAttacks", name = "No Of Attacks Before DashBack", value = 1, min = 0, max = 5, step = 1})
     self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
-    self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
-    self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable MeleeHelper", value = true})
-    self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Use Auto Q", value = false})
     self.Menu.AutoMode:MenuElement({id = "UseQHealth", name = "Q Min Health %", value = 10, min = 0, max = 100, step = 1})
@@ -1172,8 +1169,6 @@ function Tryndamere:Menu()
     self.Menu.AutoMode:MenuElement({id = "RInfo2", name = "(R) Ignores Min % if there is Incoming Damage", type = MENU})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "MeleeHelperSpot", name = "Draw Melee Helper Spot", value = false})
-    self.Menu.Draw:MenuElement({id = "MeleeHelperDistance", name = "Draw Melee Helper Mouse Distance", value = false})
     self.Menu.Draw:MenuElement({id = "WScan", name = "Draw Potentential Hidden Enemies", value = false})
     self.Menu.Draw:MenuElement({id = "DashBack", name = "Draw If DashBack Is On", value = false})
     self.Menu.Draw:MenuElement({id = "ESticky", name = "Draw If StickyE Is On", value = false})
@@ -1190,17 +1185,6 @@ function Tryndamere:Draw()
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
         if self.Menu.Draw.AArange:Value() then 
             Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
-        end
-        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperDistance:Value() then
-            Draw.Circle(target.pos, self.Menu.OrbMode.MeleeHelperMouseDistance:Value(), 1, Draw.Color(255, 0, 0, 0))
-        end
-        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperSpot:Value() then
-            local MeleeSpot = self:DrawMeleeHelper()
-            if MeleeSpot then
-                Draw.Circle(MeleeSpot, 25, 1, Draw.Color(255, 0, 100, 255))
-                Draw.Circle(MeleeSpot, 35, 1, Draw.Color(255, 0, 100, 255))
-                Draw.Circle(MeleeSpot, 45, 1, Draw.Color(255, 0, 100, 255))
-            end
         end
         if self.Menu.Draw.WScan:Value() then
             self:WScan()
@@ -1226,51 +1210,6 @@ function Tryndamere:Draw()
     end
 end
 
-function Tryndamere:DrawMeleeHelper()
-    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    local MoveSpot = nil
-    if self.Menu.OrbMode.UseMeleeHelper:Value() and target and Mode() == "Combo" and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange then
-        local MouseDirection = Vector((target.pos-mousePos):Normalized())
-        local MouseDistance = GetDistance(mousePos, target.pos)
-        local MouseSpotDistance = AARange - target.boundingRadius
-        if IsFacing(target) then
-            MouseSpotDistance = AARange - 10
-            --PrintChat("Facing")
-        end
-        local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
-        MoveSpot = MouseSpot
-        return MoveSpot
-        --PrintChat("Forcing")
-    else
-        return nil
-    end
-end
-
-function Tryndamere:MeleeHelper()
-    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    local MoveSpot = nil
-    if self.Menu.OrbMode.UseMeleeHelper:Value() and target and Mode() == "Combo" and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange then
-        local MouseDirection = Vector((target.pos-mousePos):Normalized())
-        local MouseDistance = GetDistance(mousePos, target.pos)
-        local MouseSpotDistance = AARange - target.boundingRadius
-        if IsFacing(target) then
-            MouseSpotDistance = AARange - 10
-            --PrintChat("Facing")
-        end
-        local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
-        MoveSpot = MouseSpot
-        _G.SDK.Orbwalker.ForceMovement = MoveSpot
-        --PrintChat("Forcing")
-    else
-        _G.SDK.Orbwalker.ForceMovement = nil
-    end
-    if MoveSpot and GetDistance(MoveSpot) < 50 then
-        _G.SDK.Orbwalker:SetMovement(false)
-        --PrintChat("False")
-    else
-        _G.SDK.Orbwalker:SetMovement(true)
-    end
-end
 
 function Tryndamere:WScan()
     local spell = _W
@@ -1397,7 +1336,6 @@ function Tryndamere:Tick()
     if Mode() ~= "Harass" then
         Dashed = true
     end
-    self:MeleeHelper()
     self:UpdateItems()
     self:Logic()
     self:Auto()
@@ -2368,12 +2306,23 @@ function Vayne:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E to stun in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEGap", name = "Anti Gap Close E", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEDelay", name = "E Delay", value = 50, min = 0, max = 200, step = 10})
+
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E to stun in Harass", value = false})
+
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseE", name = "Auto Use E to stun", value = true})
     self.Menu.AutoMode:MenuElement({id = "UseEGap", name = "Anti Gap Close E", value = true})
+
+    self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
+    self.Menu.OrbMode:MenuElement({id = "UseRangedHelper", name = "Enable Range Helper ", value = true})
+    self.Menu.OrbMode:MenuElement({id = "UseRangedHelperWalk", name = "Enable Range Helper Moving", value = true})
+    self.Menu.OrbMode:MenuElement({id = "RangedHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
+    self.Menu.OrbMode:MenuElement({id = "RangedHelperRange", name = "Extra Distance To Kite (%)", value = 50, min = 0, max = 100, step = 10})
+    self.Menu.OrbMode:MenuElement({id = "RangedHelperRangeFacing", name = "Extra Distance When Chasing (%)", value = 10, min = 0, max = 100, step = 10})
+    self.Menu.OrbMode:MenuElement({id = "UseRangedHelperQ", name = "Enable Q in Range Helper", value = true})
+    self.Menu.OrbMode:MenuElement({id = "UseRangedHelperQAlways", name = "Enable Q in Range Helper For damage", value = false})
 
     self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
     self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use Q in KS", value = true})
@@ -2381,6 +2330,11 @@ function Vayne:Menu()
 
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+    self.Menu.Draw:MenuElement({id = "RangedHelperSpot", name = "Draw Ranged Helper Spot", value = false})
+    self.Menu.Draw:MenuElement({id = "RangedHelperDistance", name = "Draw Ranged Helper Mouse Distance", value = false})
+    self.Menu.Draw:MenuElement({id = "Path", name = "Draw Path", value = false})
+    self.Menu.Draw:MenuElement({id = "StunCalc", name = "Draw Stun calcs", value = false})
+
 end
 
 function Vayne:Spells()
@@ -2415,6 +2369,9 @@ function Vayne:Tick()
     end
     if target then
         self:GetStunSpot(target)
+        self:RangedHelper(target)
+    else
+        _G.SDK.Orbwalker.ForceMovement = nil
     end
     self:Logic()
     self:Auto()
@@ -2432,6 +2389,94 @@ function Vayne:Tick()
     end
 end
 
+function Vayne:DrawRangedHelper(unit)
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local EAARange = _G.SDK.Data:GetAutoAttackRange(unit)
+    local QRange = 300
+    local MoveSpot = nil
+    local RangeDif = AARange - EAARange
+    local RangeDist = RangeDif*(self.Menu.OrbMode.RangedHelperRange:Value()/100)
+    local RangeDistChase = RangeDif*(self.Menu.OrbMode.RangedHelperRangeFacing:Value()/100)
+    if self.Menu.OrbMode.UseRangedHelper:Value() and unit and Mode() == "Combo" and GetDistance(mousePos, unit.pos) < self.Menu.OrbMode.RangedHelperMouseDistance:Value() and GetDistance(unit.pos) <= AARange+300 then
+        
+        local ScanDirection = Vector((myHero.pos-mousePos):Normalized())
+        local ScanDistance = GetDistance(myHero.pos, unit.pos) * 0.8
+        local ScanSpot = myHero.pos - ScanDirection * ScanDistance
+
+        local MouseDirection = Vector((unit.pos-ScanSpot):Normalized())
+        local MouseSpotDistance = EAARange + RangeDist
+        if not IsFacing(unit) then
+            MouseSpotDistance = EAARange + RangeDistChase
+        end
+        if AARange < EAARange + 150 then
+            MouseSpotDistance = GetDistance(unit.pos)
+            local UnitDistance = GetDistance(unit.pos)
+            if UnitDistance < AARange*0.5 then
+                MouseSpotDistance = GetDistance(unit.pos) + AARange*0.2
+            end
+            if UnitDistance > AARange*0.8 then
+                MouseSpotDistance = GetDistance(unit.pos) - AARange*0.2
+            end
+        end
+        local MouseSpot = unit.pos - MouseDirection * (MouseSpotDistance)
+        MoveSpot = MouseSpot
+        return MoveSpot
+        --PrintChat("Forcing")
+    else
+        return nil
+    end
+end
+
+function Vayne:RangedHelper(unit)
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local EAARange = _G.SDK.Data:GetAutoAttackRange(unit)
+    local QRange = 300
+    local MoveSpot = nil
+    local RangeDif = AARange - EAARange
+    local RangeDist = RangeDif*(self.Menu.OrbMode.RangedHelperRange:Value()/100)
+    local RangeDistChase = RangeDif*(self.Menu.OrbMode.RangedHelperRangeFacing:Value()/100)
+    if self.Menu.OrbMode.UseRangedHelper:Value() and unit and Mode() == "Combo" and GetDistance(mousePos, unit.pos) < self.Menu.OrbMode.RangedHelperMouseDistance:Value() and GetDistance(unit.pos) <= AARange+300 then
+        
+        local ScanDirection = Vector((myHero.pos-mousePos):Normalized())
+        local ScanDistance = GetDistance(myHero.pos, unit.pos) * 0.8
+        local ScanSpot = myHero.pos - ScanDirection * ScanDistance
+
+        local MouseDirection = Vector((unit.pos-ScanSpot):Normalized())
+        local MouseSpotDistance = EAARange + RangeDist
+        if not IsFacing(unit) then
+            MouseSpotDistance = EAARange + RangeDistChase
+        end
+        if AARange < EAARange + 150 then
+            MouseSpotDistance = GetDistance(unit.pos)
+        end
+        local MouseSpot = unit.pos - MouseDirection * (MouseSpotDistance)
+        MoveSpot = MouseSpot
+        
+        --if IsFacing(unit) then
+            if self.Menu.OrbMode.UseRangedHelperQ:Value() then
+                if ((GetDistance(unit.pos, myHero.pos) > AARange and GetDistance(MouseSpot, myHero.pos) < 300) or GetDistance(unit.pos, myHero.pos) > MouseSpotDistance+300 or GetDistance(unit.pos, myHero.pos) < EAARange+45 or self.Menu.OrbMode.UseRangedHelperQAlways:Value()) then
+                    if IsReady(_Q) and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and not CastingE then
+                        Control.CastSpell(HK_Q, MoveSpot)
+                    end
+                end
+            end
+        --end
+        
+
+        if self.Menu.OrbMode.UseRangedHelperWalk:Value() and GetDistance(unit.pos) <= AARange and AARange > EAARange + 150 then
+            _G.SDK.Orbwalker.ForceMovement = MoveSpot
+        else
+            _G.SDK.Orbwalker.ForceMovement = nil
+        end
+    else
+        _G.SDK.Orbwalker.ForceMovement = nil
+    end
+    if MoveSpot and GetDistance(MoveSpot) < 50 and self.Menu.OrbMode.UseRangedHelperWalk:Value() then
+        _G.SDK.Orbwalker:SetMovement(false)
+    else
+        _G.SDK.Orbwalker:SetMovement(true)
+    end
+end
 
 function Vayne:Eflash()
     if target then
@@ -2449,23 +2494,35 @@ function Vayne:Draw()
         --local Xadd = Vector(100,0,0)
         --local HeroAdded = Vector(myHero.pos + Xadd)
         --Draw.Circle(HeroAdded, 225, 1, Draw.Color(255, 0, 191, 255))
-        Draw.Circle(myHero.pos, 225, 1, Draw.Color(255, 0, 191, 255))
-
-        local path = myHero.pathing;
-        local PathStart = myHero.pathing.pathIndex
-        local PathEnd = myHero.pathing.pathCount
-        if PathStart and PathEnd and PathStart >= 0 and PathEnd <= 20 and path.hasMovePath then
-            for i = path.pathIndex, path.pathCount do
-                local path_vec = myHero:GetPath(i)
-                if path.isDashing then
-                    Draw.Circle(path_vec,100,1,Draw.Color(255,0,0,255))
-                else
-                    Draw.Circle(path_vec,100,1,Draw.Color(255,225,255,255))
+        Draw.Circle(myHero.pos, 300, 1, Draw.Color(255, 0, 191, 255))
+        if self.Menu.Draw.Path:Value() then
+            local path = myHero.pathing;
+            local PathStart = myHero.pathing.pathIndex
+            local PathEnd = myHero.pathing.pathCount
+            if PathStart and PathEnd and PathStart >= 0 and PathEnd <= 20 and path.hasMovePath then
+                for i = path.pathIndex, path.pathCount do
+                    local path_vec = myHero:GetPath(i)
+                    if path.isDashing then
+                        Draw.Circle(path_vec,100,1,Draw.Color(255,0,0,255))
+                    else
+                        Draw.Circle(path_vec,100,1,Draw.Color(255,225,255,255))
+                    end
                 end
             end
         end
+        if self.Menu.OrbMode.UseRangedHelper:Value() and target and self.Menu.Draw.RangedHelperDistance:Value() then
+            Draw.Circle(target.pos, self.Menu.OrbMode.RangedHelperMouseDistance:Value(), 1, Draw.Color(255, 0, 0, 0))
+        end
+        if self.Menu.OrbMode.UseRangedHelper:Value() and target and self.Menu.Draw.RangedHelperSpot:Value() then
+            local RangedSpot = self:DrawRangedHelper(target)
+            if RangedSpot then
+                Draw.Circle(RangedSpot, 25, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(RangedSpot, 35, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(RangedSpot, 45, 1, Draw.Color(255, 0, 100, 255))
+            end
+        end
 
-        if target then
+        if target and self.Menu.Draw.StunCalc:Value() then
             self:DrawStunSpot()
 
 
