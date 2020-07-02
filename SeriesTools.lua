@@ -9,7 +9,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 100.00
+    local Version = 102.00
     
     local Files = {
         Lua = {
@@ -50,7 +50,7 @@ do
     
     end
     
-    AutoUpdate()
+    --AutoUpdate()
 
 end
 
@@ -296,7 +296,7 @@ function Utility:Menu()
     self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable MeleeHelper", value = true})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
-    self.Menu.OrbMode:MenuElement({id = "MeleeHelperExtraDistance", name = "Extra Distance To Stick To target", value = 150, min = 0, max = 1500, step = 10})
+    self.Menu.OrbMode:MenuElement({id = "MeleeHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = 0, max = 1500, step = 10})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
     self.Menu.Draw:MenuElement({id = "DrawSummonerRange", name = "Enable Summoner Range", value = false})
