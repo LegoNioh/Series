@@ -7,7 +7,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 95.00
+    local Version = 96.00
     
     local Files = {
         Lua = {
@@ -2012,7 +2012,7 @@ function Lucian:Logic()
 			--PrintChat("Attack ACttive")
 		end
 
-		local Qrange = 1000 + myHero.boundingRadius + target.boundingRadius
+		local Qrange = 500 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and not _G.SDK.Attack:IsActive() then
 			Control.CastSpell(HK_Q, target)
