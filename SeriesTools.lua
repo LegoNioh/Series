@@ -11,7 +11,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 106.00
+    local Version = 107.00
     
     local Files = {
         Lua = {
@@ -468,9 +468,11 @@ end
 
 function Utility:Draw()
     if self.Menu.Draw.UseDraws:Value() then
-        LastHitTarget = self:NasusHelper()
-        if LastHitTarget then
-            Draw.Circle(LastHitTarget.pos, 200, 1, Draw.Color(255, 0, 191, 255))
+        if myHero.charName == "Nasus" then
+            LastHitTarget = self:NasusHelper()
+            if LastHitTarget then
+                Draw.Circle(LastHitTarget.pos, 200, 1, Draw.Color(255, 0, 191, 255))
+            end
         end
         if self.Menu.Draw.DrawSummonerRange:Value() then
             Draw.Circle(myHero.pos, Range, 1, Draw.Color(255, 0, 191, 255))
