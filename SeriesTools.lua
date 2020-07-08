@@ -11,7 +11,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 104.00
+    local Version = 106.00
     
     local Files = {
         Lua = {
@@ -436,7 +436,7 @@ function Utility:MeleeHelper()
 
     local DariusCheck = QHelperActive
     local ModeCheck = Mode() == "Combo" or (Mode() == "Harass" and self.Menu.OrbMode.UseMeleeHelperHarass:Value())
-    if not DariusCheck and self:CanClick() and self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
+    if not _G.SDK.Attack:IsActive() and not DariusCheck and self:CanClick() and self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
         local MouseDirection = Vector((target.pos-mousePos):Normalized())
         local MouseDistance = GetDistance(mousePos, target.pos)
         local MouseSpotDistance = AARange - target.boundingRadius
