@@ -11,7 +11,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 103.00
+    local Version = 104.00
     
     local Files = {
         Lua = {
@@ -310,7 +310,21 @@ function Utility:Menu()
     self.Menu.Draw:MenuElement({id = "MeleeHelperText", name = "Draw Melee Helper Text (On/Off)", value = false})
 end
 
+function Utility:NasusHelper()
+    local LastHitTarget = _G.SDK.HealthPrediction:GetLaneMinion()
+    if LastHitTarget then
+        local QDamage = getdmg("Q", LastHitTarget, myHero)
+        local AADamage = getdmg("AA", LastHitTarget, myHero)
+        local TotalDamage = QDamage + AADamage
+        PrintChat(TotalDamage)
+        if LastHitTarget.health < TotalDamage then
+            return LastHitTarget
+        end
+    end
+end
+
 function Utility:Spells()
+
 end
 
 function Utility:Tick()
@@ -324,6 +338,13 @@ function Utility:Tick()
         else
             EnemyLoaded = true
             PrintChat("Enemy Loaded")
+        end
+    end
+    if myHero.charName == "Nasus" then
+        local LastHitTarget = self:NasusHelper()
+        if LastHitTarget and IsReady(_Q) then
+            --PrintChat("Yes")
+            Control.CastSpell(HK_Q)
         end
     end
     if _G.QHelperActive then
@@ -342,6 +363,12 @@ function Utility:Tick()
             SetMovement(false)
             MovementSet = "False"
             --PrintChat("Stopping Clicks")
+        end
+    else
+        if MovementSet == "False" then
+            SetMovement(true)
+            MovementSet = "True"
+            --PrintChat("Can Click")
         end
     end
     if Game.IsChatOpen() or myHero.dead then return end
@@ -383,14 +410,9 @@ function Utility:DrawMeleeHelper()
     local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
     local MoveSpot = nil
 
-    local TargetUnderTurret = false
-    local HeroUnderTurret = IsUnderEnemyTurret(myHero.pos, -200)
-    if target then
-        TargetUnderTurret = IsUnderEnemyTurret(target.pos)
-    end
-    local TurretCheck = not TargetUnderTurret or (TargetUnderTurret and HeroUnderTurret)
+
     local ModeCheck = Mode() == "Combo" or (Mode() == "Harass" and self.Menu.OrbMode.UseMeleeHelperHarass:Value())
-    if self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and TurretCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
+    if self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
         local MouseDirection = Vector((target.pos-mousePos):Normalized())
         local MouseDistance = GetDistance(mousePos, target.pos)
         local MouseSpotDistance = AARange - target.boundingRadius
@@ -411,22 +433,10 @@ function Utility:MeleeHelper()
     local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
     local MoveSpot = nil
 
-    local TargetUnderTurret = false
-    local HeroUnderTurret = IsUnderEnemyTurret(myHero.pos, - 200) ~= nil
-    if HeroUnderTurret == true then
-        PrintChat("true")
-    end
 
-    if target then
-        TargetUnderTurret = IsUnderEnemyTurret(target.pos) ~= nil
-        if TargetUnderTurret == true then
-            --PrintChat("True")
-        end
-    end
-    local TurretCheck = not TargetUnderTurret or (TargetUnderTurret and HeroUnderTurret)
     local DariusCheck = QHelperActive
     local ModeCheck = Mode() == "Combo" or (Mode() == "Harass" and self.Menu.OrbMode.UseMeleeHelperHarass:Value())
-    if not DariusCheck and self:CanClick() and self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and TurretCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
+    if not DariusCheck and self:CanClick() and self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
         local MouseDirection = Vector((target.pos-mousePos):Normalized())
         local MouseDistance = GetDistance(mousePos, target.pos)
         local MouseSpotDistance = AARange - target.boundingRadius
@@ -447,8 +457,9 @@ function Utility:MeleeHelper()
     end
     if MoveSpot and GetDistance(MoveSpot) < myHero.boundingRadius and GetDistance(target.pos) <= AARange then
         _G.SDK.Orbwalker:SetMovement(false)
+        MovementSet = "False"
         --PrintChat("False")
-    elseif not (self.Menu.OrbMode.StopClick:Value() and not self:CanClick()) then
+    elseif MovementSet == "True" or not self.Menu.OrbMode.StopClick:Value() then
         _G.SDK.Orbwalker:SetMovement(true)
     end
 end
@@ -457,6 +468,10 @@ end
 
 function Utility:Draw()
     if self.Menu.Draw.UseDraws:Value() then
+        LastHitTarget = self:NasusHelper()
+        if LastHitTarget then
+            Draw.Circle(LastHitTarget.pos, 200, 1, Draw.Color(255, 0, 191, 255))
+        end
         if self.Menu.Draw.DrawSummonerRange:Value() then
             Draw.Circle(myHero.pos, Range, 1, Draw.Color(255, 0, 191, 255))
         end
