@@ -10,7 +10,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 100.00
+    local Version = 102.00
     
     local Files = {
         Lua = {
@@ -297,6 +297,10 @@ class "Manager"
 function Manager:__init()
     if myHero.charName == "Kled" then
         DelayAction(function() self:LoadKled() end, 1.05)
+    elseif myHero.charName == "Rengar" then
+        DelayAction(function() self:LoadRengar() end, 1.05)
+    elseif myHero.charName == "Jax" then
+        DelayAction(function() self:LoadJax() end, 1.05)
     elseif myHero.charName == "Darius" then
         DelayAction(function() self:LoadDarius() end, 1.05)
     end
@@ -317,6 +321,34 @@ function Manager:LoadKled()
     end
 end
 
+function Manager:LoadJax()
+    Jax:Spells()
+    Jax:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Jax:Tick() end)
+    Callback.Add("Draw", function() Jax:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Jax:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Jax:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Jax:OnPostAttack(...) end)
+    end
+end
+
+function Manager:LoadRengar()
+    Rengar:Spells()
+    Rengar:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Rengar:Tick() end)
+    Callback.Add("Draw", function() Rengar:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Rengar:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Rengar:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Rengar:OnPostAttack(...) end)
+    end
+end
+
 function Manager:LoadDarius()
     Darius:Spells()
     Darius:Menu()
@@ -331,6 +363,700 @@ function Manager:LoadDarius()
     end
 end
 
+class "Jax"
+
+local EnemyLoaded = false
+local TargetTime = 0
+
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+local Item_HK = {}
+
+local WasInRange = false
+
+local ForceTarget = nil
+
+local EBuff = false
+
+
+
+local QRange = 700
+local WRange = 0
+local AARange = 0
+local ERange = 350
+local RRange = 0
+
+
+
+function Jax:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Jax", name = "Jax"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQAA", name = "(Q) Use Q In AA Range", value = false})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE2", name = "(E2) Enabled", key = string.byte("T"), toggle = true, value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "(R) Min % Health", value = 40, min = 0, max = 100, step = 5})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseQAA", name = "(Q) Use Q In AA Range", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseE2", name = "(E2) Enabled", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "(R) Enabled", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseRHealth", name = "(R) Min % Health", value = 20, min = 0, max = 100, step = 5})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
+end
+
+function Jax:Spells()
+
+end
+
+
+function Jax:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if self.Menu.Draw.DrawAA:Value() then
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
+        end
+        if self.Menu.Draw.DrawQ:Value() then
+            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+        if self.Menu.Draw.DrawE:Value() then
+            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
+        end
+        if self.Menu.Draw.DrawR:Value() then
+            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
+        end
+        if self.Menu.Draw.DrawCustom:Value() then
+            Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
+        end
+        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
+        --if self.Menu.ComboMode.UseEAA:Value() then
+            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --else
+            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --end
+    end
+end
+
+
+
+function Jax:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(2000)
+    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    WRange = AARange + 50
+    CastingQ = myHero.activeSpell.name == "JaxQ"
+    CastingW = myHero.activeSpell.name == "JaxW"
+    CastingE = myHero.activeSpell.name == "JaxE"
+    CastingR = myHero.activeSpell.name == "JaxR"
+    EBuff = BuffActive(myHero, "JaxCounterStrike")
+    --PrintChat(myHero:GetSpellData(_W).ammo)
+    self:UpdateItems()
+    self:Logic()
+    self:Auto()
+    self:Items2()
+    self:ProcessSpells()
+    if TickW then
+        --_G.SDK.Orbwalker:__OnAutoAttackReset()
+        TickW = false
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+
+function Jax:UpdateItems()
+    Item_HK[ITEM_1] = HK_ITEM_1
+    Item_HK[ITEM_2] = HK_ITEM_2
+    Item_HK[ITEM_3] = HK_ITEM_3
+    Item_HK[ITEM_4] = HK_ITEM_4
+    Item_HK[ITEM_5] = HK_ITEM_5
+    Item_HK[ITEM_6] = HK_ITEM_6
+    Item_HK[ITEM_7] = HK_ITEM_7
+end
+
+function Jax:Items1()
+    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+        end
+    end
+    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+        end
+    end
+    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
+        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
+        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
+        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+        end
+    end
+end
+
+function Jax:Items2()
+    if GetItemSlot(myHero, 3139) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+            end
+        end
+    end
+    if GetItemSlot(myHero, 3140) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+            end
+        end
+    end
+end
+
+function Jax:GetPassiveBuffs(unit, buffname)
+    for i = 0, unit.buffCount do
+        local buff = unit:GetBuff(i)
+        if buff.name == buffname and buff.count > 0 then 
+            return buff
+        end
+    end
+    return nil
+end
+
+
+function Jax:Auto()
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Jax:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
+    elseif spell == _E then
+        if not EBuff then
+            if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+                return true
+            end
+            if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+                return true
+            end
+        else
+            if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE2:Value() then
+                return true
+            end
+            if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE2:Value() then
+                return true
+            end
+        end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
+    end
+    return false
+end
+
+function Jax:Logic()
+    if target == nil then 
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+        return 
+    end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        --PrintChat("Logic")
+        TargetTime = Game.Timer()
+        self:Items1()
+        
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            if Mode() == "Combo" then
+                if not self.Menu.ComboMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
+                    self:UseQ(target)
+                end
+            elseif Mode() == "Harass" then
+                if not self.Menu.HarassMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
+                    self:UseQ(target)
+                end
+            end
+        end
+        if self:CanUse(_W, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange) then
+            if myHero.attackData.state == STATE_WINDDOWN or Mode() == "Harass" then
+                self:UseW(target)
+            end
+        end
+        if self:CanUse(_E, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange) then
+            self:UseE(target)
+        end
+        if self:CanUse(_R, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, QRange) then
+            self:UseR(target)
+        end
+        --
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+    end     
+end
+
+function Jax:ProcessSpells()
+    if myHero:GetSpellData(_W).currentCd == 0 then
+        CastedW = false
+    else
+        if CastedW == false then
+            --GotBall = "ECast"
+            TickW = true
+        end
+        CastedW = true
+    end
+end
+
+function Jax:CastingChecks()
+    if not CastingQ and not CastingE and not CastingW and not CastingR then
+        return true
+    else
+        return false
+    end
+end
+
+
+function Jax:OnPostAttack(args)
+
+end
+
+function Jax:OnPostAttackTick(args)
+end
+
+function Jax:OnPreAttack(args)
+end
+
+function Jax:UseQ(unit)
+    Control.CastSpell(HK_Q, unit)
+end
+
+function Jax:UseW(unit)
+    Control.CastSpell(HK_W)
+end
+
+function Jax:UseE(unit)
+    Control.CastSpell(HK_E)
+end
+
+function Jax:UseR(unit)
+    local HealthValue = 1
+    if Mode() == "Combo" then
+        HealthValue = self.Menu.ComboMode.UseRHealth:Value() / 100
+    elseif Mode() == "Harass" then
+        HealthValue = self.Menu.HarassMode.UseRHealth:Value() / 100
+    end
+    if myHero.health < myHero.maxHealth*HealthValue then
+        Control.CastSpell(HK_R)
+    end
+end
+
+class "Rengar"
+
+local EnemyLoaded = false
+local TargetTime = 0
+
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+local Item_HK = {}
+
+local WasInRange = false
+
+local ForceTarget = nil
+
+local PBuff = false
+
+
+
+local QRange = 0
+local WRange = 450
+local AARange = 0
+local ERange = 1000
+
+local Mounted = true
+
+
+function Rengar:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Rengar", name = "Rengar"})
+    self.Menu:MenuElement({id = "MeleeKey", name = "Melee Helper Toggle", key = string.byte("H"), toggle = true, value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Use E", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
+end
+
+function Rengar:Spells()
+    --ESpellData = {speed = math.huge, range = ERange, delay = 0, angle = 50, radius = 0, collision = {}, type = "conic"}
+    ESpellData = {speed = 2000, range = 1000, delay = 0, radius = 30, collision = {"minion"}, type = "linear"}
+end
+
+
+function Rengar:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if self.Menu.Draw.DrawAA:Value() then
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
+        end
+        if self.Menu.Draw.DrawQ:Value() then
+            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+        if self.Menu.Draw.DrawE:Value() then
+            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
+        end
+        if self.Menu.Draw.DrawR:Value() then
+            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
+        end
+        if self.Menu.Draw.DrawCustom:Value() then
+            Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
+        end
+        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
+        --if self.Menu.ComboMode.UseEAA:Value() then
+            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --else
+            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --end
+    end
+end
+
+
+
+function Rengar:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(2000)
+    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    QRange = AARange + 20
+    WRange = 450
+    CastingQ = myHero.activeSpell.name == "RengarQ"
+    CastingW = myHero.activeSpell.name == "RengarW"
+    CastingE = myHero.activeSpell.name == "RengarE"
+    CastingR = myHero.activeSpell.name == "RengarR"
+    PBuff = AARange > 800
+    --PrintChat(myHero:GetSpellData(_W).ammo)
+    if myHero:GetSpellData(_Q).name == "RengarRiderQ" then
+        Mounted = false 
+    else
+        Mounted = true
+    end
+    self:UpdateItems()
+    self:Logic()
+    self:Auto()
+    self:Items2()
+    self:ProcessSpells()
+    if TickW then
+        --DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+        TickW = false
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+
+function Rengar:UpdateItems()
+    Item_HK[ITEM_1] = HK_ITEM_1
+    Item_HK[ITEM_2] = HK_ITEM_2
+    Item_HK[ITEM_3] = HK_ITEM_3
+    Item_HK[ITEM_4] = HK_ITEM_4
+    Item_HK[ITEM_5] = HK_ITEM_5
+    Item_HK[ITEM_6] = HK_ITEM_6
+    Item_HK[ITEM_7] = HK_ITEM_7
+end
+
+function Rengar:Items1()
+    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+        end
+    end
+    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+        end
+    end
+    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
+        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
+        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
+        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+        end
+    end
+end
+
+function Rengar:Items2()
+    if GetItemSlot(myHero, 3139) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+            end
+        end
+    end
+    if GetItemSlot(myHero, 3140) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+            end
+        end
+    end
+end
+
+function Rengar:GetPassiveBuffs()
+    for i = 0, myHero.buffCount do
+        local buff = myHero:GetBuff(i)
+        if buff.name == "RengarPassive" and buff.count > 0 then 
+            return true
+        end
+    end
+    return false
+end
+
+
+function Rengar:Auto()
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Rengar:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+function Rengar:Logic()
+    if target == nil then 
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+        return 
+    end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        --PrintChat("Logic")
+        TargetTime = Game.Timer()
+        self:Items1()
+        
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange+200) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
+            self:UseQ()
+        end
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
+            if myHero.mana < 4 then
+                --PrintChat("Yep")
+                if (PBuff == false or (myHero.pathing and myHero.pathing.isDashing)) and (not self:CanUse(_Q, Mode()) or GetDistance(target.pos) > AARange)  then
+                    --PrintChat("Yep2")
+                    self:UseE(target)
+                end
+            end
+        end
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
+            if myHero.mana < 4 then
+                self:UseW()
+            end
+        end
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+    end     
+end
+
+function Rengar:ProcessSpells()
+    if myHero:GetSpellData(_W).currentCd == 0 then
+        CastedW = false
+    else
+        if CastedW == false then
+            --GotBall = "ECast"
+            TickW = true
+        end
+        CastedW = true
+    end
+end
+
+function Rengar:CastingChecks()
+    if not CastingQ and not CastingE and not CastingW and not CastingR then
+        return true
+    else
+        return false
+    end
+end
+
+
+function Rengar:OnPostAttack(args)
+
+end
+
+function Rengar:OnPostAttackTick(args)
+end
+
+function Rengar:OnPreAttack(args)
+end
+
+function Rengar:UseQ()
+    Control.CastSpell(HK_Q)
+end
+
+function Rengar:UseW()
+    Control.CastSpell(HK_W)
+end
+
+function Rengar:UseE(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < ERange then
+            Control.CastSpell(HK_E, pred.CastPos)
+    end 
+end
 
 
 class "Darius"
