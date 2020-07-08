@@ -10,7 +10,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 107.00
+    local Version = 108.00
     
     local Files = {
         Lua = {
@@ -416,7 +416,7 @@ function Jax:Menu()
     self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
     self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
     self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E Settings text", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawES", name = "Draw E Settings text", value = false})
 end
 
 function Jax:Spells()
@@ -442,7 +442,7 @@ function Jax:Draw()
         if self.Menu.Draw.DrawCustom:Value() then
             Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
         end
-        if self.Menu.Draw.DrawE:Value() then
+        if self.Menu.Draw.DrawES:Value() then
             if self.Menu.ComboMode.UseE2:Value() then
                 Draw.Text("E2 On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
             else
