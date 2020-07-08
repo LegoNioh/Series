@@ -10,7 +10,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 105.00
+    local Version = 106.00
     
     local Files = {
         Lua = {
@@ -416,6 +416,7 @@ function Jax:Menu()
     self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
     self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
     self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
+    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E Settings text", value = false})
 end
 
 function Jax:Spells()
@@ -441,14 +442,13 @@ function Jax:Draw()
         if self.Menu.Draw.DrawCustom:Value() then
             Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
         end
-        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
-        --if self.Menu.ComboMode.UseEAA:Value() then
-            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --else
-            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --end
+        if self.Menu.Draw.DrawE:Value() then
+            if self.Menu.ComboMode.UseE2:Value() then
+                Draw.Text("E2 On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+            else
+                Draw.Text("E2 Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+            end
+        end
     end
 end
 
