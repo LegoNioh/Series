@@ -10,7 +10,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 106.00
+    local Version = 107.00
     
     local Files = {
         Lua = {
@@ -642,7 +642,7 @@ function Jax:Logic()
         end
         if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
             if Mode() == "Combo" then
-                if not self.Menu.ComboMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
+                if self.Menu.ComboMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
                     self:UseQ(target)
                 end
             elseif Mode() == "Harass" then
@@ -651,7 +651,7 @@ function Jax:Logic()
                 end
             end
         end
-        if self:CanUse(_W, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange) then
+        if self:CanUse(_W, Mode()) and self:CastingChecks() and ValidTarget(target, ERange) then
             if myHero.attackData.state == STATE_WINDDOWN or Mode() == "Harass" then
                 self:UseW(target)
             end
@@ -706,6 +706,7 @@ end
 
 function Jax:UseW(unit)
     Control.CastSpell(HK_W)
+    _G.SDK.Orbwalker:__OnAutoAttackReset()
 end
 
 function Jax:UseE(unit)
