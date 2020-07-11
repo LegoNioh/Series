@@ -10,7 +10,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 108.00
+    local Version = 109.00
     
     local Files = {
         Lua = {
@@ -388,6 +388,8 @@ local AARange = 0
 local ERange = 350
 local RRange = 0
 
+local QAAW = 0
+
 
 
 function Jax:Menu()
@@ -396,6 +398,7 @@ function Jax:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQAA", name = "(Q) Use Q In AA Range", value = false})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWReset", name = "(W) To Reset Auto Attack", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE2", name = "(E2) Enabled", key = string.byte("T"), toggle = true, value = true})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
@@ -444,9 +447,9 @@ function Jax:Draw()
         end
         if self.Menu.Draw.DrawES:Value() then
             if self.Menu.ComboMode.UseE2:Value() then
-                Draw.Text("E2 On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+                Draw.Text("(Jax) E2 On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-120, Draw.Color(255, 0, 255, 100))
             else
-                Draw.Text("E2 Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+                Draw.Text("(Jax) E2 Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-120, Draw.Color(255, 255, 0, 100))
             end
         end
     end
@@ -464,7 +467,7 @@ function Jax:Tick()
     CastingE = myHero.activeSpell.name == "JaxE"
     CastingR = myHero.activeSpell.name == "JaxR"
     EBuff = BuffActive(myHero, "JaxCounterStrike")
-    --PrintChat(myHero:GetSpellData(_W).ammo)
+    --PrintChat(myHero.activeSpell.name)
     self:UpdateItems()
     self:Logic()
     self:Auto()
@@ -640,26 +643,35 @@ function Jax:Logic()
         if GetDistance(target.pos) < AARange then
             WasInRange = true
         end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+        if self:CanUse(_W, Mode()) and ValidTarget(target, ERange) then
+            if myHero.attackData.state == STATE_WINDDOWN or Mode() == "Harass" or not self.Menu.ComboMode.UseWReset:Value() or QAAW == 2 then
+                self:UseW(target)
+                if QAAW == 2 then
+                    QAAW = 0
+                end
+            end
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
             if Mode() == "Combo" then
                 if self.Menu.ComboMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
+                    if self:CanUse(_W, Mode()) and not self.Menu.ComboMode.UseWReset:Value() then
+                        self:UseW(target)
+                    end
                     self:UseQ(target)
                 end
             elseif Mode() == "Harass" then
                 if not self.Menu.HarassMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
+                    if self:CanUse(_W, Mode()) then
+                        self:UseW(target)
+                    end
                     self:UseQ(target)
                 end
             end
         end
-        if self:CanUse(_W, Mode()) and self:CastingChecks() and ValidTarget(target, ERange) then
-            if myHero.attackData.state == STATE_WINDDOWN or Mode() == "Harass" then
-                self:UseW(target)
-            end
-        end
-        if self:CanUse(_E, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange) then
+        if self:CanUse(_E, Mode()) and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange) then
             self:UseE(target)
         end
-        if self:CanUse(_R, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, QRange) then
+        if self:CanUse(_R, Mode()) and not _G.SDK.Attack:IsActive() and ValidTarget(target, QRange) then
             self:UseR(target)
         end
         --
@@ -691,10 +703,13 @@ end
 
 
 function Jax:OnPostAttack(args)
-
+    if QAAW == 1 then
+        QAAW = 2
+    end
 end
 
 function Jax:OnPostAttackTick(args)
+
 end
 
 function Jax:OnPreAttack(args)
@@ -702,6 +717,7 @@ end
 
 function Jax:UseQ(unit)
     Control.CastSpell(HK_Q, unit)
+    QAAW = 1
 end
 
 function Jax:UseW(unit)
@@ -742,6 +758,7 @@ local ForceTarget = nil
 
 local PBuff = false
 
+local MaxFerocity = "Q"
 
 
 local QRange = 0
@@ -759,12 +776,14 @@ function Rengar:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseItems", name = "Items Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Use E", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu.HarassMode:MenuElement({id = "UseItems", name = "Items Enabled", value = true})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
@@ -835,7 +854,7 @@ function Rengar:Tick()
     self:Auto()
     self:Items2()
     self:ProcessSpells()
-    if TickW then
+    if self:CanUse(_W, Mode()) then
         --DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
         TickW = false
     end
@@ -865,50 +884,39 @@ function Rengar:UpdateItems()
 end
 
 function Rengar:Items1()
-    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+    if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
+        if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
+            if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
+            end
         end
-    end
-    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+        if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
+            if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
+            end
         end
-    end
-    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+        if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
+            if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
+            end
         end
     end
 end
 
 function Rengar:Items2()
-    if GetItemSlot(myHero, 3139) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+    if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
+        if GetItemSlot(myHero, 3139) > 0 then
+            if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
+                if IsImmobile(myHero) then
+                    Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+                end
             end
         end
-    end
-    if GetItemSlot(myHero, 3140) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+        if GetItemSlot(myHero, 3140) > 0 then
+            if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
+                if IsImmobile(myHero) then
+                    Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+                end
             end
         end
     end
@@ -990,11 +998,13 @@ function Rengar:Logic()
         if GetDistance(target.pos) < AARange then
             WasInRange = true
         end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange+200) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
-            self:UseQ()
+        if self:CanUse(_Q, Mode()) and ValidTarget(target) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ((myHero.pathing and myHero.pathing.isDashing) or GetDistance(target.pos) < AARange+200) then
+            if myHero.mana < 4 or MaxFerocity == "Q" then
+                self:UseQ()
+            end
         end
         if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
-            if myHero.mana < 4 then
+            if myHero.mana < 4 or MaxFerocity == "E" then
                 --PrintChat("Yep")
                 if (PBuff == false or (myHero.pathing and myHero.pathing.isDashing)) and (not self:CanUse(_Q, Mode()) or GetDistance(target.pos) > AARange)  then
                     --PrintChat("Yep2")
@@ -1005,6 +1015,43 @@ function Rengar:Logic()
         if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
             if myHero.mana < 4 then
                 self:UseW()
+            end
+            if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
+                if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+                    if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+                    end
+                end
+                if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+                    if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+                    end
+                end
+                if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+                    if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+                    end
+                end
+            end
+        end
+        if TickW or (not self:CanUse(_Q, Mode()) and not self:CanUse(_W, Mode())) then
+            if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
+                if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+                    if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+                    end
+                end
+                if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+                    if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+                    end
+                end
+                if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+                    if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+                    end
+                end
+                TickW = false
             end
         end
         if Game.Timer() - TargetTime > 2 then
@@ -1029,7 +1076,7 @@ function Rengar:CastingChecks()
     if not CastingQ and not CastingE and not CastingW and not CastingR then
         return true
     else
-        return false
+        return true
     end
 end
 
