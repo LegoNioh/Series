@@ -11,7 +11,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 108.00
+    local Version = 109.00
     
     local Files = {
         Lua = {
@@ -302,6 +302,7 @@ function Utility:Menu()
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelperHarass", name = "Enable MeleeHelper In harass", value = false})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = 0, max = 1500, step = 10})
+    self.Menu.OrbMode:MenuElement({id = "StutterStep", name = "Stutter Step Towards Mouse At Max Range", value = false})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
     self.Menu.Draw:MenuElement({id = "DrawSummonerRange", name = "Enable Summoner Range", value = false})
@@ -359,7 +360,7 @@ function Utility:Tick()
                 MovementSet = "True"
                 --PrintChat("Can Click")
             end
-        else
+        elseif MeleeHelperActive == true then
             SetMovement(false)
             MovementSet = "False"
             --PrintChat("Stopping Clicks")
@@ -439,23 +440,26 @@ function Utility:MeleeHelper()
     if not _G.SDK.Attack:IsActive() and not DariusCheck and self:CanClick() and self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
         local MouseDirection = Vector((target.pos-mousePos):Normalized())
         local MouseDistance = GetDistance(mousePos, target.pos)
-        local MouseSpotDistance = AARange - target.boundingRadius
+        local MouseSpotDistance = AARange - (target.boundingRadius+30)
         if IsFacing(target) then
             MouseSpotDistance = AARange - (target.boundingRadius/2)
             --PrintChat("Facing")
         end
         local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
+        local StutterSpot = target.pos - MouseDirection * AARange
         MoveSpot = MouseSpot
-        _G.SDK.Orbwalker.ForceMovement = MoveSpot
+        if GetDistance(MoveSpot) > 55 then
+            _G.SDK.Orbwalker.ForceMovement = MoveSpot
+        end
         MeleeHelperActive = true
         --PrintChat("Forcing")
-    else
+    elseif not _G.SDK.Attack:IsActive() then
         if not DariusCheck then
             _G.SDK.Orbwalker.ForceMovement = nil
         end
         MeleeHelperActive = false
     end
-    if MoveSpot and GetDistance(MoveSpot) < myHero.boundingRadius and GetDistance(target.pos) <= AARange then
+    if MoveSpot and GetDistance(MoveSpot) < 55 and GetDistance(target.pos) <= AARange then
         _G.SDK.Orbwalker:SetMovement(false)
         MovementSet = "False"
         --PrintChat("False")
