@@ -11,7 +11,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 107.00
+    local Version = 108.00
     
     local Files = {
         Lua = {
@@ -52,7 +52,7 @@ do
     
     end
     
-    --AutoUpdate()
+    AutoUpdate()
 
 end
 
