@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 97.00
+    local Version = 100.00
     
     local Files = {
         Lua = {
@@ -1810,6 +1810,7 @@ function Lucian:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "Use2", name = "Use E Before W", value = true})
+	self.Menu.ComboMode:MenuElement({id = "Use3", name = "Use E Before Q", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseQMinionCombo", name = "Q on minions in Combo (No FPS Drops)", value = false})
@@ -1992,7 +1993,7 @@ function Lucian:Logic()
 					end
 				end 
 			else
-				if myHero.attackData.state == STATE_WINDDOWN and not DoubleShot and (self.Menu.ComboMode.Use2:Value() or not self:CanUse(_W, Mode())) and not self:CanUse(_Q, Mode()) and not _G.SDK.Attack:IsActive() then
+				if myHero.attackData.state == STATE_WINDDOWN and not DoubleShot and (self.Menu.ComboMode.Use2:Value() or not self:CanUse(_W, Mode())) and (self.Menu.ComboMode.Use3:Value() or not self:CanUse(_Q, Mode())) and not _G.SDK.Attack:IsActive() then
 					local CloseMouse = mousePos 
 					CloseMouse = myHero.pos:Extended(mousePos, 100)
 					Control.CastSpell(HK_E, CloseMouse)
@@ -2016,7 +2017,9 @@ function Lucian:Logic()
 		local Qrange = 1000 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
 		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" and not _G.SDK.Attack:IsActive() then
-			Control.CastSpell(HK_Q, target)
+			if not self.Menu.ComboMode.Use3:Value() or not self:CanUse(_E, Mode()) then
+				Control.CastSpell(HK_Q, target)
+			end
 			--DelayAction(function() self:QClick() end, 0.30)
 			--self:QClick()
 			--PrintChat(myHero.attackSpeed)
