@@ -1,13 +1,14 @@
 require "PremiumPrediction"
 require "DamageLib"
 require "2DGeometry"
+require "MapPositionGOS"
 
 local EnemyHeroes = {}
 local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 96.00
+    local Version = 97.00
     
     local Files = {
         Lua = {
@@ -2012,9 +2013,9 @@ function Lucian:Logic()
 			--PrintChat("Attack ACttive")
 		end
 
-		local Qrange = 500 + myHero.boundingRadius + target.boundingRadius
+		local Qrange = 1000 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and not _G.SDK.Attack:IsActive() then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" and not _G.SDK.Attack:IsActive() then
 			Control.CastSpell(HK_Q, target)
 			--DelayAction(function() self:QClick() end, 0.30)
 			--self:QClick()
