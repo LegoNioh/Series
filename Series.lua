@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 100.00
+    local Version = 100.80
     
     local Files = {
         Lua = {
@@ -1810,7 +1810,7 @@ function Lucian:Menu()
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "Use2", name = "Use E Before W", value = true})
-	self.Menu.ComboMode:MenuElement({id = "Use3", name = "Use E Before Q", value = true})
+	self.Menu.ComboMode:MenuElement({id = "Use3", name = "Use E Before Q", value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseRManKey", name = "Manual R key", key = string.byte("T"), value = false})
 	self.Menu.ComboMode:MenuElement({id = "UseQMinionCombo", name = "Q on minions in Combo (No FPS Drops)", value = false})
