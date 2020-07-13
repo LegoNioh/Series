@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 100.80
+    local Version = 110.00
     
     local Files = {
         Lua = {
