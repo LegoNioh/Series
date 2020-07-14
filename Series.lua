@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 110.00
+    local Version = 111.00
     
     local Files = {
         Lua = {
@@ -1982,7 +1982,7 @@ function Lucian:Logic()
 		end
 		if self:CanUse(_E, Mode()) and myHero:GetSpellData(_R).toggleState == 1 then
 			if GetDistance(target.pos) > 520 then
-				if WasInRange == true and GetDistance(target.pos) < 1050 then
+				if (WasInRange == true or self.Menu.ComboMode.Use3:Value()) and GetDistance(target.pos) < 1050 then
 					if GetDistance(mousePos, target.pos) < 500 then
 						Control.CastSpell(HK_E, mousePos)
 						if _G.PremiumOrbwalker then
@@ -2016,7 +2016,7 @@ function Lucian:Logic()
 
 		local Qrange = 1000 + myHero.boundingRadius + target.boundingRadius
 		--PrintChat(range)
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" and not _G.SDK.Attack:IsActive() then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and not (myHero.pathing and myHero.pathing.isDashing) and not DoubleShot and myHero.activeSpell.name ~= "LucianQ" and myHero.activeSpell.name ~= "LucianE" and not _G.SDK.Attack:IsActive() then
 			if not self.Menu.ComboMode.Use3:Value() or not self:CanUse(_E, Mode()) then
 				Control.CastSpell(HK_Q, target)
 			end
