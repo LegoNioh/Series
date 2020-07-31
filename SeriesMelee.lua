@@ -5,12 +5,14 @@ require "2DGeometry"
 require "MapPositionGOS"
 
 _G.QHelperActive = false
+_G.AatroxQType = 0
+
 local EnemyHeroes = {}
 local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 109.00
+    local Version = 110.00
     
     local Files = {
         Lua = {
@@ -297,6 +299,10 @@ class "Manager"
 function Manager:__init()
     if myHero.charName == "Kled" then
         DelayAction(function() self:LoadKled() end, 1.05)
+    elseif myHero.charName == "Aatrox" then
+        DelayAction(function() self:LoadAatrox() end, 1.05)
+    elseif myHero.charName == "Lillia" then
+        DelayAction(function() self:LoadLillia() end, 1.05)
     elseif myHero.charName == "Rengar" then
         DelayAction(function() self:LoadRengar() end, 1.05)
     elseif myHero.charName == "Jax" then
@@ -335,6 +341,35 @@ function Manager:LoadJax()
     end
 end
 
+function Manager:LoadAatrox()
+    Aatrox:Spells()
+    Aatrox:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Aatrox:Tick() end)
+    Callback.Add("Draw", function() Aatrox:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Aatrox:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Aatrox:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Aatrox:OnPostAttack(...) end)
+    end
+end
+
+
+function Manager:LoadLillia()
+    Lillia:Spells()
+    Lillia:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Lillia:Tick() end)
+    Callback.Add("Draw", function() Lillia:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Lillia:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Lillia:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Lillia:OnPostAttack(...) end)
+    end
+end
+
 function Manager:LoadRengar()
     Rengar:Spells()
     Rengar:Menu()
@@ -361,6 +396,982 @@ function Manager:LoadDarius()
         _G.SDK.Orbwalker:OnPostAttackTick(function(...) Darius:OnPostAttackTick(...) end)
         _G.SDK.Orbwalker:OnPostAttack(function(...) Darius:OnPostAttack(...) end)
     end
+end
+
+
+class "Lillia"
+
+local EnemyLoaded = false
+local TargetTime = 0
+
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+local Item_HK = {}
+
+local WasInRange = false
+
+local ForceTarget = nil
+
+local RBuff = false
+local QBuff = nil
+
+
+
+local QRange = 485
+local WRange = 565
+local AARange = 0
+
+local BallSpot = nil
+local BallDirection = nil
+local BallVelocity = 0
+local Fired = false
+local BallAlive = false
+local BallFiredTime = 0
+
+local CastedW = false
+local TickW = false
+
+local RStackTime = Game.Timer()
+local LastRstacks = 0
+
+local ARStackTime = Game.Timer()
+local ALastRstacks = 0
+local ALastTickTarget = myHero
+
+function Lillia:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Lillia", name = "Lillia"})
+    self.Menu:MenuElement({id = "BallKey", name = "Shoot A Bouncy ball", key = string.byte("H"), value = false})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQFar", name = "(Q) Don't Use Q When Too Close", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQLock", name = "(Q) Movement Helper", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWFast", name = "(W) Use Fast Mode", value = false})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEQ", name = "(E) Don't Q until E is Used", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEW", name = "(E) Don't W until E is Used", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "(E) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu.ComboMode:MenuElement({id = "UseEDistance", name = "(E) Max Distance", value = 2000, min = 0, max = 20000, step = 10})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 3, min = 1, max = 5, step = 1})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Use E", value = false})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu.AutoMode:MenuElement({id = "UseR", name = "(R) Auto", value = true})
+    self.Menu.AutoMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 3, min = 1, max = 5, step = 1})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawW", name = "Draw W range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawHelper", name = "Draw Q helper", value = false})
+end
+
+function Lillia:Spells()
+    --local Erange = self.Menu.ComboMode.UseEDistance:Value()
+    WSpellData = {speed = math.huge, range = 500, delay = 0.6, radius = 65, collision = {}, type = "circular"}
+    ESpellData = {speed = 1400, range = math.huge, delay = 0.4, angle = 50, radius = 120, collision = {""}, type = "linear"}
+    ESpellDataCol = {speed = 1400, range = math.huge, delay = 0, angle = 50, radius = 120, collision = {"minion"}, type = "linear"}
+    ELobSpellData = {speed = 1400, range = 750, delay = 0.4, angle = 50, radius = 120, collision = {}, type = "linear"}
+end
+
+
+function Lillia:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if self.Menu.Draw.DrawAA:Value() then
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
+        end
+        if self.Menu.Draw.DrawQ:Value() then
+            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+        if self.Menu.Draw.DrawW:Value() then
+            Draw.Circle(myHero.pos, WRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+        if self.Menu.Draw.DrawE:Value() then
+            Draw.Circle(myHero.pos, self.Menu.ComboMode.UseEDistance:Value(), 1, Draw.Color(255, 0, 0, 255))
+        end
+        if self.Menu.Draw.DrawHelper:Value() then
+            local QSpot = self:DrawQHelper()
+            if QSpot then
+                Draw.Circle(QSpot, 100, 1, Draw.Color(255, 0, 191, 255))
+                Draw.Circle(QSpot, 80, 1, Draw.Color(255, 0, 191, 255))
+                Draw.Circle(QSpot, 60, 1, Draw.Color(255, 0, 191, 255))
+                Draw.Circle(target.pos, QRange, 1, Draw.Color(255, 255, 191, 255))
+                Draw.Circle(target.pos, QRange-205, 1, Draw.Color(255, 255, 191, 255))
+            end
+        end
+        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
+        --if self.Menu.ComboMode.UseEAA:Value() then
+            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --else
+            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --end
+    end
+end
+
+function Lillia:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(2000)
+    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    CastingQ = myHero.activeSpell.name == "LilliaQ"
+    CastingW = myHero.activeSpell.name == "LilliaW"
+    CastingE = myHero.activeSpell.name == "LilliaE"
+    CastingR = myHero.activeSpell.name == "LilliaR"
+    QBuff = GetBuffExpire(myHero, "LilliaQ")
+    self:QHelper()
+    --RBuff = GetBuffExpire(myHero, "Undying")
+    --PrintChat(myHero.activeSpell.name)
+    self:UpdateItems()
+    self:Logic()
+    self:Auto()
+    self:Items2()
+    self:ProcessSpells()
+    if TickW then
+        --DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
+        TickW = false
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+
+function Lillia:UpdateItems()
+    Item_HK[ITEM_1] = HK_ITEM_1
+    Item_HK[ITEM_2] = HK_ITEM_2
+    Item_HK[ITEM_3] = HK_ITEM_3
+    Item_HK[ITEM_4] = HK_ITEM_4
+    Item_HK[ITEM_5] = HK_ITEM_5
+    Item_HK[ITEM_6] = HK_ITEM_6
+    Item_HK[ITEM_7] = HK_ITEM_7
+end
+
+function Lillia:Items1()
+    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+        end
+    end
+    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+        end
+    end
+    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
+        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
+        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
+        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+        end
+    end
+end
+
+function Lillia:Items2()
+    if GetItemSlot(myHero, 3139) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+            end
+        end
+    end
+    if GetItemSlot(myHero, 3140) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+            end
+        end
+    end
+end
+
+function Lillia:GetSleepBuffs(unit, buffname)
+    for i = 0, unit.buffCount do
+        local buff = unit:GetBuff(i)
+        if buff.name == buffname and buff.count > 0 then 
+            return buff
+        end
+    end
+    return nil
+end
+
+function Lillia:Auto()
+    NumRTargets = 0
+    local Etarget = nil
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+            local Buff = self:GetSleepBuffs(enemy, "LilliaPDoT")
+            if Buff ~= nil then
+                NumRTargets = NumRTargets + 1
+            end
+            if not target and Mode() == "Combo" and self:CanUse(_E, Mode()) then
+                if Etarget == nil or (GetDistance(enemy.pos, mousePos) < GetDistance(Etarget.pos, mousePos)) then
+                    Etarget = enemy
+                end
+            end
+        end
+    end
+    if Etarget and self:CastingChecks() and ValidTarget(Etarget) then
+        self:UseE(Etarget)
+    end
+    if self:CanUse(_R, "Auto") and NumRTargets >= self.Menu.AutoMode.UseRNum:Value() then
+        Control.CastSpell(HK_R)
+    end
+end 
+
+
+function Lillia:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "AutoUlt" and IsReady(spell) and self.Menu.AutoMode.UseQUlt:Value() then
+            return true
+        end
+        if mode == "Ult" and IsReady(spell) and self.Menu.ComboMode.UseQUlt:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
+            return true
+        end
+        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+function Lillia:DrawQHelper()
+    if self.Menu.ComboMode.UseQLock:Value() and QBuff ~= nil and target and Mode() == "Combo" then
+        local Distance = GetDistance(target.pos)
+        local QExpire = QBuff - Game.Timer()
+        local myHeroMs = myHero.ms * 0.75
+        if not IsFacing(target) then
+            myHeroMs = myHeroMs - (target.ms/2)
+        end
+        local MaxMove = myHeroMs * QExpire
+
+        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
+        local MouseSpotDistance = MaxMove * 0.8
+        if MaxMove > Distance then
+            MouseSpotDistance = Distance * 0.8
+        end
+        local MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
+
+        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
+        local TargetMouseSpot = target.pos - TargetMouseDirection * 315
+        local TargetMouseSpotDistance = GetDistance(myHero.pos, TargetMouseSpot)
+
+        if MaxMove < TargetMouseSpotDistance then
+            MouseDirection = Vector((myHero.pos-mousePos):Normalized())
+            MouseSpotDistance = Distance * 0.4
+            MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
+            TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
+            TargetMouseSpot = target.pos - TargetMouseDirection * 315
+        end
+        if Distance < QRange + MaxMove then
+            return TargetMouseSpot
+        end
+        --local HeroDirection = Vector((myHero.pos-target.pos):Normalized())
+        --local HeroSpot = myHero.pos + HeroDirection * 315
+    end
+end
+
+
+function Lillia:QHelper()
+    --PrintChat(myHero.activeSpell.name)
+    if not target then return end
+    if not ValidTarget(target) then return end
+    local Qon = myHero.activeSpell.name == "LilliaQ" or (GetDistance(target.pos) < 315 and self:CanUse(_Q, Mode()))
+    if self.Menu.ComboMode.UseQLock:Value() and Qon and target and Mode() == "Combo" then
+        --PrintChat("Moving")
+        --_G.SDK.Orbwalker:SetMovement(false)
+        local Distance = GetDistance(target.pos)
+        --local QExpire = QBuff - Game.Timer()
+        local myHeroMs = myHero.ms * 0.75
+        if not IsFacing(target) then
+            myHeroMs = myHeroMs - (target.ms/2)
+        end
+        local MaxMove = myHeroMs * 0.5
+
+        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
+        local MouseSpotDistance = Distance  * 0.8
+        if MaxMove > Distance then
+            MouseSpotDistance = Distance * 0.8
+        end
+        local MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
+
+        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
+        local TargetMouseSpot = target.pos - TargetMouseDirection * 315
+        local TargetMouseSpotDistance = GetDistance(myHero.pos, TargetMouseSpot)
+
+        if Distance < QRange + MaxMove then
+            --Control.Move(TargetMouseSpot)
+            --PrintChat("Walking for Q")
+            _G.SDK.Orbwalker.ForceMovement = TargetMouseSpot
+            _G.QHelperActive = true
+        else
+            --PrintChat("Not Q")
+            _G.SDK.Orbwalker.ForceMovement = nil
+            _G.QHelperActive = false
+            --Control.Move(mousePos)
+        end
+        --local HeroDirection = Vector((myHero.pos-target.pos):Normalized())
+        --local HeroSpot = myHero.pos + HeroDirection * 315
+    else
+        _G.QHelperActive = false
+        --_G.SDK.Orbwalker:SetMovement(true)
+    end
+end
+
+function Lillia:Logic()
+    if target == nil then 
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+        return 
+    end
+    if Mode() == "Combo" or Mode() == "Harass" and target and ValidTarget(target) then
+        --PrintChat("Logic")
+        TargetTime = Game.Timer()
+        self:Items1()
+
+        local QRangeExtra = 0
+        if IsFacing(target) then
+            QRangeExtra = myHero.ms * 0.2
+        end
+        if IsImmobile(target) then
+            QRangeExtra = myHero.ms * 0.5
+        end
+        
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            if not self.Menu.ComboMode.UseEW:Value() or not self:CanUse(_E, Mode()) then
+                self:UseW(target)
+            end
+        end
+        local TargetSleep = self:GetSleepBuffs(target, "LilliaPDoT")
+        if self:CanUse(_R, Mode()) and not CastingR then
+            if NumRTargets >= self.Menu.ComboMode.UseRNum:Value() and TargetSleep ~= nil then
+                Control.CastSpell(HK_R)
+            end
+        end
+
+        if self:CanUse(_E, Mode()) and ValidTarget(target, self.Menu.ComboMode.UseEDistance:Value()) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            --PrintChat("Casitng E")
+            if GetDistance(target.pos) < 750 then
+                self:UseELob(target)
+            else
+                self:UseE(target)
+            end
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            if not self.Menu.ComboMode.UseEQ:Value() or not self:CanUse(_E, Mode()) then
+                if GetDistance(target.pos) > 250 or not self.Menu.ComboMode.UseQFar:Value() then
+                    Control.CastSpell(HK_Q)
+                end
+            end
+        end
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+    end     
+end
+
+function Lillia:ProcessSpells()
+    if myHero:GetSpellData(_W).currentCd == 0 then
+        CastedW = false
+    else
+        if CastedW == false then
+            --GotBall = "ECast"
+            TickW = true
+        end
+        CastedW = true
+    end
+end
+
+function Lillia:CastingChecks()
+    if not CastingQ and not CastingE and not CastingR and not CastingW then
+        return true
+    else
+        return false
+    end
+end
+
+
+function Lillia:OnPostAttack(args)
+
+end
+
+function Lillia:OnPostAttackTick(args)
+end
+
+function Lillia:OnPreAttack(args)
+end
+
+function Lillia:UseW(unit)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
+    if pred.CastPos and pred.HitChance > 0 then
+        if (not self:CanUse(_E, Mode()) and not self:CanUse(_Q, Mode())) or pred.HitChance > 0.8 then 
+            Control.CastSpell(HK_W, pred.CastPos)
+        end
+    end
+end
+
+function Lillia:UseELob(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ELobSpellData)
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value()and myHero.pos:DistanceTo(pred.CastPos) < self.Menu.ComboMode.UseEDistance:Value() then
+        Control.CastSpell(HK_E, pred.CastPos)
+    end
+end
+
+function Lillia:WallCollision(pos1, pos2)
+    local Direction = Vector((pos1-pos2):Normalized())
+    --Draw.Circle(TargetAdded, 30, 1, Draw.Color(255, 0, 191, 255))
+    local checks = GetDistance(pos1,pos2)/50
+    --PrintChat("Walls")
+    for i=15, checks do
+        local CheckSpot = pos1 - Direction * (50*i)
+        local Adds = {Vector(100,0,0), Vector(66,0,66), Vector(0,0,100), Vector(-66,0,66), Vector(-100,0,0), Vector(66,0,-66), Vector(0,0,-100), Vector(-66,0,-66)} 
+        for i = 1, #Adds do
+            local TargetAdded = Vector(CheckSpot + Adds[i])
+            if MapPosition:inWall(TargetAdded) then
+                Draw.Circle(CheckSpot, 30, 1, Draw.Color(255, 255, 0, 0))
+                return true
+            else
+                Draw.Circle(CheckSpot, 30, 1, Draw.Color(255, 0, 191, 255))
+            end
+        end
+    end
+    return false
+end
+
+function Lillia:UseE(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value()and myHero.pos:DistanceTo(pred.CastPos) < self.Menu.ComboMode.UseEDistance:Value() then
+        local Direction2 = Vector((myHero.pos-pred.CastPos):Normalized())
+        local Pos2 = myHero.pos - Direction2 * 750
+        local pred2 = _G.PremiumPrediction:GetPrediction(Pos2, unit, ESpellDataCol)
+        if pred2.CastPos and pred2.HitChance >= 0 then
+            Direction = Vector((myHero.pos-pred.CastPos):Normalized())
+            Distance = 750
+            Spot = myHero.pos - Direction * Distance
+            local MouseSpotBefore = mousePos
+            if not self:WallCollision(myHero.pos, pred.CastPos) then
+                --PrintChat("Casting E")
+                --PrintChat(pred.CastPos:ToScreen().onScreen)
+                if pred.CastPos:ToScreen().onScreen then
+                    Control.CastSpell(HK_E, pred.CastPos)
+                else
+                    local MMSpot = Vector(pred.CastPos):ToMM()
+                    Control.SetCursorPos(MMSpot.x, MMSpot.y)
+                    Control.KeyDown(HK_E); Control.KeyUp(HK_E)
+                    DelayAction(function() Control.SetCursorPos(MouseSpotBefore) end, 0.20)
+                    --Control.SetCursorPos(MouseSpotBefore)
+                    --Control.CastSpell(HK_E, Spot)
+                end
+            end
+        end
+    end
+end
+
+class "Aatrox"
+
+local EnemyLoaded = false
+local TargetTime = 0
+
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+local Item_HK = {}
+
+local WasInRange = false
+
+local ForceTarget = nil
+
+local WBuff = nil
+
+
+
+local Q1Range = 625
+local Q2Range = 475
+local Q3Range = 360
+local WRange = 825
+local AARange = 0
+local ERange = 300
+local RRange = 0
+local QActiveRadius = 100
+local QDashRadius = 55
+
+local CastedE = false
+local TickE = false
+
+local QVersion = 0
+local QActiveRange = Q1Range
+local QActiveSweetRange = Q1Range - 120
+local QMovementHelper = false
+
+function Aatrox:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Aatrox", name = "Aatrox"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQ1Knockup", name = "(Q1) Use Q1 Only When it Knocks Up", value = false})
+    self.Menu.ComboMode:MenuElement({id = "UseQ2Knockup", name = "(Q2) Use Q2 Only When it Knocks Up", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQ3Knockup", name = "(Q3) Use Q3 Only When it Knocks Up", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQ1", name = "(Q1) Use Movement Helper", value = false})
+    self.Menu.ComboMode:MenuElement({id = "UseQ2", name = "(Q2) Use Movement Helper", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQ3", name = "(Q3) Use Movement Helper", value = true})
+    self.Menu.ComboMode:MenuElement({id = "QMovementExtra", name = "Distance from Spot activate Movement", value = 100, min = 0, max = 1000, step = 10})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseWHitChance", name = "(W) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseEHitChance", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "(R) Enabled", value = false})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
+end
+
+function Aatrox:Spells()
+    --ESpellData = {speed = math.huge, range = ERange, delay = 0, angle = 50, radius = 0, collision = {}, type = "conic"}
+    WSpellData = {speed = 1800, range = 825, delay = 0.25, radius = 160, collision = {"minion"}, type = "linear"}
+    QSpellData = {speed = math.huge, range = 625, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
+end
+
+
+function Aatrox:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if self.Menu.Draw.DrawAA:Value() then
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
+        end
+        if self.Menu.Draw.DrawQ:Value() then
+            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+        if self.Menu.Draw.DrawE:Value() then
+            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
+        end
+        if self.Menu.Draw.DrawR:Value() then
+            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
+        end
+        if self.Menu.Draw.DrawCustom:Value() then
+            Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
+        end
+        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
+        --if self.Menu.ComboMode.UseEAA:Value() then
+            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --else
+            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+        --end
+        if myHero.activeSpell.name == "AatroxQWrapperCast" then
+            local CastDirection = myHero.dir
+            local CastDistance = QActiveSweetRange
+            local CastVector = myHero.pos + CastDirection * CastDistance
+
+            Draw.Circle(CastVector, QActiveRadius, 1, Draw.Color(255, 255, 0, 0))
+            --PrintChat(myHero.activeSpell.castEndTime)
+        end
+    end
+end
+
+
+
+function Aatrox:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+    target = GetTarget(2000)
+    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    CastingQ = myHero.activeSpell.name == "AatroxQWrapperCast"
+    CastingW = myHero.activeSpell.name == "AatroxW"
+    CastingE = myHero.activeSpell.name == "AatroxE"
+    CastingR = myHero.activeSpell.name == "AatroxR"
+    --PrintChat(myHero:GetSpellData(_Q).name)
+    if myHero:GetSpellData(_Q).name == "AatroxQ" and not CastingQ then
+        QVersion = 1
+        QActiveRange = Q1Range
+        QActiveSweetRange = Q1Range - 95
+        QMovementHelper = self.Menu.ComboMode.UseQ1:Value()
+        QActiveRadius = 110
+        QDashRadius = 55
+        QSpellData = {speed = math.huge, range = 625, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
+    elseif myHero:GetSpellData(_Q).name == "AatroxQ2" and not CastingQ  then
+        QVersion = 2
+        QActiveRange = Q2Range
+        QActiveSweetRange = Q2Range - 70
+        QMovementHelper = self.Menu.ComboMode.UseQ2:Value()
+        QActiveRadius = 100
+        QDashRadius = 200
+        QSpellData = {speed = math.huge, range = Q2Range, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
+    elseif myHero:GetSpellData(_Q).name == "AatroxQ3" and not CastingQ then
+        QVersion = 3
+        QActiveRange = Q3Range
+        QActiveSweetRange = 200
+        QActiveRadius = 160
+        QDashRadius = 80
+        QMovementHelper = self.Menu.ComboMode.UseQ3:Value()
+        QSpellData = {speed = math.huge, range = Q3Range, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
+    end
+    if Mode() == "Combo" and target and self:CanUse(_Q, Mode()) and ValidTarget(target, QActiveRange+self.Menu.ComboMode.QMovementExtra:Value()) and (GetDistance(target.pos) + self.Menu.ComboMode.QMovementExtra:Value() > QActiveSweetRange) and QMovementHelper then
+        --PrintChat(QVersion)
+        _G.AatroxQType = QVersion
+    else
+        _G.AatroxQType = 0
+    end
+    if TickE then
+        ECastTime = Game.Timer()
+        TickE = false
+    end
+    if ECastTime then
+        if not (myHero.pathing and myHero.pathing.isDashing) then
+            --PrintChat(Game.Timer() - ECastTime)
+            ECastTime = nil
+        end
+    end
+
+
+    self:UpdateItems()
+    self:Logic()
+    self:Auto()
+    self:Items2()
+    self:ProcessSpells()
+    if CastingQ then
+        _G.AatroxQType = 0
+    end
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+
+function Aatrox:UpdateItems()
+    Item_HK[ITEM_1] = HK_ITEM_1
+    Item_HK[ITEM_2] = HK_ITEM_2
+    Item_HK[ITEM_3] = HK_ITEM_3
+    Item_HK[ITEM_4] = HK_ITEM_4
+    Item_HK[ITEM_5] = HK_ITEM_5
+    Item_HK[ITEM_6] = HK_ITEM_6
+    Item_HK[ITEM_7] = HK_ITEM_7
+end
+
+function Aatrox:Items1()
+    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+        end
+    end
+    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+        end
+    end
+    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
+        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
+        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
+        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+        end
+    end
+end
+
+function Aatrox:Items2()
+    if GetItemSlot(myHero, 3139) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+            end
+        end
+    end
+    if GetItemSlot(myHero, 3140) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+            end
+        end
+    end
+end
+
+function Aatrox:GetPassiveBuffs(unit, buffname)
+    for i = 0, unit.buffCount do
+        local buff = unit:GetBuff(i)
+        if buff.name == buffname and buff.count > 0 then 
+            return buff
+        end
+    end
+    return nil
+end
+
+
+function Aatrox:Auto()
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+function Aatrox:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Combo2" and IsReady(spell) and self.Menu.ComboMode.UseQ2:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+function Aatrox:Logic()
+            --PrintChat(myHero.activeSpell.name)
+    if target == nil then 
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+        return 
+    end
+    if Mode() == "Combo" or Mode() == "Harass" and target then
+        --PrintChat("Logic")
+        TargetTime = Game.Timer()
+        self:Items1()
+        
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+        if self:CanUse(_Q, Mode()) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and ValidTarget(target, QActiveRange) then
+            if (QVersion == 1 and self.Menu.ComboMode.UseQ1Knockup:Value()) or (QVersion == 2 and self.Menu.ComboMode.UseQ2Knockup:Value()) or (QVersion == 3 and self.Menu.ComboMode.UseQ3Knockup:Value()) then
+                if QVersion == 3 and GetDistance(target.pos) < QActiveSweetRange then
+                    local pred = _G.PremiumPrediction:GetPrediction(myHero, target, QSpellData)
+                    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) < QActiveSweetRange then
+                        Control.CastSpell(HK_Q, pred.CastPos)
+                    end
+                elseif GetDistance(target.pos) > QActiveSweetRange then
+                    local pred = _G.PremiumPrediction:GetPrediction(myHero, target, QSpellData)
+                    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) > QActiveSweetRange and myHero.pos:DistanceTo(pred.CastPos) < QActiveRange then
+                        Control.CastSpell(HK_Q, pred.CastPos)
+                    end            
+                end
+            else
+                self:UseQ(target)
+            end
+        end
+        if self:CanUse(_W, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, WRange) then
+            self:UseW(target)
+        end
+        if self:CanUse(_E, Mode()) and _G.AatroxQType == 0 and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange+AARange) and GetDistance(target.pos) > AARange then
+            --self:UseE(target)
+        end
+
+        if self:CanUse(_E, Mode()) and CastingQ then
+               --PrintChat("Less Cast Time")
+                local CastDirection = myHero.dir
+                local CastDistance = QActiveSweetRange
+                local CastVector = myHero.pos + CastDirection * CastDistance
+                local TravelTime = GetDistance(CastVector)/1000
+                if QVersion == 1 then
+                    TravelTime = GetDistance(CastVector)/1200
+                elseif QVersion == 2 then
+                    TravelTime = GetDistance(CastVector)/1200
+                elseif QVersion == 3 then
+                    TravelTime = GetDistance(CastVector)/600
+                end
+                if GetDistance(target.pos, CastVector) > QActiveRadius and myHero.activeSpell.castEndTime - Game.Timer() < TravelTime then
+                    --PrintChat("Q missed")
+                    local EVector = target.pos - CastDirection * CastDistance
+                    if GetDistance(EVector) < ERange + QDashRadius then
+                        Control.CastSpell(HK_E, EVector)
+                    end
+                end
+        end
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+    end     
+end
+
+function Aatrox:ProcessSpells()
+    if myHero:GetSpellData(_E).currentCd == 0 then
+        CastedE = false
+    else
+        if CastedE == false then
+            --GotBall = "ECast"
+            TickE = true
+        end
+        CastedE = true
+    end
+end
+
+function Aatrox:CastingChecks()
+    if not CastingQ and not CastingW and not CastingE and not CastingR then
+        return true
+    else
+        return false
+    end
+end
+
+
+function Aatrox:OnPostAttack(args)
+
+end
+
+function Aatrox:OnPostAttackTick(args)
+end
+
+function Aatrox:OnPreAttack(args)
+end
+
+function Aatrox:UseQ(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) < QActiveRange then
+        Control.CastSpell(HK_Q, pred.CastPos)
+    end 
+end
+
+function Aatrox:UseW(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseWHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < WRange then
+        Control.CastSpell(HK_W, pred.CastPos)
+    end 
+end
+
+function Aatrox:UseE(unit)
+    Control.CastSpell(HK_E, unit)
 end
 
 class "Jax"
@@ -1744,7 +2755,6 @@ local Mounted = true
 
 function Kled:Menu()
     self.Menu = MenuElement({type = MENU, id = "Kled", name = "Kled"})
-    self.Menu:MenuElement({id = "MeleeKey", name = "Melee Helper Toggle", key = string.byte("H"), toggle = true, value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQHitChance", name = "(Q) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
@@ -1999,7 +3009,7 @@ function Kled:Logic()
                 end
             end
         end
-        if Mounted and self:CanUse(_Q, Mode()) and not CastingQ and not CastingR and not _G.SDK.Attack:IsActive() and ValidTarget(target, QRange) then
+        if Mounted and self:CanUse(_Q, Mode()) and not CastingQ and not CastingR and ValidTarget(target, QRange) then
             self:UseQ(target)
         end
         if not Mounted and self:CanUse(_Q, "Combo2") and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and ValidTarget(target, Q2Range) then
@@ -2047,14 +3057,14 @@ end
 function Kled:UseQ(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
     if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < QRange then
-            Control.CastSpell(HK_Q, pred.CastPos)
+        Control.CastSpell(HK_Q, pred.CastPos)
     end 
 end
 
 function Kled:UseQ2(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, Q2SpellData)
     if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQ2HitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < Q2Range then
-            Control.CastSpell(HK_Q, pred.CastPos)
+        Control.CastSpell(HK_Q, pred.CastPos)
     end 
 end
 
