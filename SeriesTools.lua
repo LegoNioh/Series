@@ -11,7 +11,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 109.00
+    local Version = 110.00
     
     local Files = {
         Lua = {
@@ -297,12 +297,12 @@ function Utility:Menu()
     self.Menu:MenuElement({id = "ExKey", name = "Exhaust Key", key = string.byte("A"), value = false})  
     self.Menu:MenuElement({id = "MeleeKey", name = "Melee Helper Toggle Key", key = string.byte("H"), toggle = true, value = true})
     self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
+    self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable Melee Movement Helper", value = true})
     self.Menu.OrbMode:MenuElement({id = "StopClick", name = "Disable Orbwalker While Manually Casting", value = true})
-    self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable MeleeHelper", value = true})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelperHarass", name = "Enable MeleeHelper In harass", value = false})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = 0, max = 1500, step = 10})
-    self.Menu.OrbMode:MenuElement({id = "StutterStep", name = "Stutter Step Towards Mouse At Max Range", value = false})
+    self.Menu.OrbMode:MenuElement({id = "MeleeHelperSkillsOnly", name = "Enabled = Only Move to help for skills", value = false})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
     self.Menu.Draw:MenuElement({id = "DrawSummonerRange", name = "Enable Summoner Range", value = false})
@@ -373,7 +373,7 @@ function Utility:Tick()
         end
     end
     if Game.IsChatOpen() or myHero.dead then return end
-    --PrintChat(myHero.activeSpell.name)
+    --PrintChat(myHero.attackData.state)
     target = GetTarget(1400)
     self:MeleeHelper()
     if self.Menu.ExKey:Value() then
@@ -422,6 +422,9 @@ function Utility:DrawMeleeHelper()
             --PrintChat("Facing")
         end
         local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
+        if MouseSpot and MapPosition:inWall(MouseSpot) then
+
+        end
         MoveSpot = MouseSpot
         return MoveSpot
         --PrintChat("Forcing")
@@ -435,9 +438,32 @@ function Utility:MeleeHelper()
     local MoveSpot = nil
 
 
-    local DariusCheck = QHelperActive
+    local DariusCheck = _G.QHelperActive
+    local AatroxQCheck = 0
+    local MeleeMenuMouseDistance = self.Menu.OrbMode.MeleeHelperMouseDistance:Value()
+    if _G.AatroxQType then
+        AatroxQCheck = _G.AatroxQType
+        MeleeMenuMouseDistance = 700 
+    end
+    local AatroxQCasting = myHero.activeSpell.name == "AatroxQWrapperCast"
     local ModeCheck = Mode() == "Combo" or (Mode() == "Harass" and self.Menu.OrbMode.UseMeleeHelperHarass:Value())
-    if not _G.SDK.Attack:IsActive() and not DariusCheck and self:CanClick() and self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ModeCheck and GetDistance(mousePos, target.pos) < self.Menu.OrbMode.MeleeHelperMouseDistance:Value() and GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() then
+    local SkillsOrAttack = (AatroxQCheck > 0 or not self.Menu.OrbMode.MeleeHelperSkillsOnly:Value())
+    local OrbWalkSpot = nil
+    local MouseInWall = false
+    if target and ValidTarget(target) then
+        local MouseDirection = Vector((target.pos-mousePos):Normalized())
+        local MouseDistance = GetDistance(mousePos, target.pos)
+        local MouseSpotDistance = AARange - (target.boundingRadius+30)
+        local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
+        OrbWalkSpot  = MouseSpot
+        MouseInWall = MapPosition:inWall(OrbWalkSpot)
+    end
+    if MouseInWall then
+        --PrintChat("Mouse in wall")
+    else
+        --PrintChat("Mouse n")
+    end
+    if not MouseInWall and SkillsOrAttack and not AatroxQCasting and not _G.SDK.Attack:IsActive() and not DariusCheck and self:CanClick() and self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() and target and ValidTarget(target) and ModeCheck and GetDistance(mousePos, target.pos) < MeleeMenuMouseDistance and (GetDistance(target.pos) <= AARange + self.Menu.OrbMode.MeleeHelperExtraDistance:Value() or AatroxQCheck > 0) then
         local MouseDirection = Vector((target.pos-mousePos):Normalized())
         local MouseDistance = GetDistance(mousePos, target.pos)
         local MouseSpotDistance = AARange - (target.boundingRadius+30)
@@ -445,13 +471,21 @@ function Utility:MeleeHelper()
             MouseSpotDistance = AARange - (target.boundingRadius/2)
             --PrintChat("Facing")
         end
+        if AatroxQCheck > 0 then
+            if AatroxQCheck == 1 then
+                MouseSpotDistance = 545
+            elseif AatroxQCheck == 2 then
+                MouseSpotDistance = 355
+            elseif AatroxQCheck == 3 then
+                MouseSpotDistance = 280
+            end
+            MouseDirection = Vector((target.pos-myHero.pos):Normalized())
+        end
         local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
-        local StutterSpot = target.pos - MouseDirection * AARange
         MoveSpot = MouseSpot
-        if GetDistance(MoveSpot) > 55 then
+        if MoveSpot and GetDistance(MoveSpot) > 55 then
             _G.SDK.Orbwalker.ForceMovement = MoveSpot
         end
-        MeleeHelperActive = true
         --PrintChat("Forcing")
     elseif not _G.SDK.Attack:IsActive() then
         if not DariusCheck then
@@ -459,7 +493,7 @@ function Utility:MeleeHelper()
         end
         MeleeHelperActive = false
     end
-    if MoveSpot and GetDistance(MoveSpot) < 55 and GetDistance(target.pos) <= AARange then
+    if MoveSpot and GetDistance(MoveSpot) < 55 and (GetDistance(target.pos) <= AARange or AatroxQCheck > 0) then
         _G.SDK.Orbwalker:SetMovement(false)
         MovementSet = "False"
         --PrintChat("False")
@@ -472,6 +506,13 @@ end
 
 function Utility:Draw()
     if self.Menu.Draw.UseDraws:Value() then
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy) then
+                if enemy.activeSpell and enemy.activeSpell.placementPos then
+                    Draw.Circle(enemy.activeSpell.placementPos, 25, 1, Draw.Color(255, 0, 100, 255))
+                end
+            end
+        end
         if myHero.charName == "Nasus" then
             LastHitTarget = self:NasusHelper()
             if LastHitTarget then
