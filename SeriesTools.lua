@@ -11,7 +11,7 @@ local EnemySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 110.00
+    local Version = 111.00
     
     local Files = {
         Lua = {
@@ -506,13 +506,6 @@ end
 
 function Utility:Draw()
     if self.Menu.Draw.UseDraws:Value() then
-        for i, enemy in pairs(EnemyHeroes) do
-            if enemy and not enemy.dead and ValidTarget(enemy) then
-                if enemy.activeSpell and enemy.activeSpell.placementPos then
-                    Draw.Circle(enemy.activeSpell.placementPos, 25, 1, Draw.Color(255, 0, 100, 255))
-                end
-            end
-        end
         if myHero.charName == "Nasus" then
             LastHitTarget = self:NasusHelper()
             if LastHitTarget then
