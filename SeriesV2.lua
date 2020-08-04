@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 550.00
+    local Version = 560.00
     
     local Files = {
         Lua = {
@@ -2852,6 +2852,8 @@ function Corki:Menu()
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
     self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = false})
     self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseR", name = "Use R in Harass", value = false})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu.AutoMode:MenuElement({id = "UseQ", name = "Auto Use Q", value = true})
     self.Menu.AutoMode:MenuElement({id = "UseQHitChance", name = "Q Hit Chance (0.50)", value = 0.50, min = 0, max = 1.0, step = 0.05})
