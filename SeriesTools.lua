@@ -8,10 +8,12 @@ MeleeHelperActive = false
 local EnemyHeroes = {}
 local AllyHeroes = {}
 local EnemySpawnPos = nil
+local Flipped = false
+local SavedSpot = myHero.pos
 -- [ AutoUpdate ] --
 do
     
-    local Version = 111.00
+    local Version = 112.00
     
     local Files = {
         Lua = {
@@ -296,19 +298,30 @@ function Utility:Menu()
     self.Menu = MenuElement({type = MENU, id = "Utility", name = "Series Tools"})
     self.Menu:MenuElement({id = "ExKey", name = "Exhaust Key", key = string.byte("A"), value = false})  
     self.Menu:MenuElement({id = "MeleeKey", name = "Melee Helper Toggle Key", key = string.byte("H"), toggle = true, value = true})
+    self.Menu:MenuElement({id = "RangedKey", name = "Ranged Helper Toggle Key", key = string.byte("H"), toggle = true, value = true})
+    self.Menu:MenuElement({id = "StopHelperKey", name = "Stop Helper On Hold", key = string.byte("A"), value = false})
     self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable Melee Movement Helper", value = true})
-    self.Menu.OrbMode:MenuElement({id = "StopClick", name = "Disable Orbwalker While Manually Casting", value = true})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelperHarass", name = "Enable MeleeHelper In harass", value = false})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = 0, max = 1500, step = 10})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperSkillsOnly", name = "Enabled = Only Move to help for skills", value = false})
+    self.Menu:MenuElement({id = "OrbModeR", name = "Orbwalker Ranged", type = MENU})
+    self.Menu.OrbModeR:MenuElement({id = "UseRangedHelper", name = "Enable Ranged Movement Helper", value = true})
+    self.Menu.OrbModeR:MenuElement({id = "UseRangedHelperHarass", name = "Enable RangedHelper In harass", value = false})
+    self.Menu.OrbModeR:MenuElement({id = "RangedHelperStandStill", name = "Stand Still When In Perfect Spot", value = false})
+    self.Menu.OrbModeR:MenuElement({id = "RangedHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
+    self.Menu.OrbModeR:MenuElement({id = "RangedHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = -500, max = 1500, step = 10})
+    self.Menu.OrbModeR:MenuElement({id = "RangedHelperSkillsOnly", name = "Enabled = Only Move to help for skills", value = false})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
     self.Menu.Draw:MenuElement({id = "DrawSummonerRange", name = "Enable Summoner Range", value = false})
     self.Menu.Draw:MenuElement({id = "MeleeHelperSpot", name = "Draw Melee Helper Spot", value = false})
     self.Menu.Draw:MenuElement({id = "MeleeHelperDistance", name = "Draw Melee Helper Mouse Distance", value = false})
     self.Menu.Draw:MenuElement({id = "MeleeHelperText", name = "Draw Melee Helper Text (On/Off)", value = false})
+    self.Menu.Draw:MenuElement({id = "RangedHelperSpot", name = "Draw Ranged Helper Spot", value = false})
+    self.Menu.Draw:MenuElement({id = "RangedHelperDistance", name = "Draw Ranged Helper Mouse Distance", value = false})
+    self.Menu.Draw:MenuElement({id = "RangedHelperText", name = "Draw Melee Ranged Text (On/Off)", value = false})
 end
 
 function Utility:NasusHelper()
@@ -353,29 +366,11 @@ function Utility:Tick()
     else
         --PrintChat("Q helper OFF")
     end
-    if self.Menu.OrbMode.StopClick:Value() then
-        if self:CanClick() then
-            if MovementSet == "False" then
-                SetMovement(true)
-                MovementSet = "True"
-                --PrintChat("Can Click")
-            end
-        elseif MeleeHelperActive == true then
-            SetMovement(false)
-            MovementSet = "False"
-            --PrintChat("Stopping Clicks")
-        end
-    else
-        if MovementSet == "False" then
-            SetMovement(true)
-            MovementSet = "True"
-            --PrintChat("Can Click")
-        end
-    end
     if Game.IsChatOpen() or myHero.dead then return end
     --PrintChat(myHero.attackData.state)
     target = GetTarget(1400)
     self:MeleeHelper()
+    self:RangedHelper()
     if self.Menu.ExKey:Value() then
     	self:Exhaust()
     end
@@ -401,10 +396,80 @@ function Utility:Tick()
 end
 
 function Utility:CanClick()
-    if Control.IsKeyDown(HK_Q) or Control.IsKeyDown(HK_E) or Control.IsKeyDown(HK_W) or Control.IsKeyDown(HK_R) then
+    if self.Menu.StopHelperKey:Value() then
         return false
-    end  
+    end
     return true
+end
+
+
+function Utility:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+
+        for i, enemy in pairs(EnemyHeroes) do
+            if enemy and not enemy.dead and ValidTarget(enemy) then
+                if enemy.activeSpell and enemy.activeSpell.placementPos then
+                    local SpellPlacementPos = enemy.activeSpell.placementPos
+                    local VectorSpellPlacementPos = Vector(SpellPlacementPos.x,SpellPlacementPos.y,SpellPlacementPos.z)
+                    Draw.Circle(VectorSpellPlacementPos, 100, 1, Draw.Color(255, 0, 191, 255))
+                end
+            end
+        end
+
+        if myHero.charName == "Nasus" then
+            LastHitTarget = self:NasusHelper()
+            if LastHitTarget then
+                Draw.Circle(LastHitTarget.pos, 200, 1, Draw.Color(255, 0, 191, 255))
+            end
+        end
+        if self.Menu.Draw.DrawSummonerRange:Value() then
+            Draw.Circle(myHero.pos, Range, 1, Draw.Color(255, 0, 191, 255))
+        end
+        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperDistance:Value() then
+            Draw.Circle(target.pos, self.Menu.OrbMode.MeleeHelperMouseDistance:Value(), 1, Draw.Color(255, 0, 0, 0))
+        end
+
+
+
+        if self.Menu.OrbModeR.UseRangedHelper:Value() and target and self.Menu.Draw.RangedHelperDistance:Value() then
+            Draw.Circle(target.pos, self.Menu.OrbModeR.RangedHelperMouseDistance:Value(), 1, Draw.Color(255, 0, 0, 0))
+        end
+        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperSpot:Value() then
+            local MeleeSpot = self:DrawMeleeHelper()
+            if MeleeSpot then
+                Draw.Circle(MeleeSpot, 25, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(MeleeSpot, 35, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(MeleeSpot, 45, 1, Draw.Color(255, 0, 100, 255))
+            end
+        end
+        if self.Menu.OrbModeR.UseRangedHelper:Value() and target and self.Menu.Draw.RangedHelperSpot:Value() then
+            local RangedSpot = self:DrawRangedHelper()
+            if RangedSpot then
+                Draw.Circle(RangedSpot, 25, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(RangedSpot, 35, 1, Draw.Color(255, 0, 100, 255))
+                Draw.Circle(RangedSpot, 45, 1, Draw.Color(255, 0, 100, 255))
+            end
+        end
+
+        if self.Menu.Draw.MeleeHelperText:Value() then
+            if self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() then
+                Draw.Text("Melee Helper On", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            else
+                Draw.Text("Melee Helper On", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            end
+        end
+        if self.Menu.Draw.RangedHelperText:Value() then
+            if self.Menu.RangedKey:Value() and self.Menu.OrbModeR.UseRangedHelper:Value() then
+                Draw.Text("Ranged Helper On", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
+                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            else
+                Draw.Text("Ranged Helper On", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
+                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
+            end
+        end
+    end
 end
 
 function Utility:DrawMeleeHelper()
@@ -430,6 +495,147 @@ function Utility:DrawMeleeHelper()
         --PrintChat("Forcing")
     else
         return nil
+    end
+end
+
+function Utility:DrawRangedHelper()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local MoveSpot = nil
+    local RangedMenuMouseDistance = self.Menu.OrbModeR.RangedHelperMouseDistance:Value()
+    local ModeCheck = Mode() == "Combo" or (Mode() == "Harass" and self.Menu.OrbModeR.UseRangedHelperHarass:Value())
+    local RangedSkillsOnly = self.Menu.OrbModeR.RangedHelperSkillsOnly:Value()
+    local OrbWalkSpot = nil
+    local MouseInWall = false
+    if target and ValidTarget(target) then
+        local EAArange = _G.SDK.Data:GetAutoAttackRange(target)
+
+        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
+        local MouseDistance = GetDistance(mousePos, myHero.pos) * 0.2
+        local MouseSpot = myHero.pos - MouseDirection * (MouseDistance + 100)
+
+
+        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
+        local RangeDifference = AARange - EAArange
+        if RangeDifference > 0 then
+            RangeDifference = RangeDifference/2
+        else
+            RangeDifference = RangeDifference
+        end
+        local TargetDistance = EAArange + RangeDifference
+        local TargetMouseSpot = target.pos - TargetMouseDirection * TargetDistance
+
+        if GetDistance(TargetMouseSpot) > 60 and (Flipped == false or GetDistance(TargetMouseSpot) > 120) or self.Menu.OrbModeR.RangedHelperStandStill:Value() then
+            OrbWalkSpot = TargetMouseSpot
+            Flipped = false
+        else
+            if Flipped == false then
+                SavedSpot = TargetMouseSpot
+            end
+            if GetDistance(SavedSpot) > 100 and GetDistance(TargetMouseSpot) > 60 then
+                Flipped = false
+            else
+                Flipped = true
+                MouseDirection = Vector((myHero.pos-mousePos):Normalized())
+                MouseDistance = GetDistance(mousePos, myHero.pos) * 0.2
+                MouseSpot = myHero.pos + MouseDirection * (MouseDistance + 100)
+
+                TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
+                RangeDifference = AARange - EAArange
+                if RangeDifference > 0 then
+                    RangeDifference = RangeDifference/2
+                else
+                    RangeDifference = RangeDifference
+                end
+                TargetDistance = EAArange + RangeDifference
+                TargetMouseSpot = target.pos - TargetMouseDirection * TargetDistance
+                OrbWalkSpot = TargetMouseSpot
+            end
+        end
+        return OrbWalkSpot
+    else
+        return nil
+    end
+end
+
+
+
+function Utility:RangedHelper()
+    local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    local MoveSpot = nil
+    local RangedMenuMouseDistance = self.Menu.OrbModeR.RangedHelperMouseDistance:Value()
+    local ModeCheck = Mode() == "Combo" or (Mode() == "Harass" and self.Menu.OrbModeR.UseRangedHelperHarass:Value())
+    local RangedSkillsOnly = self.Menu.OrbModeR.RangedHelperSkillsOnly:Value()
+    local OrbWalkSpot = nil
+    local MouseInWall = false
+    if target and ValidTarget(target) then
+        local EAArange = _G.SDK.Data:GetAutoAttackRange(target)
+
+        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
+        local MouseDistance = GetDistance(mousePos, myHero.pos) * 0.2
+        local MouseSpot = myHero.pos - MouseDirection * (MouseDistance + 100)
+
+
+        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
+        local RangeDifference = AARange - EAArange
+        if RangeDifference > 0 then
+            RangeDifference = RangeDifference/2
+        else
+            RangeDifference = RangeDifference
+        end
+        local TargetDistance = EAArange + RangeDifference
+        local TargetMouseSpot = target.pos - TargetMouseDirection * TargetDistance
+
+        if GetDistance(TargetMouseSpot) > 60 and (Flipped == false or GetDistance(TargetMouseSpot) > 120) or self.Menu.OrbModeR.RangedHelperStandStill:Value() then
+            OrbWalkSpot = TargetMouseSpot
+            Flipped = false
+        else
+            if Flipped == false then
+                SavedSpot = TargetMouseSpot
+            end
+            if GetDistance(SavedSpot) > 100 and GetDistance(TargetMouseSpot) > 60 then
+                Flipped = false
+            else
+                Flipped = true
+                MouseDirection = Vector((myHero.pos-mousePos):Normalized())
+                MouseDistance = GetDistance(mousePos, myHero.pos) * 0.2
+                MouseSpot = myHero.pos + MouseDirection * (MouseDistance + 100)
+
+                TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
+                RangeDifference = AARange - EAArange
+                if RangeDifference > 0 then
+                    RangeDifference = RangeDifference/2
+                else
+                    RangeDifference = RangeDifference
+                end
+                TargetDistance = EAArange + RangeDifference
+                TargetMouseSpot = target.pos - TargetMouseDirection * TargetDistance
+                OrbWalkSpot = TargetMouseSpot
+            end
+        end
+        MouseInWall = MapPosition:inWall(OrbWalkSpot)
+
+
+    end
+    if MouseInWall then
+        --PrintChat("Mouse in wall")
+    else
+        --PrintChat("Mouse n")
+    end
+    if OrbWalkSpot ~= nil and GetDistance(OrbWalkSpot) > 0 and not MouseInWall and not RangedSkillsOnly and 
+    not _G.SDK.Attack:IsActive() and self:CanClick() and self.Menu.RangedKey:Value() and self.Menu.OrbModeR.UseRangedHelper:Value() 
+    and target and ValidTarget(target) and ModeCheck and GetDistance(mousePos, target.pos) < RangedMenuMouseDistance 
+    and GetDistance(target.pos) <= AARange + self.Menu.OrbModeR.RangedHelperExtraDistance:Value() then
+        --PrintChat("Ranged Helper FOrce")
+        _G.SDK.Orbwalker.ForceMovement = OrbWalkSpot
+    elseif not _G.SDK.Attack:IsActive() then
+        _G.SDK.Orbwalker.ForceMovement = nil
+        RangedHelperActive = false
+    end
+    if OrbWalkSpot and GetDistance(OrbWalkSpot) < 60 and self.Menu.OrbModeR.RangedHelperStandStill:Value() and self:CanClick() then
+        _G.SDK.Orbwalker:SetMovement(false)
+        MovementSet = "False" 
+    else
+        _G.SDK.Orbwalker:SetMovement(true)
     end
 end
 
@@ -497,46 +703,13 @@ function Utility:MeleeHelper()
         _G.SDK.Orbwalker:SetMovement(false)
         MovementSet = "False"
         --PrintChat("False")
-    elseif MovementSet == "True" or not self.Menu.OrbMode.StopClick:Value() then
+    elseif MovementSet == "True" and self.Menu.OrbMode.UseMeleeHelper:Value() then
         _G.SDK.Orbwalker:SetMovement(true)
     end
 end
 
 
 
-function Utility:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        if myHero.charName == "Nasus" then
-            LastHitTarget = self:NasusHelper()
-            if LastHitTarget then
-                Draw.Circle(LastHitTarget.pos, 200, 1, Draw.Color(255, 0, 191, 255))
-            end
-        end
-        if self.Menu.Draw.DrawSummonerRange:Value() then
-            Draw.Circle(myHero.pos, Range, 1, Draw.Color(255, 0, 191, 255))
-        end
-        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperDistance:Value() then
-            Draw.Circle(target.pos, self.Menu.OrbMode.MeleeHelperMouseDistance:Value(), 1, Draw.Color(255, 0, 0, 0))
-        end
-        if self.Menu.OrbMode.UseMeleeHelper:Value() and target and self.Menu.Draw.MeleeHelperSpot:Value() then
-            local MeleeSpot = self:DrawMeleeHelper()
-            if MeleeSpot then
-                Draw.Circle(MeleeSpot, 25, 1, Draw.Color(255, 0, 100, 255))
-                Draw.Circle(MeleeSpot, 35, 1, Draw.Color(255, 0, 100, 255))
-                Draw.Circle(MeleeSpot, 45, 1, Draw.Color(255, 0, 100, 255))
-            end
-        end
-        if self.Menu.Draw.MeleeHelperText:Value() then
-            if self.Menu.MeleeKey:Value() and self.Menu.OrbMode.UseMeleeHelper:Value() then
-                Draw.Text("Melee Helper On", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-            else
-                Draw.Text("Melee Helper On", 10, myHero.pos:To2D().x, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-                --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-            end
-        end
-    end
-end
 
 function Utility:Exhaust()
     local TargetEnemy = nil
