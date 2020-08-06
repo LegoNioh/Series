@@ -13,7 +13,7 @@ local SavedSpot = myHero.pos
 -- [ AutoUpdate ] --
 do
     
-    local Version = 112.00
+    local Version = 113.00
     
     local Files = {
         Lua = {
@@ -303,7 +303,7 @@ function Utility:Menu()
     self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable Melee Movement Helper", value = true})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelperHarass", name = "Enable MeleeHelper In harass", value = false})
-    self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
+    self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 1500, min = 0, max = 1500, step = 50})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = 0, max = 1500, step = 10})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperSkillsOnly", name = "Enabled = Only Move to help for skills", value = false})
     self.Menu:MenuElement({id = "OrbModeR", name = "Orbwalker Ranged", type = MENU})
