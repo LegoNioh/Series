@@ -12,7 +12,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 110.00
+    local Version = 120.00
     
     local Files = {
         Lua = {
@@ -303,6 +303,8 @@ function Manager:__init()
         DelayAction(function() self:LoadAatrox() end, 1.05)
     elseif myHero.charName == "Lillia" then
         DelayAction(function() self:LoadLillia() end, 1.05)
+    elseif myHero.charName == "Yone" then
+        DelayAction(function() self:LoadYone() end, 1.05)
     elseif myHero.charName == "Rengar" then
         DelayAction(function() self:LoadRengar() end, 1.05)
     elseif myHero.charName == "Jax" then
@@ -370,6 +372,20 @@ function Manager:LoadLillia()
     end
 end
 
+function Manager:LoadYone()
+    Yone:Spells()
+    Yone:Menu()
+    --
+    --GetEnemyHeroes()
+    Callback.Add("Tick", function() Yone:Tick() end)
+    Callback.Add("Draw", function() Yone:Draw() end)
+    if _G.SDK then
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Yone:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Yone:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPostAttack(function(...) Yone:OnPostAttack(...) end)
+    end
+end
+
 function Manager:LoadRengar()
     Rengar:Spells()
     Rengar:Menu()
@@ -395,6 +411,482 @@ function Manager:LoadDarius()
         _G.SDK.Orbwalker:OnPreAttack(function(...) Darius:OnPreAttack(...) end)
         _G.SDK.Orbwalker:OnPostAttackTick(function(...) Darius:OnPostAttackTick(...) end)
         _G.SDK.Orbwalker:OnPostAttack(function(...) Darius:OnPostAttack(...) end)
+    end
+end
+
+
+class "Yone"
+
+local EnemyLoaded = false
+local TargetTime = 0
+
+local CastingQ = false
+local CastingW = false
+local CastingE = false
+local CastingR = false
+local Item_HK = {}
+
+local WasInRange = false
+
+local ForceTarget = nil
+
+local EBuff = false
+local Q2Buff = false
+
+local PostAttack = false
+local LastSpellName = ""
+
+local Etarget = nil
+local LastCastDamage = 0
+local EdmgRecv = 0
+local Edmg = 0
+local LastTargetHealth = 0
+local Added = false
+local EdmgFinal = 0
+
+
+local QRange = 950
+local Q2Range = 475
+local WRange = 600
+local RRange = 1000
+local AARange = 0
+
+
+
+local CastedW = false
+local TickW = false
+local CastedQ = false
+local TickQ = false
+local CastedR = false
+local TickR = false
+
+
+local RStackTime = Game.Timer()
+local LastRstacks = 0
+
+local ARStackTime = Game.Timer()
+local ALastRstacks = 0
+local ALastTickTarget = myHero
+
+function Yone:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Yone", name = "Yone"})
+    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseQ2HitChance", name = "(Q2) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled To Finish Kills", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEPercent", name = "(E) Percent of E Damage", value = 80, min = 1, max = 100, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 2, min = 1, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseRFinish", name = "(R) To Finish A Single Target", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRHitChance", name = "(R) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
+    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
+    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
+    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
+    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawW", name = "Draw W range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
+end
+
+function Yone:Spells()
+    --local Erange = self.Menu.ComboMode.UseEDistance:Value()
+    QSpellData = {speed = 1550, range = 475, delay = 0.4, angle = 50, radius = 80, collision = {""}, type = "linear"}
+    Q2SpellData = {speed = 1550, range = 950, delay = 0.4, angle = 50, radius = 120, collision = {""}, type = "linear"}
+    RSpellData = {speed = 1550, range = 1000, delay = 0.75, angle = 50, radius = 120, collision = {""}, type = "linear"}
+
+    WSpellData = {speed = math.huge, range = 600, delay = 0.5, angle = 80, radius = 0, collision = {}, type = "conic"}
+end
+
+
+function Yone:Draw()
+    if self.Menu.Draw.UseDraws:Value() then
+        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+        if self.Menu.Draw.DrawAA:Value() then
+            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
+        end
+        if self.Menu.Draw.DrawQ:Value() then
+            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+        if self.Menu.Draw.DrawW:Value() then
+            Draw.Circle(myHero.pos, WRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+        if self.Menu.Draw.DrawR:Value() then
+            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 0, 255))
+        end
+    end
+end
+
+function Yone:Tick()
+    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
+
+    target = GetTarget(2000)
+
+    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
+    CastingQ = myHero.activeSpell.name == "YoneQ" or myHero.activeSpell.name == "YoneQ3"
+    CastingW = myHero.activeSpell.name == "YoneW"
+    CastingE = myHero.activeSpell.name == "YoneE"
+    CastingR = myHero.activeSpell.name == "YoneR"
+
+    EBuff = myHero.mana > 1 and myHero.mana < 499
+
+    Q2Buff = GetBuffExpire(myHero, "yoneq3ready")
+    --PrintChat(myHero.activeSpell.name)
+    self:GetEDamage(target)
+    self:UpdateItems()
+    self:Logic()
+    self:Auto()
+    self:Items2()
+    self:ProcessSpells()
+    if EnemyLoaded == false then
+        local CountEnemy = 0
+        for i, enemy in pairs(EnemyHeroes) do
+            CountEnemy = CountEnemy + 1
+        end
+        if CountEnemy < 1 then
+            GetEnemyHeroes()
+        else
+            EnemyLoaded = true
+            PrintChat("Enemy Loaded")
+        end
+    end
+end
+
+
+function Yone:UpdateItems()
+    Item_HK[ITEM_1] = HK_ITEM_1
+    Item_HK[ITEM_2] = HK_ITEM_2
+    Item_HK[ITEM_3] = HK_ITEM_3
+    Item_HK[ITEM_4] = HK_ITEM_4
+    Item_HK[ITEM_5] = HK_ITEM_5
+    Item_HK[ITEM_6] = HK_ITEM_6
+    Item_HK[ITEM_7] = HK_ITEM_7
+end
+
+function Yone:Items1()
+    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
+        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
+        end
+    end
+    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
+        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
+        end
+    end
+    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
+        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
+        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
+        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
+        end
+    end
+    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
+        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
+            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
+        end
+    end
+end
+
+function Yone:Items2()
+    if GetItemSlot(myHero, 3139) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
+            end
+        end
+    end
+    if GetItemSlot(myHero, 3140) > 0 then
+        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
+            if IsImmobile(myHero) then
+                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
+            end
+        end
+    end
+end
+
+function Yone:GetSleepBuffs(unit, buffname)
+    for i = 0, unit.buffCount do
+        local buff = unit:GetBuff(i)
+        if buff.name == buffname and buff.count > 0 then 
+            return buff
+        end
+    end
+    return nil
+end
+
+function Yone:Auto()
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+        end
+    end
+end 
+
+
+function Yone:CanUse(spell, mode)
+    if mode == nil then
+        mode = Mode()
+    end
+    --PrintChat(Mode())
+    if spell == _Q then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+    elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
+    elseif spell == _E then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+    end
+    return false
+end
+
+
+function Yone:Logic()
+    if target == nil then 
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+        return 
+    end
+    if Mode() == "Combo" or Mode() == "Harass" and target and ValidTarget(target) then
+        --PrintChat("Logic")
+        TargetTime = Game.Timer()
+        self:Items1()
+
+        local QRangeExtra = 0
+        if IsFacing(target) then
+            QRangeExtra = myHero.ms * 0.2
+        end
+        if IsImmobile(target) then
+            QRangeExtra = myHero.ms * 0.5
+        end
+        
+        if GetDistance(target.pos) < AARange then
+            WasInRange = true
+        end
+
+        local TargetSleep = self:GetSleepBuffs(target, "YonePDoT")
+
+        if self:CanUse(_E, Mode()) and ValidTarget(target) and EBuff and target.health < EdmgFinal and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            Control.CastSpell(HK_E)
+        end
+        if self:CanUse(_Q, Mode()) and ValidTarget(target) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            if Q2Buff ~= nil then
+                if GetDistance(target.pos) < Q2Range + 200 then
+                    self:UseQ2(target)
+                end
+            else
+                if GetDistance(target.pos) < QRange + 200 then
+                    self:UseQ(target)
+                end               
+            end
+        end
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange+200) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            if GetDistance(target.pos) < WRange + 200 then
+                self:UseW(target)
+            end   
+        end
+        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange+200) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            self:UseR(target)
+        end
+
+
+
+        if Game.Timer() - TargetTime > 2 then
+            WasInRange = false
+        end
+    end     
+end
+
+function Yone:GetEDamage()
+    local unit = nil
+    if target then
+        unit = target
+    end
+    --PrintChat(TickQ)
+    if EBuff and unit ~= nil then
+        --PrintChat(myHero.activeSpell.name)
+        if Etarget == nil then
+            Etarget = unit
+            LastCastDamage = 0
+            EdmgRecv = 0
+            Edmg = 0
+            LastTargetHealth = 0
+            Added = false
+            EdmgFinal = 0
+        end
+        local Qdmg = getdmg("Q", unit, myHero)
+        local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
+        local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
+        local AAdmg = getdmg("AA", unit, myHero)
+        if Added == false then
+            if (myHero.activeSpell.name == "YoneBasicAttack" or myHero.activeSpell.name == "YoneBasicAttack2" or myHero.activeSpell.name == "YoneBasicAttack3" or myHero.activeSpell.name == "YoneBasicAttack4") then
+                Edmg = Edmg + AAdmg
+                LastCastDamage = AAdmg
+                LastSpellName = myHero.activeSpell.name
+                --PrintChat(LastCastDamage)
+                Added = true
+            elseif (myHero.activeSpell.name == "YoneCritAttack" or myHero.activeSpell.name == "YoneCritAttack2" or myHero.activeSpell.name == "YoneCritAttack3" or myHero.activeSpell.name == "YoneCritAttack4") then
+                Edmg = Edmg + AAdmg
+                LastCastDamage = AAdmg * 2
+                LastSpellName = myHero.activeSpell.name
+                --PrintChat(LastCastDamage)
+                Added = true   
+            end
+        elseif myHero.activeSpell.name ~= LastSpellName then
+            if myHero.activeSpell.name == "" then
+                LastSpellName = myHero.activeSpell.name
+            end
+            Added = false
+        end
+        if Added == false then
+            if TickQ and Qdmg then
+                Edmg = Edmg + Qdmg
+                LastSpellName = myHero.activeSpell.name
+                LastCastDamage = Qdmg
+                --PrintChat(LastCastDamage)
+                TickQ = false
+            elseif TickW and Wdmg then
+                Edmg = Edmg + Wdmg
+                LastSpellName = myHero.activeSpell.name
+                LastCastDamage = Wdmg
+                --PrintChat(LastCastDamage)
+                TickW = false
+            elseif TickR and Rdmg then
+                Edmg = Edmg + Rdmg
+                LastSpellName = myHero.activeSpell.name
+                LastCastDamage = Rdmg
+                --PrintChat(LastCastDamage)
+                TickR = false
+            end
+        end
+
+        if unit.health ~= LastTargetHealth then
+            if ((LastTargetHealth - unit.health) < LastCastDamage *1.5 and (LastTargetHealth - unit.health) > LastCastDamage * 0.5) then
+                --PrintChat(LastTargetHealth - unit.health)
+                EdmgRecv = EdmgRecv + LastTargetHealth - unit.health
+                LastCastDamage = 0
+            end
+        end
+        LastTargetHealth = unit.health
+        local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
+        EdmgFinal = (EdmgRecv * EPercent) * (self.Menu.ComboMode.UseEPercent:Value() / 100)
+        --PrintChat(EdmgFinal)
+    else
+        Etarget = nil
+        LastCastDamage = 0
+        EdmgRecv = 0
+        Edmg = 0
+        LastTargetHealth = 0
+        Added = false
+        EdmgFinal = 0
+    end
+end
+
+
+function Yone:ProcessSpells()
+    if myHero:GetSpellData(_Q).currentCd == 0 then
+        CastedQ = false
+    else
+        if CastedQ == false then
+            TickQ = true
+            --PrintChat(TickQ)
+        end
+        CastedQ = true
+    end
+    if myHero:GetSpellData(_W).currentCd == 0 then
+        CastedW = false
+    else
+        if CastedW == false then
+            TickW = true
+        end
+        CastedW = true
+    end
+    if myHero:GetSpellData(_R).currentCd == 0 then
+        CastedR = false
+    else
+        if CastedR == false then
+            TickR = true
+        end
+        CastedR = true
+    end
+end
+
+function Yone:CastingChecks()
+    if not CastingQ and not CastingE and not CastingR and not CastingW then
+        return true
+    else
+        return false
+    end
+end
+
+
+function Yone:OnPostAttack(args)
+    --PrintChat("Post")
+    PostAttack = true
+end
+
+function Yone:OnPostAttackTick(args)
+end
+
+function Yone:OnPreAttack(args)
+end
+
+function Yone:UseW(unit)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
+    if pred.CastPos and pred.HitChance > 0 then
+        Control.CastSpell(HK_W, pred.CastPos)
+    end
+end
+
+function Yone:UseR(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+    local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseRHitChance:Value() then
+        if pred.HitCount >= self.Menu.ComboMode.UseRNum:Value() then
+            Control.CastSpell(HK_R, pred.CastPos)
+        elseif self.Menu.ComboMode.UseRFinish:Value() and unit.health < Rdmg then
+            Control.CastSpell(HK_R, pred.CastPos)
+        end
+    end
+end
+
+function Yone:UseQ(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and pred.HitChance > 0 then
+        Control.CastSpell(HK_Q, pred.CastPos)
+    end
+end
+
+function Yone:UseQ2(unit)
+    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, Q2SpellData)
+    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQ2HitChance:Value() then
+        Control.CastSpell(HK_Q, pred.CastPos)
     end
 end
 
