@@ -12,7 +12,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 120.00
+    local Version = 125.00
     
     local Files = {
         Lua = {
@@ -768,19 +768,21 @@ function Yone:GetEDamage()
             if TickQ and Qdmg then
                 Edmg = Edmg + Qdmg
                 LastSpellName = myHero.activeSpell.name
-                LastCastDamage = Qdmg
+                LastCastDamage =  Qdmg
                 --PrintChat(LastCastDamage)
                 TickQ = false
-            elseif TickW and Wdmg then
+            end
+            if TickW and Wdmg then
                 Edmg = Edmg + Wdmg
                 LastSpellName = myHero.activeSpell.name
-                LastCastDamage = Wdmg
+                LastCastDamage =  Wdmg
                 --PrintChat(LastCastDamage)
                 TickW = false
-            elseif TickR and Rdmg then
+            end
+            if TickR and Rdmg then
                 Edmg = Edmg + Rdmg
                 LastSpellName = myHero.activeSpell.name
-                LastCastDamage = Rdmg
+                LastCastDamage =  Rdmg
                 --PrintChat(LastCastDamage)
                 TickR = false
             end
@@ -795,7 +797,7 @@ function Yone:GetEDamage()
         end
         LastTargetHealth = unit.health
         local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
-        EdmgFinal = (EdmgRecv * EPercent) * (self.Menu.ComboMode.UseEPercent:Value() / 100)
+        EdmgFinal = (Edmg * EPercent) * (self.Menu.ComboMode.UseEPercent:Value() / 100)
         --PrintChat(EdmgFinal)
     else
         Etarget = nil
@@ -805,6 +807,9 @@ function Yone:GetEDamage()
         LastTargetHealth = 0
         Added = false
         EdmgFinal = 0
+        TickQ = false
+        TickW = false
+        TickR = false
     end
 end
 
@@ -866,11 +871,28 @@ end
 
 function Yone:UseR(unit)
     local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+    local Qdmg = getdmg("Q", unit, myHero)
+    local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
     local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
+    local AAdmg = getdmg("AA", unit, myHero)
+    local RTotalDmg = 0
+    if EBuff then
+        local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
+        local RComboDmg = Rdmg
+        if self:CanUse(_Q, Mode()) then
+            RComboDmg = RComboDmg + Qdmg
+        end
+        if self:CanUse(_W, Mode()) then
+            RComboDmg = RComboDmg + Wdmg
+        end
+        RTotalDmg = Rdmg + (RComboDmg*EPercent)
+    else
+        RTotalDmg = Rdmg
+    end
     if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseRHitChance:Value() then
         if pred.HitCount >= self.Menu.ComboMode.UseRNum:Value() then
             Control.CastSpell(HK_R, pred.CastPos)
-        elseif self.Menu.ComboMode.UseRFinish:Value() and unit.health < Rdmg then
+        elseif self.Menu.ComboMode.UseRFinish:Value() and unit.health < RTotalDmg then
             Control.CastSpell(HK_R, pred.CastPos)
         end
     end
