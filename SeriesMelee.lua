@@ -12,7 +12,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 125.00
+    local Version = 130.00
     
     local Files = {
         Lua = {
@@ -494,8 +494,8 @@ end
 
 function Yone:Spells()
     --local Erange = self.Menu.ComboMode.UseEDistance:Value()
-    QSpellData = {speed = 1550, range = 475, delay = 0.4, angle = 50, radius = 80, collision = {""}, type = "linear"}
-    Q2SpellData = {speed = 1550, range = 950, delay = 0.4, angle = 50, radius = 120, collision = {""}, type = "linear"}
+    QSpellData = {speed = 1550, range = 475, delay = 0.4, radius = 80, collision = {""}, type = "linear"}
+    Q2SpellData = {speed = 1550, range = 950, delay = 0.4, radius = 120, collision = {""}, type = "linear"}
     RSpellData = {speed = 1550, range = 1000, delay = 0.75, angle = 50, radius = 120, collision = {""}, type = "linear"}
 
     WSpellData = {speed = math.huge, range = 600, delay = 0.5, angle = 80, radius = 0, collision = {}, type = "conic"}
@@ -746,13 +746,13 @@ function Yone:GetEDamage()
         local AAdmg = getdmg("AA", unit, myHero)
         if Added == false then
             if (myHero.activeSpell.name == "YoneBasicAttack" or myHero.activeSpell.name == "YoneBasicAttack2" or myHero.activeSpell.name == "YoneBasicAttack3" or myHero.activeSpell.name == "YoneBasicAttack4") then
-                Edmg = Edmg + AAdmg
+                --Edmg = Edmg + AAdmg
                 LastCastDamage = AAdmg
                 LastSpellName = myHero.activeSpell.name
                 --PrintChat(LastCastDamage)
                 Added = true
             elseif (myHero.activeSpell.name == "YoneCritAttack" or myHero.activeSpell.name == "YoneCritAttack2" or myHero.activeSpell.name == "YoneCritAttack3" or myHero.activeSpell.name == "YoneCritAttack4") then
-                Edmg = Edmg + AAdmg
+                --Edmg = Edmg + AAdmg
                 LastCastDamage = AAdmg * 2
                 LastSpellName = myHero.activeSpell.name
                 --PrintChat(LastCastDamage)
@@ -762,15 +762,14 @@ function Yone:GetEDamage()
             if myHero.activeSpell.name == "" then
                 LastSpellName = myHero.activeSpell.name
             end
-            Added = false
+            --Added = false
         end
         if Added == false then
             if TickQ and Qdmg then
-                Edmg = Edmg + Qdmg
+                --Edmg = Edmg + Qdmg
                 LastSpellName = myHero.activeSpell.name
                 LastCastDamage =  Qdmg
                 --PrintChat(LastCastDamage)
-                TickQ = false
             end
             if TickW and Wdmg then
                 Edmg = Edmg + Wdmg
@@ -789,16 +788,26 @@ function Yone:GetEDamage()
         end
 
         if unit.health ~= LastTargetHealth then
-            if ((LastTargetHealth - unit.health) < LastCastDamage *1.5 and (LastTargetHealth - unit.health) > LastCastDamage * 0.5) then
+            if Added == true then
                 --PrintChat(LastTargetHealth - unit.health)
-                EdmgRecv = EdmgRecv + LastTargetHealth - unit.health
-                LastCastDamage = 0
+                if (LastTargetHealth - unit.health) > 30 then
+                    Edmg = Edmg + (LastTargetHealth - unit.health)
+                    Added = false
+                end
+            end
+
+            if TickQ == true then
+                --PrintChat(LastTargetHealth - unit.health)
+                if (LastTargetHealth - unit.health) > 30 then
+                    Edmg = Edmg + (LastTargetHealth - unit.health)
+                    TickQ = false
+                end
             end
         end
         LastTargetHealth = unit.health
         local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
         EdmgFinal = (Edmg * EPercent) * (self.Menu.ComboMode.UseEPercent:Value() / 100)
-        --PrintChat(EdmgFinal)
+        PrintChat(EdmgFinal)
     else
         Etarget = nil
         LastCastDamage = 0
@@ -906,7 +915,7 @@ function Yone:UseQ(unit)
 end
 
 function Yone:UseQ2(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, Q2SpellData)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, Q2SpellData)
     if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQ2HitChance:Value() then
         Control.CastSpell(HK_Q, pred.CastPos)
     end
