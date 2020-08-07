@@ -12,7 +12,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 130.00
+    local Version = 150.00
     
     local Files = {
         Lua = {
@@ -496,7 +496,7 @@ function Yone:Spells()
     --local Erange = self.Menu.ComboMode.UseEDistance:Value()
     QSpellData = {speed = 1550, range = 475, delay = 0.4, radius = 80, collision = {""}, type = "linear"}
     Q2SpellData = {speed = 1550, range = 950, delay = 0.4, radius = 120, collision = {""}, type = "linear"}
-    RSpellData = {speed = 1550, range = 1000, delay = 0.75, angle = 50, radius = 120, collision = {""}, type = "linear"}
+    RSpellData = {speed = 1550, range = 1000, delay = 0.75, radius = 120, collision = {""}, type = "linear"}
 
     WSpellData = {speed = math.huge, range = 600, delay = 0.5, angle = 80, radius = 0, collision = {}, type = "conic"}
 end
@@ -879,7 +879,7 @@ function Yone:UseW(unit)
 end
 
 function Yone:UseR(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
     local Qdmg = getdmg("Q", unit, myHero)
     local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
     local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
