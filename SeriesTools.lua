@@ -13,7 +13,7 @@ local SavedSpot = myHero.pos
 -- [ AutoUpdate ] --
 do
     
-    local Version = 113.00
+    local Version = 120.00
     
     local Files = {
         Lua = {
@@ -303,14 +303,14 @@ function Utility:Menu()
     self.Menu:MenuElement({id = "OrbMode", name = "Orbwalker", type = MENU})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelper", name = "Enable Melee Movement Helper", value = true})
     self.Menu.OrbMode:MenuElement({id = "UseMeleeHelperHarass", name = "Enable MeleeHelper In harass", value = false})
-    self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 1500, min = 0, max = 1500, step = 50})
+    self.Menu.OrbMode:MenuElement({id = "MeleeHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = 0, max = 1500, step = 10})
     self.Menu.OrbMode:MenuElement({id = "MeleeHelperSkillsOnly", name = "Enabled = Only Move to help for skills", value = false})
     self.Menu:MenuElement({id = "OrbModeR", name = "Orbwalker Ranged", type = MENU})
     self.Menu.OrbModeR:MenuElement({id = "UseRangedHelper", name = "Enable Ranged Movement Helper", value = true})
     self.Menu.OrbModeR:MenuElement({id = "UseRangedHelperHarass", name = "Enable RangedHelper In harass", value = false})
     self.Menu.OrbModeR:MenuElement({id = "RangedHelperStandStill", name = "Stand Still When In Perfect Spot", value = false})
-    self.Menu.OrbModeR:MenuElement({id = "RangedHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 550, min = 0, max = 1500, step = 50})
+    self.Menu.OrbModeR:MenuElement({id = "RangedHelperMouseDistance", name = "Mouse Distance From Target To Enable", value = 1500, min = 0, max = 1500, step = 50})
     self.Menu.OrbModeR:MenuElement({id = "RangedHelperExtraDistance", name = "Extra Distance To Stick To target", value = 0, min = -500, max = 1500, step = 10})
     self.Menu.OrbModeR:MenuElement({id = "RangedHelperSkillsOnly", name = "Enabled = Only Move to help for skills", value = false})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
@@ -368,9 +368,14 @@ function Utility:Tick()
     end
     if Game.IsChatOpen() or myHero.dead then return end
     --PrintChat(myHero.attackData.state)
+    --PrintChat(myHero.activeSpell.name)
     target = GetTarget(1400)
-    self:MeleeHelper()
-    self:RangedHelper()
+    if self.Menu.OrbMode.UseMeleeHelper:Value() then
+        self:MeleeHelper()
+    end
+    if self.Menu.OrbModeR.UseRangedHelper:Value() then
+        self:RangedHelper()
+    end
     if self.Menu.ExKey:Value() then
     	self:Exhaust()
     end
@@ -612,7 +617,9 @@ function Utility:RangedHelper()
                 OrbWalkSpot = TargetMouseSpot
             end
         end
-        MouseInWall = MapPosition:inWall(OrbWalkSpot)
+        if OrbWalkSpot  then
+            MouseInWall = MapPosition:inWall(OrbWalkSpot)
+        end
 
 
     end
@@ -662,7 +669,9 @@ function Utility:MeleeHelper()
         local MouseSpotDistance = AARange - (target.boundingRadius+30)
         local MouseSpot = target.pos - MouseDirection * (MouseSpotDistance)
         OrbWalkSpot  = MouseSpot
-        MouseInWall = MapPosition:inWall(OrbWalkSpot)
+        if OrbWalkSpot  then
+            MouseInWall = MapPosition:inWall(OrbWalkSpot)
+        end
     end
     if MouseInWall then
         --PrintChat("Mouse in wall")
@@ -703,7 +712,7 @@ function Utility:MeleeHelper()
         _G.SDK.Orbwalker:SetMovement(false)
         MovementSet = "False"
         --PrintChat("False")
-    elseif MovementSet == "True" and self.Menu.OrbMode.UseMeleeHelper:Value() then
+    elseif self.Menu.OrbMode.UseMeleeHelper:Value() then
         _G.SDK.Orbwalker:SetMovement(true)
     end
 end
