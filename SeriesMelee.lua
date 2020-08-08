@@ -12,7 +12,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 150.00
+    local Version = 160.00
     
     local Files = {
         Lua = {
@@ -460,6 +460,8 @@ local TickQ = false
 local CastedR = false
 local TickR = false
 
+local ENeeded = false
+
 
 local RStackTime = Game.Timer()
 local LastRstacks = 0
@@ -474,7 +476,8 @@ function Yone:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQ2HitChance", name = "(Q2) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled To Finish Kills", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE1", name = "(E1) Enabled To Combo Kill", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E2) Enabled To Finish Kills", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseEPercent", name = "(E) Percent of E Damage", value = 80, min = 1, max = 100, step = 1})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 2, min = 1, max = 5, step = 1})
@@ -489,7 +492,9 @@ function Yone:Menu()
     self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
     self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
     self.Menu.Draw:MenuElement({id = "DrawW", name = "Draw W range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawBurstDamage", name = "Burst Damage", value = false})
+    self.Menu.Draw:MenuElement({id = "DrawEDamage", name = "Draw E damage", value = false})
 end
 
 function Yone:Spells()
@@ -517,7 +522,60 @@ function Yone:Draw()
         if self.Menu.Draw.DrawR:Value() then
             Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 0, 255))
         end
+        if self.Menu.Draw.DrawBurstDamage:Value() then
+            for i, enemy in pairs(EnemyHeroes) do
+                if enemy and not enemy.dead and ValidTarget(enemy, 2000) then
+                    local BurstDamage = math.floor(self:GetAllDamage(enemy))
+                    local EnemyHealth = math.floor(enemy.health)
+                    if BurstDamage > EnemyHealth then
+                        Draw.Text("Total Dmg:" .. BurstDamage .. "/" .. EnemyHealth, 15, enemy.pos:To2D().x-15, enemy.pos:To2D().y-125, Draw.Color(255, 0, 255, 0))
+                    elseif BurstDamage*1.3 > EnemyHealth then
+                        Draw.Text("Total Dmg:" .. BurstDamage .. "/" .. EnemyHealth, 15, enemy.pos:To2D().x-15, enemy.pos:To2D().y-125, Draw.Color(255, 255, 150, 150))
+                    else
+                        Draw.Text("Total Dmg:" .. BurstDamage .. "/" .. EnemyHealth, 15, enemy.pos:To2D().x-15, enemy.pos:To2D().y-125, Draw.Color(255, 255, 0, 0))
+                    end
+                end
+            end
+        end
+        if self.Menu.Draw.DrawEDamage:Value() and target and not target.dead and ValidTarget(target, 2000) and EBuff then
+            local EDamage = math.floor(EdmgFinal)
+            local EnemyHealth = math.floor(target.health)
+            if EDamage then
+                if EDamage > EnemyHealth then
+                    Draw.Text("E Dmg:" .. EDamage .. "/" .. EnemyHealth, 15, target.pos:To2D().x-15, target.pos:To2D().y-110, Draw.Color(255, 255, 255, 255))
+                elseif EDamage*1.3 > EnemyHealth then
+                    Draw.Text("E Dmg:" .. EDamage .. "/" .. EnemyHealth, 15, target.pos:To2D().x-15, target.pos:To2D().y-110, Draw.Color(255, 150, 70, 70))
+                else
+                    Draw.Text("E Dmg:" .. EDamage .. "/" .. EnemyHealth, 15, target.pos:To2D().x-15, target.pos:To2D().y-110, Draw.Color(255, 170, 0, 0))
+                end
+            end
+        end
     end
+end
+
+function Yone:GetAllDamage(unit)
+    local Qdmg = getdmg("Q", unit, myHero)
+    local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
+    local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
+    local AAdmg = getdmg("AA", unit, myHero)
+    local TotalDmg = 0
+    if self:CanUse(_Q, "Force") then
+        TotalDmg = TotalDmg + Qdmg + AAdmg
+    end
+    if self:CanUse(_W, "Force") then
+        TotalDmg = TotalDmg + Wdmg + AAdmg
+    end
+    if self:CanUse(_R, "Force") then
+        TotalDmg = TotalDmg + Rdmg + AAdmg
+    end
+    if self:CanUse(_E, "Force") or EBuff then
+        local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
+        TotalDmg = TotalDmg + (TotalDmg*EPercent)
+        ENeeded = true
+    else
+        ENeeded = false
+    end
+    return TotalDmg
 end
 
 function Yone:Tick()
@@ -646,8 +704,16 @@ function Yone:CanUse(spell, mode)
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
             return true
         end
+
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
     elseif spell == _R then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
+            return true
+        end
+
+        if mode == "Force" and IsReady(spell) then
             return true
         end
     elseif spell == _W then
@@ -657,8 +723,16 @@ function Yone:CanUse(spell, mode)
         if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
             return true
         end
+
+        if mode == "Force" and IsReady(spell) then
+            return true
+        end
     elseif spell == _E then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+
+        if mode == "Force" and IsReady(spell) then
             return true
         end
     end
@@ -692,7 +766,7 @@ function Yone:Logic()
 
         local TargetSleep = self:GetSleepBuffs(target, "YonePDoT")
 
-        if self:CanUse(_E, Mode()) and ValidTarget(target) and EBuff and target.health < EdmgFinal and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+        if self:CanUse(_E, Mode()) and ValidTarget(target) and EBuff and target.health < EdmgFinal and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) then
             Control.CastSpell(HK_E)
         end
         if self:CanUse(_Q, Mode()) and ValidTarget(target) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
@@ -712,6 +786,19 @@ function Yone:Logic()
             end   
         end
         if self:CanUse(_R, Mode()) and ValidTarget(target, RRange+200) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
+            local BurstDamage = self:GetAllDamage(target)
+            local EnemyHealth = target.health
+            if self.Menu.ComboMode.UseRFinish:Value() and BurstDamage > EnemyHealth then
+                if ENeeded == false then
+                    self:UseR(target, "combokill")
+                else
+                    if EBuff then
+                        self:UseR(target, "combokill")
+                    elseif self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") then
+                        self:UseR(target, "combokill")
+                    end
+                end
+            end
             self:UseR(target)
         end
 
@@ -807,7 +894,7 @@ function Yone:GetEDamage()
         LastTargetHealth = unit.health
         local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
         EdmgFinal = (Edmg * EPercent) * (self.Menu.ComboMode.UseEPercent:Value() / 100)
-        PrintChat(EdmgFinal)
+        --PrintChat(EdmgFinal)
     else
         Etarget = nil
         LastCastDamage = 0
@@ -878,7 +965,7 @@ function Yone:UseW(unit)
     end
 end
 
-function Yone:UseR(unit)
+function Yone:UseR(unit, rtype)
     local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
     local Qdmg = getdmg("Q", unit, myHero)
     local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
@@ -902,6 +989,8 @@ function Yone:UseR(unit)
         if pred.HitCount >= self.Menu.ComboMode.UseRNum:Value() then
             Control.CastSpell(HK_R, pred.CastPos)
         elseif self.Menu.ComboMode.UseRFinish:Value() and unit.health < RTotalDmg then
+            Control.CastSpell(HK_R, pred.CastPos)
+        elseif rtype and rtype == "combokill" then
             Control.CastSpell(HK_R, pred.CastPos)
         end
     end
