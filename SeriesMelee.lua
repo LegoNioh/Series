@@ -12,7 +12,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 170.00
+    local Version = 180.00
     
     local Files = {
         Lua = {
@@ -790,12 +790,16 @@ function Yone:Logic()
             local EnemyHealth = target.health
             if self.Menu.ComboMode.UseRFinish:Value() and BurstDamage > EnemyHealth then
                 if ENeeded == false then
-                    self:UseR(target, "combokill")
+                    if not EBuff and self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") then
+                        Control.CastSpell(HK_E, target)
+                    else
+                        self:UseR(target, "combokill")
+                    end
                 else
                     if EBuff then
                         self:UseR(target, "combokill")
                     elseif self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") then
-                        self:UseR(target, "combokill")
+                        Control.CastSpell(HK_E, target)
                     end
                 end
             end
@@ -987,7 +991,11 @@ function Yone:UseR(unit, rtype)
     end
     if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseRHitChance:Value() then
         if pred.HitCount >= self.Menu.ComboMode.UseRNum:Value() then
-            Control.CastSpell(HK_R, pred.CastPos)
+            if not EBuff and self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") then
+                Control.CastSpell(HK_E, unit)
+            else
+                Control.CastSpell(HK_R, pred.CastPos)
+            end
         elseif self.Menu.ComboMode.UseRFinish:Value() and unit.health < RTotalDmg then
             Control.CastSpell(HK_R, pred.CastPos)
         elseif rtype and rtype == "combokill" then
