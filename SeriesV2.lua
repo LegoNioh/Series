@@ -9,7 +9,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 560.00
+    local Version = 600.00
     
     local Files = {
         Lua = {
@@ -302,8 +302,8 @@ function Manager:__init()
         DelayAction(function() self:LoadVayne() end, 1.05)
     elseif myHero.charName == "Rumble" then
         DelayAction(function() self:LoadRumble() end, 1.05)
-    elseif myHero.charName == "Taric" then
-        DelayAction(function() self:LoadTaric() end, 1.05)
+    elseif myHero.charName == "Cassiopeia" then
+        DelayAction(function() self:LoadCassiopeia() end, 1.05)
     elseif myHero.charName == "Ezreal" then
         DelayAction(function() self:LoadEzreal() end, 1.05)
     elseif myHero.charName == "Corki" then
@@ -434,16 +434,16 @@ function Manager:LoadRumble()
     end
 end
 
-function Manager:LoadTaric()
-    Taric:Spells()
-    Taric:Menu()
+function Manager:LoadCassiopeia()
+    Cassiopeia:Spells()
+    Cassiopeia:Menu()
     --
     --GetEnemyHeroes()
-    Callback.Add("Tick", function() Taric:Tick() end)
-    Callback.Add("Draw", function() Taric:Draw() end)
+    Callback.Add("Tick", function() Cassiopeia:Tick() end)
+    Callback.Add("Draw", function() Cassiopeia:Draw() end)
     if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Taric:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Taric:OnPostAttackTick(...) end)
+        _G.SDK.Orbwalker:OnPreAttack(function(...) Cassiopeia:OnPreAttack(...) end)
+        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Cassiopeia:OnPostAttackTick(...) end)
     end
 end
 
@@ -460,7 +460,7 @@ function Manager:LoadEzreal()
     end
 end
 
-class "Taric"
+class "Cassiopeia"
 
 local EnemyLoaded = false
 local casted = 0
@@ -475,55 +475,55 @@ local CastingW = false
 local CastingE = false
 local Direction = nil
 local CastingR = false
-local ERange = 575
+local QRange = 850
+local WRange = 700
+local ERange = 700
+local RRange = 825
 local WasInRange = false
 local attacked = 0
 
-function Taric:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Taric", name = "Taric"})
+function Cassiopeia:Menu()
+    self.Menu = MenuElement({type = MENU, id = "Cassiopeia", name = "Cassiopeia"})
     self.Menu:MenuElement({id = "UltKey", name = "Manual R Key", key = string.byte("T"), value = false})
     self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "R Hit Chance (0.15)", value = 0.15, min = 0, max = 1.0, step = 0.05})
+    self.Menu.ComboMode:MenuElement({id = "UseEDisableAA", name = "Disable AA's For E", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseR", name = "Use R in Combo", value = true})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
+    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "Use Q in Harass", value = true})
+    self.Menu.HarassMode:MenuElement({id = "UseW", name = "Use W in Harass", value = false})
+    self.Menu.HarassMode:MenuElement({id = "UseE", name = "Use E in Harass", value = true})
     self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
     self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
+    self.Menu.KSMode:MenuElement({id = "UseQ", name = "Use W in Combo", value = true})
+    self.Menu.KSMode:MenuElement({id = "UseE", name = "Use E in Combo", value = true})
     self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
     self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
 end
 
-function Taric:Spells()
-    ESpellData = {speed = 2000, range = 575, delay = 0.10, radius = 70, collision = {}, type = "linear"}
-    E2SpellData = {speed = 2000, range = 575, delay = 1.00, radius = 70, collision = {}, type = "linear"}
+function Cassiopeia:Spells()
+    QSpellData = {speed = math.huge, range = 850, delay = 0.65, radius = 50, collision = {}, type = "circular"}
+    WSpellData = {speed = 1600, range = 700, delay = 0.25, angle = 80, radius = 0, collision = {}, type = "conic"}
+    RSpellData = {speed = math.huge, range = 825, delay = 0.5, angle = 80, radius = 0, collision = {}, type = "conic"}
 end
 
-function Taric:Tick()
+function Cassiopeia:Tick()
     if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
     target = GetTarget(2000)
-    CastingQ = myHero.activeSpell.name == "TaricQ"
-    CastingW = myHero.activeSpell.name == "TaricW"
-    CastingE = myHero.activeSpell.name == "TaricE"
-    CastingR = myHero.activeSpell.name == "TaricR" 
+    CastingQ = myHero.activeSpell.name == "CassiopeiaQ"
+    CastingW = myHero.activeSpell.name == "CassiopeiaW"
+    CastingE = myHero.activeSpell.name == "CassiopeiaE"
+    CastingR = myHero.activeSpell.name == "CassiopeiaR" 
     --PrintChat(myHero.activeSpell.name)
     self:ProcessSpells()
     self:Logic()
-    if TickE then
-        --PrintChat("Casted E")
-        EActive = true
-        TickE = false
-        TimeE = Game.Timer() + 1
-    end
-    if EActive and target and Mode() == "Combo" then
-        if TimeE - Game.Timer() > 0 then
-            self:Lock()
-        else
-            EActive = false
-        end
-    elseif target then
-        _G.SDK.Orbwalker:SetMovement(true)
-        Direction = Vector((target.pos-myHero.pos):Normalized())
+    self:Auto()
+    if Mode() == "Combo" and myHero.mana > 50 and myHero:GetSpellData(_E).level > 0 and self.Menu.ComboMode.UseEDisableAA:Value() then
+        _G.SDK.Orbwalker:SetAttack(false)
     else
-        _G.SDK.Orbwalker:SetMovement(true)
+        _G.SDK.Orbwalker:SetAttack(true)
     end
     if EnemyLoaded == false then
         local CountEnemy = 0
@@ -539,13 +539,12 @@ function Taric:Tick()
     end
 end
 
-function Taric:Draw()
+function Cassiopeia:Draw()
     if self.Menu.Draw.UseDraws:Value() then
-        Draw.Circle(myHero.pos, 575, 1, Draw.Color(255, 0, 191, 255))
     end
 end
 
-function Taric:ProcessSpells()
+function Cassiopeia:ProcessSpells()
     if myHero:GetSpellData(_E).currentCd == 0 then
         CastedE = false
     else
@@ -557,51 +556,90 @@ function Taric:ProcessSpells()
     end
 end
 
-function Taric:Lock()
-    --PrintChat("Locking")
-    _G.SDK.Orbwalker:SetMovement(false)
-    local lhs = Vector(mousePos-myHero.pos)
-    local dotp = lhs:DotProduct(Direction)
-    local clicker = -GetDistance(target.pos)+100
-    if dotp < 0 then
-        clicker = -GetDistance(target.pos)-100
-    end
-    local Location = target.pos + Direction * clicker
-    if GetDistance(myHero.pos, Location) < 575 and GetDistance(mousePos, myHero.pos) < 1000 and GetDistance(target.pos, myHero.pos) < 675 then
-        Control.Move(Location)
-    else
-        _G.SDK.Orbwalker:SetMovement(true)
-    end
-end
-
-function Taric:CanUse(spell, mode)
+function Cassiopeia:CanUse(spell, mode)
     if mode == nil then
         mode = Mode()
     end
     --PrintChat(Mode())
     if spell == _Q then
-    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseQ:Value() then
+            return true
+        end
     elseif spell == _W then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
+            return true
+        end
     elseif spell == _E then
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
+            return true
+        end
+        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
+            return true
+        end
+        if mode == "KS" and IsReady(spell) and self.Menu.KSMode.UseE:Value() then
+            return true
+        end
+    elseif spell == _R then
+        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
             return true
         end
     end
     return false
 end
 
+function Cassiopeia:Auto()
+    for i, enemy in pairs(EnemyHeroes) do
+        if enemy and not enemy.dead and ValidTarget(enemy) then
+            if self:CanUse(_Q, "KS") and ValidTarget(enemy, QRange) then
+                local Qdmg = getdmg("Q", enemy, myHero)
+                local Edmg = getdmg("E", enemy, myHero)
+                if enemy.health < Qdmg + Edmg then
+                    self:UseQ(enemy)
+                end
+            end
+            if self:CanUse(_E, "KS") and ValidTarget(enemy, ERange) then
+                local Edmg = getdmg("E", enemy, myHero)
+                if enemy.health < Edmg then
+                    Control.CastSpell(HK_E, enemy)
+                end
+            end
+        end
+    end
+end
 
 
-function Taric:Logic()
+function Cassiopeia:Logic()
     if target == nil then return end
-    if Mode() == "Combo" or Mode() == "Harass" and target then
+    if Mode() == "Combo" or Mode() == "Harass" and target and ValidTarget(target) then
+        local Poisoned = self:GetBuffPosion(target)
         local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
         if GetDistance(target.pos) < AARange then
             WasInRange = true
         end
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and not CastingQ and not CastingW and not CastingE and not CastingR and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            --self:UseE(target)
-            Control.CastSpell(HK_E, target.pos)
+        local NotCastingSpell = not CastingQ and not CastingW and not CastingE and not CastingR
+        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and NotCastingSpell and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and not Poisoned then
+            self:UseQ(target)
+        end
+        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and NotCastingSpell and not (myHero.pathing and myHero.pathing.isDashing) then
+            Control.CastSpell(HK_E, target)
+        end
+        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and NotCastingSpell and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and not Poisoned then
+            if not self:CanUse(_Q, Mode()) then
+                self:UseW(target)
+            end
+        end
+        local targetHealthPercent = target.health / target.maxHealth
+        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange) and NotCastingSpell and not (myHero.pathing and myHero.pathing.isDashing) and IsFacing(target) and (targetHealthPercent < 0.7 or GetDistance(target.pos) < 650) then
+            self:UseR(target)
         end
     else
         WasInRange = false
@@ -610,20 +648,43 @@ end
 
 
 
-function Taric:OnPostAttack(args)
+function Cassiopeia:OnPostAttack(args)
 end
 
-function Taric:OnPostAttackTick(args)
+function Cassiopeia:OnPostAttackTick(args)
 end
 
-function Taric:OnPreAttack(args)
+function Cassiopeia:OnPreAttack(args)
 end
 
+function Cassiopeia:GetBuffPosion(unit)
+    for i = 0, unit.buffCount do
+        local buff = unit:GetBuff(i)
+        if buff.type == 23 and Game.Timer() < buff.expireTime - 0.1 then 
+            return true
+        end
+    end
+    return false
+end
 
-function Taric:UseE(unit, hits)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value()and myHero.pos:DistanceTo(pred.CastPos) < 575 then
-        Control.CastSpell(HK_E, pred.CastPos)
+function Cassiopeia:UseQ(unit)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, QSpellData)
+    if pred.CastPos and pred.HitChance > 0 then
+        Control.CastSpell(HK_Q, pred.CastPos)
+    end
+end
+
+function Cassiopeia:UseW(unit)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
+    if pred.CastPos and pred.HitChance > 0 then
+        Control.CastSpell(HK_W, pred.CastPos)
+    end
+end
+
+function Cassiopeia:UseR(unit)
+    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
+    if pred.CastPos and pred.HitChance > 0 then
+        Control.CastSpell(HK_R, pred.CastPos)
     end
 end
 
