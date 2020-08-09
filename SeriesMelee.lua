@@ -12,7 +12,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 180.00
+    local Version = 200.00
     
     local Files = {
         Lua = {
@@ -445,8 +445,8 @@ local Added = false
 local EdmgFinal = 0
 
 
-local QRange = 950
-local Q2Range = 475
+local QRange = 475
+local Q2Range = 950
 local WRange = 600
 local RRange = 1000
 local AARange = 0
@@ -476,11 +476,15 @@ function Yone:Menu()
     self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseQ2HitChance", name = "(Q2) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
     self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE1", name = "(E1) Enabled To Combo Kill", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E2) Enabled To Finish Kills", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEPercent", name = "(E) Percent of E Damage", value = 80, min = 1, max = 100, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseE1", name = "(E1) Use E-R When Killable", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseESmallCombo", name = "(E1) Use E When Killable", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseESmallPercent", name = "(E1) % of Combo Damage To Use (E1)", value = 60, min = 1, max = 100, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E2) Recall E To Finish Kills", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseEPercent", name = "(E2) % of Combo Damage To Use (E2)", value = 70, min = 1, max = 100, step = 1})
     self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 2, min = 1, max = 5, step = 1})
+    self.Menu.ComboMode:MenuElement({id = "UseRComboFinish", name = "(R) In Combo When Killable", value = true})
+    self.Menu.ComboMode:MenuElement({id = "UseRComboFinishDamage", name = "(R) % of Combo Damage To Use (R)", value = 70, min = 1, max = 100, step = 1})
     self.Menu.ComboMode:MenuElement({id = "UseRFinish", name = "(R) To Finish A Single Target", value = true})
     self.Menu.ComboMode:MenuElement({id = "UseRHitChance", name = "(R) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
     self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
@@ -526,6 +530,10 @@ function Yone:Draw()
             for i, enemy in pairs(EnemyHeroes) do
                 if enemy and not enemy.dead and ValidTarget(enemy, 2000) then
                     local BurstDamage = math.floor(self:GetAllDamage(enemy))
+                    if not self:CanUse(_R, "Force") then 
+                        BurstDamage = math.floor(self:GetAllDamage(enemy, "E"))
+                    end
+
                     local EnemyHealth = math.floor(enemy.health)
                     if BurstDamage > EnemyHealth then
                         Draw.Text("Total Dmg:" .. BurstDamage .. "/" .. EnemyHealth, 15, enemy.pos:To2D().x-15, enemy.pos:To2D().y-125, Draw.Color(255, 0, 255, 0))
@@ -553,11 +561,12 @@ function Yone:Draw()
     end
 end
 
-function Yone:GetAllDamage(unit)
+function Yone:GetAllDamage(unit, extra)
     local Qdmg = getdmg("Q", unit, myHero)
     local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
     local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
-    local AAdmg = getdmg("AA", unit, myHero)
+    local CritChance = myHero.critChance
+    local AAdmg = getdmg("AA", unit, myHero) + (getdmg("AA", unit, myHero) * CritChance)
     local TotalDmg = 0
     if self:CanUse(_Q, "Force") then
         TotalDmg = TotalDmg + Qdmg + AAdmg
@@ -574,6 +583,9 @@ function Yone:GetAllDamage(unit)
         ENeeded = true
     else
         ENeeded = false
+    end
+    if extra and extra == "E" then
+        TotalDmg = TotalDmg + AAdmg
     end
     return TotalDmg
 end
@@ -731,7 +743,12 @@ function Yone:CanUse(spell, mode)
         if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
             return true
         end
-
+        if mode == "ERCombo" and IsReady(spell) and self.Menu.ComboMode.UseE1:Value() then
+            return true
+        end
+        if mode == "ESmallCombo" and IsReady(spell) and self.Menu.ComboMode.UseESmallCombo:Value() then
+            return true
+        end
         if mode == "Force" and IsReady(spell) then
             return true
         end
@@ -769,6 +786,30 @@ function Yone:Logic()
         if self:CanUse(_E, Mode()) and ValidTarget(target) and EBuff and target.health < EdmgFinal and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) then
             Control.CastSpell(HK_E)
         end
+        if not EBuff and self:CanUse(_E, "ESmallCombo") and ValidTarget(target) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) then
+            local BurstDamage = self:GetAllDamage(target, "E") * (self.Menu.ComboMode.UseESmallPercent:Value() / 100)
+            local EnemyHealth = target.health
+            if ENeeded then
+                local EngageRange = 0
+                if self:CanUse(_Q, Mode()) then
+                    if Q2Buff ~= nil then 
+                        EngageRange =  Q2Range
+                    else
+                        EngageRange = QRange
+                    end
+                elseif self:CanUse(_W, Mode()) then
+                    EngageRange =  WRange
+                else
+                    EngageRange = AARange
+                end
+                EngageRange = EngageRange + 300
+                if GetDistance(target.pos) < EngageRange and BurstDamage > EnemyHealth then
+                    Control.CastSpell(HK_E, target)
+                    --PrintChat(BurstDamage)
+                end
+            end
+
+        end
         if self:CanUse(_Q, Mode()) and ValidTarget(target) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
             if Q2Buff ~= nil then
                 if GetDistance(target.pos) < Q2Range + 200 then
@@ -786,11 +827,11 @@ function Yone:Logic()
             end   
         end
         if self:CanUse(_R, Mode()) and ValidTarget(target, RRange+200) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            local BurstDamage = self:GetAllDamage(target)
+            local BurstDamage = self:GetAllDamage(target) * (self.Menu.ComboMode.UseRComboFinishDamage:Value() / 100)
             local EnemyHealth = target.health
-            if self.Menu.ComboMode.UseRFinish:Value() and BurstDamage > EnemyHealth then
+            if self.Menu.ComboMode.UseRComboFinish:Value() and BurstDamage > EnemyHealth then
                 if ENeeded == false then
-                    if not EBuff and self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") then
+                    if not EBuff and self:CanUse(_E, "ERCombo") then
                         Control.CastSpell(HK_E, target)
                     else
                         self:UseR(target, "combokill")
@@ -798,7 +839,7 @@ function Yone:Logic()
                 else
                     if EBuff then
                         self:UseR(target, "combokill")
-                    elseif self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") then
+                    elseif self:CanUse(_E, "ERCombo") then
                         Control.CastSpell(HK_E, target)
                     end
                 end
@@ -997,7 +1038,19 @@ function Yone:UseR(unit, rtype)
                 Control.CastSpell(HK_R, pred.CastPos)
             end
         elseif self.Menu.ComboMode.UseRFinish:Value() and unit.health < RTotalDmg then
-            Control.CastSpell(HK_R, pred.CastPos)
+            EnemiesAroundUnit = 0
+            for i, enemy in pairs(EnemyHeroes) do
+                if enemy and not enemy.dead and ValidTarget(enemy, 2000) then
+                    if GetDistance(enemy.pos, unit.pos) < 600 then
+                        EnemiesAroundUnit = EnemiesAroundUnit + 1
+                    end
+                end
+            end
+            if not EBuff and self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") and EnemiesAroundUnit > 2 then
+                Control.CastSpell(HK_E, unit)
+            else
+                Control.CastSpell(HK_R, pred.CastPos)
+            end
         elseif rtype and rtype == "combokill" then
             Control.CastSpell(HK_R, pred.CastPos)
         end
