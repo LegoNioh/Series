@@ -12,18 +12,18 @@ local AllySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 10101.00
+    local Version = 1.0
     
     local Files = {
         Lua = {
             Path = SCRIPT_PATH,
             Name = "SeriesMelee.lua",
-            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesMelee.lua"
+            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesOP.lua"
         },
         Version = {
             Path = SCRIPT_PATH,
             Name = "SeriesMelee.version",
-            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesMelee.version"    -- check if Raw Adress correct pls.. after you have create the version file on Github
+            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesOP.version"    -- check if Raw Adress correct pls.. after you have create the version file on Github
         }
     }
     
