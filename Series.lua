@@ -8,7 +8,7 @@ local AllyHeroes = {}
 -- [ AutoUpdate ] --
 do
     
-    local Version = 111.00
+    local Version = 1111.00
     
     local Files = {
         Lua = {
@@ -1102,7 +1102,7 @@ end
 
 function TwistedFate:UseQ(unit)
         local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 700 then
+        if pred.CastPos and _G.PremiumPrediction.HitChance.Low(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1450 then
                 Control.CastSpell(HK_Q, pred.CastPos)
         end 
 end
@@ -2439,6 +2439,7 @@ function Draven:Menu()
 	self.Menu = MenuElement({type = MENU, id = "Draven", name = "Draven"})
 	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
 	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
+	self.Menu.ComboMode:MenuElement({id = "CatchAxes", name = "Catch Axes", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseW", name = "Use W in Combo", value = true})
 	self.Menu.ComboMode:MenuElement({id = "UseE", name = "Use smart E in Combo", value = true})
@@ -2653,7 +2654,7 @@ function Draven:AxeOrb()
 		local Time = TargetAxe.endTime - Game.Timer()
 		local MaxDistance = myHero.ms * Time
 		local ActualDistance = GetDistance(TargetAxe.pos, myHero.pos)
-		if ActualDistance < MaxDistance then
+		if ActualDistance < MaxDistance and self.Menu.ComboMode.CatchAxes:Value() then
 			--PrintChat(ActualDistance)
 			--PrintChat("Orb orb axe")
 			if ActualDistance > SmallRange then
@@ -2956,10 +2957,11 @@ local LastESpot = myHero.pos
 local LastE2Spot = myHero.pos
 local attackedfirst = 0
 local WasInRange = false
+local RRange = 400
 
 function Teemo:Menu()
 	self.Menu = MenuElement({type = MENU, id = "Teemo", name = "Teemo"})
-	self.Menu:MenuElement({id = "FarmKey", name = "Farm Key", key = string.byte("Z"), value = false})
+	self.Menu:MenuElement({id = "UltKey", name = "Ult Key", key = string.byte("T"), value = false})
 	self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
 	self.Menu.ComboMode:MenuElement({id = "UseQ", name = "Use Q in Combo", value = true})
 	self.Menu:MenuElement({id = "KSMode", name = "KS", type = MENU})
@@ -2971,7 +2973,7 @@ function Teemo:Menu()
 end
 
 function Teemo:Spells()
-	RSpellData = {speed = 1300, range = 1300, delay = 0.25, radius = 70, collision = {}, type = "linear"}
+	RSpellData = {speed = 900, range = 400, delay = 0.25, radius = 450, collision = {}, type = "linear"}
 	ESpellData = {speed = 1300, range = 700, delay = 0.25, radius = 20, collision = {}, type = "linear"}
 	E2SpellData = {speed = 3000, range = 470, delay = 0.45, radius = 200, collision = {}, type = "circular"}
 end
@@ -2982,9 +2984,23 @@ function Teemo:Tick()
 	--PrintChat(myHero:GetSpellData(_R).toggleState)
 	--PrintChat(myHero.activeSpell.name)
 	ActiveSpell = myHero.activeSpell.name
+	local Rlevel = myHero:GetSpellData(_R).level
+	if Rlevel == 2 then
+		RRange = 650
+
+	elseif Rlevel == 3 then
+		RRange = 900
+	end
+	if RSpellData.range ~= RRange then
+		RSpellData = {speed = 900, range = RRange, delay = 0.25, radius = 450, collision = {}, type = "linear"}
+	end
+	--PrintChat(Rlevel)
 	target = GetTarget(1400)
 	self:KS()
 	self:Logic()
+	if self.Menu.UltKey:Value() then
+		self:CastShroom()
+	end
 	if EnemyLoaded == false then
 		local CountEnemy = 0
 		for i, enemy in pairs(EnemyHeroes) do
@@ -3001,7 +3017,7 @@ end
 
 function Teemo:Draw()
 	if self.Menu.Draw.UseDraws:Value() then
-		local AARange = 590
+		local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
 		Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 255))
 		Draw.Circle(myHero.pos, 680, 1, Draw.Color(255, 0, 191, 255))
 		--Draw.Circle(LastESpot, 85, 1, Draw.Color(255, 0, 0, 255))
@@ -3057,7 +3073,7 @@ function Teemo:CanUse(spell, mode)
 		if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
 			return true
 		end
-		if mode == "Manual" and IsReady(spell) and self.Menu.ComboMode.UseRMan:Value() and self.Menu.ComboMode.UseRManKey:Value() then
+		if mode == "Manual" and IsReady(spell) then
 			return true
 		end
 	end
@@ -3068,12 +3084,12 @@ function Teemo:Logic()
 	--PrintChat(ActiveSpell)
 	if target == nil then return end
 	if Mode() == "Combo" or Mode() == "Harass" and target then
-		local AARange = 590
+		local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
 		if GetDistance(target.pos) < AARange then
 			WasInRange = true
 		end
 		local Qrange = 680 
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and GetDistance(target.pos, myHero.pos) > AARange and ActiveSpell ~= "BlindingDart" then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and GetDistance(target.pos, myHero.pos) > AARange and ActiveSpell ~= "BlindingDart" and ActiveSpell ~= "TeemoRCast" then
 			Control.CastSpell(HK_Q, target)
 		end
 	else
@@ -3081,11 +3097,21 @@ function Teemo:Logic()
     end		
 end
 
+function Teemo:CastShroom()
+	--PrintChat(ActiveSpell)
+	if target == nil then return end
+	if target then
+		if self:CanUse(_R, "Manual") and ValidTarget(target, RRange) and ActiveSpell ~= "BlindingDart" and ActiveSpell ~= "TeemoRCast" then
+			self:UseR(target)
+		end
+    end		
+end
+
 function Teemo:OnPostAttackTick(args)
 	attackedfirst = 1
 	if target then
 		local Qrange = 680 + target.boundingRadius + myHero.boundingRadius
-		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and ActiveSpell ~= "BlindingDart" then
+		if self:CanUse(_Q, Mode()) and ValidTarget(target, Qrange) and ActiveSpell ~= "BlindingDart" and ActiveSpell ~= "TeemoRCast" then
 			Control.CastSpell(HK_Q, target)
 		end
 	end
@@ -3111,8 +3137,8 @@ end
 
 function Teemo:UseR(unit)
 		local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, RSpellData)
-		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < 1300  then
-		    	Control.CastSpell(HK_R, pred.CastPos)
+		if pred.CastPos and _G.PremiumPrediction.HitChance.Medium(pred.HitChance) and myHero.pos:DistanceTo(pred.CastPos) < RRange then
+		    Control.CastSpell(HK_R, pred.CastPos)
 		end 
 end
 
