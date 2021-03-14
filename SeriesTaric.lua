@@ -12,7 +12,7 @@ local AllySpawnPos = nil
 -- [ AutoUpdate ] --
 do
     
-    local Version = 1000.0
+    local Version = 1001.0
     
     local Files = {
         Lua = {
@@ -592,7 +592,7 @@ function Taric:Draw()
         if self.Menu.Draw.DrawCustom:Value() then
             Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
         end
-        if BindedAlly ~= nil then
+        if (BindedAlly ~= nil and not BindedAlly.dead) then
             Draw.Text(BindedAlly.charName, 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
         end
         --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
@@ -835,7 +835,7 @@ function Taric:Auto()
     for i, enemy in pairs(EnemyHeroes) do
         if enemy and not enemy.dead and ValidTarget(enemy) then
 
-            if BindedAlly ~= nil then
+            if (BindedAlly ~= nil and not BindedAlly.dead) then
                 if GetDistance(enemy.pos, BindedAlly.pos) < 700 then
                     DangerBindedW = true
                     DangerBinded = true
@@ -861,11 +861,11 @@ function Taric:Auto()
                     if self.Menu.ComboMode.ComboModeE.UseEStun:Value() and ValidTarget(enemy, ERange) then
                         self:UseE(enemy)
                         --PrintChat("Stunning")
-                    elseif self.Menu.ComboMode.ComboModeE.UseEStunAlly:Value() and BindedAlly ~= nil and  ValidTarget(enemy, 2000) and GetDistance(enemy.pos, BindedAlly.pos) < ERange and Game.Timer() - BindedTime > 0.10 then
+                    elseif self.Menu.ComboMode.ComboModeE.UseEStunAlly:Value() and (BindedAlly ~= nil and not BindedAlly.dead) and  ValidTarget(enemy, 2000) and GetDistance(enemy.pos, BindedAlly.pos) < ERange and Game.Timer() - BindedTime > 0.10 then
                         self:UseE(enemy)
                     elseif self.Menu.ComboMode.ComboModeE.UseEPush:Value() and  ValidTarget(enemy, ERange)  and GetDistance(enemy.pos, myHero.pos) <= EPushRange then
                         self:UseE(enemy)
-                    elseif self.Menu.ComboMode.ComboModeE.UseEPush:Value() and BindedAlly ~= nil and ValidTarget(enemy, 2000)  and GetDistance(enemy.pos, BindedAlly.pos) <= EPushRange and Game.Timer() - BindedTime > 0.10 then
+                    elseif self.Menu.ComboMode.ComboModeE.UseEPush:Value() and (BindedAlly ~= nil and not BindedAlly.dead) and ValidTarget(enemy, 2000)  and GetDistance(enemy.pos, BindedAlly.pos) <= EPushRange and Game.Timer() - BindedTime > 0.10 then
                         self:UseE(enemy)
                     end
                 end
@@ -873,7 +873,7 @@ function Taric:Auto()
                 if self:CanUse(_E, "Force") and self.Menu.ComboMode.ComboModeE.UseEPushAuto:Value() and self:CastingChecksE() and not (myHero.pathing and myHero.pathing.isDashing) then
                     if ValidTarget(enemy, ERange) and GetDistance(enemy.pos, myHero.pos) <= EPushRange then
                         self:UseE(enemy)
-                    elseif BindedAlly ~= nil and ValidTarget(enemy, 2000) and GetDistance(enemy.pos, BindedAlly.pos) <= EPushRange then
+                    elseif (BindedAlly ~= nil and not BindedAlly.dead) and ValidTarget(enemy, 2000) and GetDistance(enemy.pos, BindedAlly.pos) <= EPushRange then
                         self:UseE(enemy)
                     end
                 end
@@ -887,7 +887,7 @@ function Taric:Auto()
                 self:UseQ()
             end
         end
-        if BindedAlly ~= nil and self.Menu.AutoMode.AutoModeQ.UseQHealAlly:Value() then
+        if (BindedAlly ~= nil and not BindedAlly.dead) and self.Menu.AutoMode.AutoModeQ.UseQHealAlly:Value() then
             local HealthPercent2 = (BindedAlly.health / BindedAlly.maxHealth) * 100
             if HealthPercent2 < self.Menu.AutoMode.AutoModeQ.UseQHealAllyHP:Value() and (self.Menu.AutoMode.AutoModeQ.UseQHealAllyStacks:Value() <= Qstacks or HealthPercent2 < self.Menu.AutoMode.AutoModeQ.UseQHealAllyHPLow:Value()) then
                 if HealthPercent2 < self.Menu.AutoMode.AutoModeQ.UseQHealAllyHPLow:Value() or (not PassiveActiveChecks or not self.Menu.AutoMode.AutoModeQ.UseQPassive:Value()) then
@@ -903,7 +903,7 @@ function Taric:Auto()
                 self:UseW(myHero)
             end
         end
-        if BindedAlly ~= nil and GetDistance(BindedAlly.pos, myHero.pos) < WRange then
+        if (BindedAlly ~= nil and not BindedAlly.dead) and GetDistance(BindedAlly.pos, myHero.pos) < WRange then
             local HealthPercent = (BindedAlly.health / BindedAlly.maxHealth) * 100
             if HealthPercent < self.Menu.AutoMode.AutoModeW.UseWShieldAllyHP:Value() then
                 if HealthPercent < 10 or (not PassiveActiveChecks or not self.Menu.AutoMode.AutoModeW.UseWPassive:Value()) then
@@ -1024,7 +1024,7 @@ function Taric:Logic()
                     self:UseQ()
                 end
             end
-            if BindedAlly ~= nil and self.Menu.ComboMode.ComboModeQ.UseQHealAlly:Value() then
+            if (BindedAlly ~= nil and not BindedAlly.dead) and self.Menu.ComboMode.ComboModeQ.UseQHealAlly:Value() then
                 local HealthPercent2 = (BindedAlly.health / BindedAlly.maxHealth) * 100
                 if HealthPercent2 < self.Menu.ComboMode.ComboModeQ.UseQHealAllyHP:Value() and (self.Menu.ComboMode.ComboModeQ.UseQHealAllyStacks:Value() <= Qstacks or HealthPercent2 < self.Menu.ComboMode.ComboModeQ.UseQHealAllyHPLow:Value()) then
                     if HealthPercent2 < self.Menu.ComboMode.ComboModeQ.UseQHealAllyHPLow:Value() or (not PassiveActiveChecks or not self.Menu.ComboMode.ComboModeQ.UseQPassive:Value()) then
@@ -1043,7 +1043,7 @@ function Taric:Logic()
                     self:UseW(myHero)
                 end
             end
-            if BindedAlly ~= nil and GetDistance(BindedAlly.pos, myHero.pos) < WRange then
+            if (BindedAlly ~= nil and not BindedAlly.dead) and GetDistance(BindedAlly.pos, myHero.pos) < WRange then
                 local HealthPercent = (BindedAlly.health / BindedAlly.maxHealth) * 100
                 if HealthPercent < self.Menu.ComboMode.ComboModeW.UseWShieldAllyHP:Value() then
                     if HealthPercent < 10 or (not PassiveActiveChecks or not self.Menu.ComboMode.ComboModeW.UseWPassive:Value()) then
