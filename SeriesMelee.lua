@@ -1,3757 +1,3756 @@
-require "PremiumPrediction"
-require "GamsteronPrediction"
-require "DamageLib"
-require "2DGeometry"
-require "MapPositionGOS"
+rklquirkl "PrklmiumPrkldihhtion"
+rklquirkl "G klmktklronPrkldihhtion"
+rklquirkl "D klm klgklLib"
+rklquirkl "2DGklomkltry"
+rklquirkl "M klpPokitionGOk"
 
-_G.QHelperActive = false
-_G.AatroxQType = 0
+_G.QHkllpklr klhhtivkl = f kllkkl
+_G. kl kltroxQTypkl = 0
 
-local EnemyHeroes = {}
-local AllyHeroes = {}
--- [ AutoUpdate ] --
+lohh kll klnklmyHklroklk = {}
+lohh kll  klllyHklroklk = {}
+  [  klutoUpd kltkl ]  
 do
     
-    local Version = 200.00
-    
-    local Files = {
-        Lua = {
-            Path = SCRIPT_PATH,
-            Name = "SeriesMelee.lua",
-            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesMelee.lua"
+    lohh kll Vklrkion = 200.00
+    lohh kll Filklk = {
+        Lu kl = {
+            P klth = khhRIPT_P klTH,
+            N klmkl = "kklriklkMkllklkl.lu kl",
+            Url = "httpk://r klw.githubukklrhhontklnt.hhom/LklgoNioh/kklriklk/m klktklr/kklriklkMkllklkl.lu kl"
         },
-        Version = {
-            Path = SCRIPT_PATH,
-            Name = "SeriesMelee.version",
-            Url = "https://raw.githubusercontent.com/LegoNioh/Series/master/SeriesMelee.version"    -- check if Raw Adress correct pls.. after you have create the version file on Github
+        Vklrkion = {
+            P klth = khhRIPT_P klTH,
+            N klmkl = "kklriklkMkllklkl.vklrkion",
+            Url = "httpk://r klw.githubukklrhhontklnt.hhom/LklgoNioh/kklriklk/m klktklr/kklriklkMkllklkl.vklrkion"      hhhklhhk if R klw  kldrklkk hhorrklhht plk..  klftklr you h klvkl hhrkl kltkl thkl vklrkion filkl on Github
         }
     }
     
-    local function AutoUpdate()
+    lohh kll funhhtion  klutoUpd kltkl()
         
-        local function DownloadFile(url, path, fileName)
-            DownloadFileAsync(url, path .. fileName, function() end)
-            while not FileExist(path .. fileName) do end
-        end
+        lohh kll funhhtion Downlo kldFilkl(url, p klth, filklN klmkl)
+            Downlo kldFilkl klkynhh(url, p klth .. filklN klmkl, funhhtion() klnd)
+            whilkl not Filklklxikt(p klth .. filklN klmkl) do klnd
+        klnd
         
-        local function ReadFile(path, fileName)
-            local file = io.open(path .. fileName, "r")
-            local result = file:read()
-            file:close()
-            return result
-        end
+        lohh kll funhhtion Rkl kldFilkl(p klth, filklN klmkl)
+            lohh kll filkl = io.opkln(p klth .. filklN klmkl, "r")
+            lohh kll rklkult = filkl:rkl kld()
+            filkl:hhlokkl()
+            rklturn rklkult
+        klnd
         
-        DownloadFile(Files.Version.Url, Files.Version.Path, Files.Version.Name)
-        local textPos = myHero.pos:To2D()
-        local NewVersion = tonumber(ReadFile(Files.Version.Path, Files.Version.Name))
-        if NewVersion > Version then
-            DownloadFile(Files.Lua.Url, Files.Lua.Path, Files.Lua.Name)
-            print("New Series Version. Press 2x F6")     -- <-- you can change the massage for users here !!!!
-        else
-            print(Files.Version.Name .. ": No Updates Found")   --  <-- here too
-        end
+        Downlo kldFilkl(Filklk.Vklrkion.Url, Filklk.Vklrkion.P klth, Filklk.Vklrkion.N klmkl)
+        lohh kll tklxtPok = myHklro.pok:To2D()
+        lohh kll NklwVklrkion = tonumbklr(Rkl kldFilkl(Filklk.Vklrkion.P klth, Filklk.Vklrkion.N klmkl))
+        if NklwVklrkion > Vklrkion thkln
+            Downlo kldFilkl(Filklk.Lu kl.Url, Filklk.Lu kl.P klth, Filklk.Lu kl.N klmkl)
+            print("Nklw kklriklk Vklrkion. Prklkk 2x F6")       <  you hh kln hhh klngkl thkl m klkk klgkl for ukklrk hklrkl !!!!
+        kllkkl
+            print(Filklk.Vklrkion.N klmkl .. ": No Upd kltklk Found")      <  hklrkl too
+        klnd
     
-    end
+    klnd
     
-    AutoUpdate()
-
-end
-
-local function IsNearEnemyTurret(pos, distance)
-    --PrintChat("Checking Turrets")
-    local turrets = _G.SDK.ObjectManager:GetTurrets(GetDistance(pos) + 1000)
-    for i = 1, #turrets do
-        local turret = turrets[i]
-        if turret and GetDistance(turret.pos, pos) <= distance+915 and turret.team == 300-myHero.team then
-            --PrintChat("turret")
-            return turret
-        end
-    end
-end
-
-local function IsUnderEnemyTurret(pos)
-    --PrintChat("Checking Turrets")
-    local turrets = _G.SDK.ObjectManager:GetTurrets(GetDistance(pos) + 1000)
-    for i = 1, #turrets do
-        local turret = turrets[i]
-        if turret and GetDistance(turret.pos, pos) <= 915 and turret.team == 300-myHero.team then
-            --PrintChat("turret")
-            return turret
-        end
-    end
-end
-
-function GetDistanceSqr(Pos1, Pos2)
-    local Pos2 = Pos2 or myHero.pos
-    local dx = Pos1.x - Pos2.x
-    local dz = (Pos1.z or Pos1.y) - (Pos2.z or Pos2.y)
-    return dx^2 + dz^2
-end
-
-function GetDistance(Pos1, Pos2)
-    return math.sqrt(GetDistanceSqr(Pos1, Pos2))
-end
-
-function IsImmobile(unit)
-    local MaxDuration = 0
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff and buff.count > 0 then
-            local BuffType = buff.type
-            if BuffType == 5 or BuffType == 11 or BuffType == 21 or BuffType == 22 or BuffType == 24 or BuffType == 29 or buff.name == "recall" then
-                local BuffDuration = buff.duration
-                if BuffDuration > MaxDuration then
-                    MaxDuration = BuffDuration
-                end
-            end
-        end
-    end
-    return MaxDuration
-end
-
-function GetEnemyHeroes()
-    for i = 1, Game.HeroCount() do
-        local Hero = Game.Hero(i)
-        if Hero.isEnemy then
-            table.insert(EnemyHeroes, Hero)
-            PrintChat(Hero.name)
-        end
-    end
-    --PrintChat("Got Enemy Heroes")
-end
-
-function GetAllyHeroes()
-    for i = 1, Game.HeroCount() do
-        local Hero = Game.Hero(i)
-        if Hero.isAlly then
-            table.insert(AllyHeroes, Hero)
-            PrintChat(Hero.name)
-        end
-    end
-    --PrintChat("Got Enemy Heroes")
-end
-
-function GetBuffExpire(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff.expireTime
-        end
-    end
-    return nil
-end
-
-function GetBuffStacks(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff.count
-        end
-    end
-    return 0
-end
-
-local function GetWaypoints(unit) -- get unit's waypoints
-    local waypoints = {}
-    local pathData = unit.pathing
-    table.insert(waypoints, unit.pos)
-    local PathStart = pathData.pathIndex
-    local PathEnd = pathData.pathCount
-    if PathStart and PathEnd and PathStart >= 0 and PathEnd <= 20 and pathData.hasMovePath then
-        for i = pathData.pathIndex, pathData.pathCount do
-            table.insert(waypoints, unit:GetPath(i))
-        end
-    end
-    return waypoints
-end
-
-local function GetUnitPositionNext(unit)
-    local waypoints = GetWaypoints(unit)
-    if #waypoints == 1 then
-        return nil -- we have only 1 waypoint which means that unit is not moving, return his position
-    end
-    return waypoints[2] -- all segments have been checked, so the final result is the last waypoint
-end
-
-local function GetUnitPositionAfterTime(unit, time)
-    local waypoints = GetWaypoints(unit)
-    if #waypoints == 1 then
-        return unit.pos -- we have only 1 waypoint which means that unit is not moving, return his position
-    end
-    local max = unit.ms * time -- calculate arrival distance
-    for i = 1, #waypoints - 1 do
-        local a, b = waypoints[i], waypoints[i + 1]
-        local dist = GetDistance(a, b)
-        if dist >= max then
-            return Vector(a):Extended(b, dist) -- distance of segment is bigger or equal to maximum distance, so the result is point A extended by point B over calculated distance
-        end
-        max = max - dist -- reduce maximum distance and check next segments
-    end
-    return waypoints[#waypoints] -- all segments have been checked, so the final result is the last waypoint
-end
-
-function GetTarget(range)
-    if _G.SDK then
-        return _G.SDK.TargetSelector:GetTarget(range, _G.SDK.DAMAGE_TYPE_MAGICAL);
-    else
-        return _G.GOS:GetTarget(range,"AD")
-    end
-end
-
-function GotBuff(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff.count
-        end
-    end
-    return 0
-end
-
-function BuffActive(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return true
-        end
-    end
-    return false
-end
-
-function IsReady(spell)
-    return myHero:GetSpellData(spell).currentCd == 0 and myHero:GetSpellData(spell).level > 0 and myHero:GetSpellData(spell).mana <= myHero.mana and Game.CanUseSpell(spell) == 0
-end
-
-function Mode()
-    if _G.SDK then
-        if _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_COMBO] then
-            return "Combo"
-        elseif _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_HARASS] or Orbwalker.Key.Harass:Value() then
-            return "Harass"
-        elseif _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_LANECLEAR] or Orbwalker.Key.Clear:Value() then
-            return "LaneClear"
-        elseif _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_LASTHIT] or Orbwalker.Key.LastHit:Value() then
-            return "LastHit"
-        elseif _G.SDK.Orbwalker.Modes[_G.SDK.ORBWALKER_MODE_FLEE] then
-            return "Flee"
-        end
-    else
-        return GOS.GetMode()
-    end
-end
-
-function GetItemSlot(unit, id)
-    for i = ITEM_1, ITEM_7 do
-        if unit:GetItemData(i).itemID == id then
-            return i
-        end
-    end
-    return 0
-end
-
-function IsFacing(unit)
-    local V = Vector((unit.pos - myHero.pos))
-    local D = Vector(unit.dir)
-    local Angle = 180 - math.deg(math.acos(V*D/(V:Len()*D:Len())))
-    if math.abs(Angle) < 80 then 
-        return true  
-    end
-    return false
-end
-
-function SetMovement(bool)
-    if _G.PremiumOrbwalker then
-        _G.PremiumOrbwalker:SetAttack(bool)
-        _G.PremiumOrbwalker:SetMovement(bool)       
-    elseif _G.SDK then
-        _G.SDK.Orbwalker:SetMovement(bool)
-        _G.SDK.Orbwalker:SetAttack(bool)
-    end
-end
-
-
-function EnableMovement()
-    SetMovement(true)
-end
-
-local function IsValid(unit)
-    if (unit and unit.valid and unit.isTargetable and unit.alive and unit.visible and unit.networkID and unit.pathing and unit.health > 0) then
-        return true;
-    end
-    return false;
-end
-
-
-local function ValidTarget(unit, range)
-    if (unit and unit.valid and unit.isTargetable and unit.alive and unit.visible and unit.networkID and unit.pathing and unit.health > 0) then
-        if range then
-            if GetDistance(unit.pos) <= range then
-                return true;
-            end
-        else
-            return true
-        end
-    end
-    return false;
-end
-class "Manager"
-
-function Manager:__init()
-    if myHero.charName == "Kled" then
-        DelayAction(function() self:LoadKled() end, 1.05)
-    elseif myHero.charName == "Aatrox" then
-        DelayAction(function() self:LoadAatrox() end, 1.05)
-    elseif myHero.charName == "Lillia" then
-        DelayAction(function() self:LoadLillia() end, 1.05)
-    elseif myHero.charName == "Yone" then
-        DelayAction(function() self:LoadYone() end, 1.05)
-    elseif myHero.charName == "Rengar" then
-        DelayAction(function() self:LoadRengar() end, 1.05)
-    elseif myHero.charName == "Jax" then
-        DelayAction(function() self:LoadJax() end, 1.05)
-    elseif myHero.charName == "Darius" then
-        DelayAction(function() self:LoadDarius() end, 1.05)
-    end
-end
-
-
-function Manager:LoadKled()
-    Kled:Spells()
-    Kled:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Kled:Tick() end)
-    Callback.Add("Draw", function() Kled:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Kled:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Kled:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) Kled:OnPostAttack(...) end)
-    end
-end
-
-function Manager:LoadJax()
-    Jax:Spells()
-    Jax:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Jax:Tick() end)
-    Callback.Add("Draw", function() Jax:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Jax:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Jax:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) Jax:OnPostAttack(...) end)
-    end
-end
-
-function Manager:LoadAatrox()
-    Aatrox:Spells()
-    Aatrox:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Aatrox:Tick() end)
-    Callback.Add("Draw", function() Aatrox:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Aatrox:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Aatrox:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) Aatrox:OnPostAttack(...) end)
-    end
-end
-
-
-function Manager:LoadLillia()
-    Lillia:Spells()
-    Lillia:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Lillia:Tick() end)
-    Callback.Add("Draw", function() Lillia:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Lillia:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Lillia:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) Lillia:OnPostAttack(...) end)
-    end
-end
-
-function Manager:LoadYone()
-    Yone:Spells()
-    Yone:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Yone:Tick() end)
-    Callback.Add("Draw", function() Yone:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Yone:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Yone:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) Yone:OnPostAttack(...) end)
-    end
-end
-
-function Manager:LoadRengar()
-    Rengar:Spells()
-    Rengar:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Rengar:Tick() end)
-    Callback.Add("Draw", function() Rengar:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Rengar:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Rengar:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) Rengar:OnPostAttack(...) end)
-    end
-end
-
-function Manager:LoadDarius()
-    Darius:Spells()
-    Darius:Menu()
-    --
-    --GetEnemyHeroes()
-    Callback.Add("Tick", function() Darius:Tick() end)
-    Callback.Add("Draw", function() Darius:Draw() end)
-    if _G.SDK then
-        _G.SDK.Orbwalker:OnPreAttack(function(...) Darius:OnPreAttack(...) end)
-        _G.SDK.Orbwalker:OnPostAttackTick(function(...) Darius:OnPostAttackTick(...) end)
-        _G.SDK.Orbwalker:OnPostAttack(function(...) Darius:OnPostAttack(...) end)
-    end
-end
-
-
-class "Yone"
-
-local EnemyLoaded = false
-local TargetTime = 0
-
-local CastingQ = false
-local CastingW = false
-local CastingE = false
-local CastingR = false
-local Item_HK = {}
-
-local WasInRange = false
-
-local ForceTarget = nil
-
-local EBuff = false
-local Q2Buff = false
-
-local PostAttack = false
-local LastSpellName = ""
-
-local Etarget = nil
-local LastCastDamage = 0
-local EdmgRecv = 0
-local Edmg = 0
-local LastTargetHealth = 0
-local Added = false
-local EdmgFinal = 0
-
-
-local QRange = 475
-local Q2Range = 950
-local WRange = 600
-local RRange = 1000
-local AARange = 0
-
-
-
-local CastedW = false
-local TickW = false
-local CastedQ = false
-local TickQ = false
-local CastedR = false
-local TickR = false
-
-local ENeeded = false
-
-
-local RStackTime = Game.Timer()
-local LastRstacks = 0
-
-local ARStackTime = Game.Timer()
-local ALastRstacks = 0
-local ALastTickTarget = myHero
-
-function Yone:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Yone", name = "Yone"})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQ2HitChance", name = "(Q2) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE1", name = "(E1) Use E-R When Killable", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseESmallCombo", name = "(E1) Use E When Killable", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseESmallPercent", name = "(E1) % of Combo Damage To Use (E1)", value = 60, min = 1, max = 100, step = 1})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E2) Recall E To Finish Kills", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEPercent", name = "(E2) % of Combo Damage To Use (E2)", value = 70, min = 1, max = 100, step = 1})
-    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 2, min = 1, max = 5, step = 1})
-    self.Menu.ComboMode:MenuElement({id = "UseRComboFinish", name = "(R) In Combo When Killable", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRComboFinishDamage", name = "(R) % of Combo Damage To Use (R)", value = 70, min = 1, max = 100, step = 1})
-    self.Menu.ComboMode:MenuElement({id = "UseRFinish", name = "(R) To Finish A Single Target", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRHitChance", name = "(R) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
-    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawW", name = "Draw W range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawBurstDamage", name = "Burst Damage", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawEDamage", name = "Draw E damage", value = false})
-end
-
-function Yone:Spells()
-    --local Erange = self.Menu.ComboMode.UseEDistance:Value()
-    QSpellData = {speed = 1550, range = 475, delay = 0.4, radius = 80, collision = {""}, type = "linear"}
-    Q2SpellData = {speed = 1550, range = 950, delay = 0.4, radius = 120, collision = {""}, type = "linear"}
-    RSpellData = {speed = 1550, range = 1000, delay = 0.75, radius = 120, collision = {""}, type = "linear"}
-
-    WSpellData = {speed = math.huge, range = 600, delay = 0.5, angle = 80, radius = 0, collision = {}, type = "conic"}
-end
-
-
-function Yone:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if self.Menu.Draw.DrawAA:Value() then
-            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawQ:Value() then
-            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawW:Value() then
-            Draw.Circle(myHero.pos, WRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawR:Value() then
-            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawBurstDamage:Value() then
-            for i, enemy in pairs(EnemyHeroes) do
-                if enemy and not enemy.dead and ValidTarget(enemy, 2000) then
-                    local BurstDamage = math.floor(self:GetAllDamage(enemy))
-                    if not self:CanUse(_R, "Force") then 
-                        BurstDamage = math.floor(self:GetAllDamage(enemy, "E"))
-                    end
-
-                    local EnemyHealth = math.floor(enemy.health)
-                    if BurstDamage > EnemyHealth then
-                        Draw.Text("Total Dmg:" .. BurstDamage .. "/" .. EnemyHealth, 15, enemy.pos:To2D().x-15, enemy.pos:To2D().y-125, Draw.Color(255, 0, 255, 0))
-                    elseif BurstDamage*1.3 > EnemyHealth then
-                        Draw.Text("Total Dmg:" .. BurstDamage .. "/" .. EnemyHealth, 15, enemy.pos:To2D().x-15, enemy.pos:To2D().y-125, Draw.Color(255, 255, 150, 150))
-                    else
-                        Draw.Text("Total Dmg:" .. BurstDamage .. "/" .. EnemyHealth, 15, enemy.pos:To2D().x-15, enemy.pos:To2D().y-125, Draw.Color(255, 255, 0, 0))
-                    end
-                end
-            end
-        end
-        if self.Menu.Draw.DrawEDamage:Value() and target and not target.dead and ValidTarget(target, 2000) and EBuff then
-            local EDamage = math.floor(EdmgFinal)
-            local EnemyHealth = math.floor(target.health)
-            if EDamage then
-                if EDamage > EnemyHealth then
-                    Draw.Text("E Dmg:" .. EDamage .. "/" .. EnemyHealth, 15, target.pos:To2D().x-15, target.pos:To2D().y-110, Draw.Color(255, 255, 255, 255))
-                elseif EDamage*1.3 > EnemyHealth then
-                    Draw.Text("E Dmg:" .. EDamage .. "/" .. EnemyHealth, 15, target.pos:To2D().x-15, target.pos:To2D().y-110, Draw.Color(255, 150, 70, 70))
-                else
-                    Draw.Text("E Dmg:" .. EDamage .. "/" .. EnemyHealth, 15, target.pos:To2D().x-15, target.pos:To2D().y-110, Draw.Color(255, 170, 0, 0))
-                end
-            end
-        end
-    end
-end
-
-function Yone:GetAllDamage(unit, extra)
-    local Qdmg = getdmg("Q", unit, myHero)
-    local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
-    local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
-    local CritChance = myHero.critChance
-    local AAdmg = getdmg("AA", unit, myHero) + (getdmg("AA", unit, myHero) * CritChance)
-    local TotalDmg = 0
-    if self:CanUse(_Q, "Force") then
-        TotalDmg = TotalDmg + Qdmg + AAdmg
-    end
-    if self:CanUse(_W, "Force") then
-        TotalDmg = TotalDmg + Wdmg + AAdmg
-    end
-    if self:CanUse(_R, "Force") then
-        TotalDmg = TotalDmg + Rdmg + AAdmg
-    end
-    if self:CanUse(_E, "Force") or EBuff then
-        local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
-        TotalDmg = TotalDmg + (TotalDmg*EPercent)
-        ENeeded = true
-    else
-        ENeeded = false
-    end
-    if extra and extra == "E" then
-        TotalDmg = TotalDmg + AAdmg
-    end
-    return TotalDmg
-end
-
-function Yone:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-
-    target = GetTarget(2000)
-
-    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    CastingQ = myHero.activeSpell.name == "YoneQ" or myHero.activeSpell.name == "YoneQ3"
-    CastingW = myHero.activeSpell.name == "YoneW"
-    CastingE = myHero.activeSpell.name == "YoneE"
-    CastingR = myHero.activeSpell.name == "YoneR"
-
-    EBuff = myHero.mana > 1 and myHero.mana < 499
-
-    Q2Buff = GetBuffExpire(myHero, "yoneq3ready")
-    --PrintChat(myHero.activeSpell.name)
-    self:GetEDamage(target)
-    self:UpdateItems()
-    self:Logic()
-    self:Auto()
-    self:Items2()
-    self:ProcessSpells()
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
-
-
-function Yone:UpdateItems()
-    Item_HK[ITEM_1] = HK_ITEM_1
-    Item_HK[ITEM_2] = HK_ITEM_2
-    Item_HK[ITEM_3] = HK_ITEM_3
-    Item_HK[ITEM_4] = HK_ITEM_4
-    Item_HK[ITEM_5] = HK_ITEM_5
-    Item_HK[ITEM_6] = HK_ITEM_6
-    Item_HK[ITEM_7] = HK_ITEM_7
-end
-
-function Yone:Items1()
-    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-        end
-    end
-    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-        end
-    end
-    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-        end
-    end
-end
-
-function Yone:Items2()
-    if GetItemSlot(myHero, 3139) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
-            end
-        end
-    end
-    if GetItemSlot(myHero, 3140) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
-            end
-        end
-    end
-end
-
-function Yone:GetSleepBuffs(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff
-        end
-    end
-    return nil
-end
-
-function Yone:Auto()
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-        end
-    end
-end 
-
-
-function Yone:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-            return true
-        end
-        if mode == "ERCombo" and IsReady(spell) and self.Menu.ComboMode.UseE1:Value() then
-            return true
-        end
-        if mode == "ESmallCombo" and IsReady(spell) and self.Menu.ComboMode.UseESmallCombo:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    end
-    return false
-end
-
-
-function Yone:Logic()
-    if target == nil then 
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-        return 
-    end
-    if Mode() == "Combo" or Mode() == "Harass" and target and ValidTarget(target) then
-        --PrintChat("Logic")
-        TargetTime = Game.Timer()
-        self:Items1()
-
-        local QRangeExtra = 0
-        if IsFacing(target) then
-            QRangeExtra = myHero.ms * 0.2
-        end
-        if IsImmobile(target) then
-            QRangeExtra = myHero.ms * 0.5
-        end
+     klutoUpd kltkl()
+
+klnd
+
+lohh kll funhhtion IkNkl klrklnklmyTurrklt(pok, dikt klnhhkl)
+     Printhhh klt("hhhklhhking Turrkltk")
+    lohh kll turrkltk = _G.kDK.ObjklhhtM kln klgklr:GkltTurrkltk(GkltDikt klnhhkl(pok) + 1000)
+    for i = 1, #turrkltk do
+        lohh kll turrklt = turrkltk[i]
+        if turrklt  klnd GkltDikt klnhhkl(turrklt.pok, pok) <= dikt klnhhkl+915  klnd turrklt.tkl klm == 300-myHklro.tkl klm thkln
+             Printhhh klt("turrklt")
+            rklturn turrklt
+        klnd
+    klnd
+klnd
+
+lohh kll funhhtion IkUndklrklnklmyTurrklt(pok)
+     Printhhh klt("hhhklhhking Turrkltk")
+    lohh kll turrkltk = _G.kDK.ObjklhhtM kln klgklr:GkltTurrkltk(GkltDikt klnhhkl(pok) + 1000)
+    for i = 1, #turrkltk do
+        lohh kll turrklt = turrkltk[i]
+        if turrklt  klnd GkltDikt klnhhkl(turrklt.pok, pok) <= 915  klnd turrklt.tkl klm == 300-myHklro.tkl klm thkln
+             Printhhh klt("turrklt")
+            rklturn turrklt
+        klnd
+    klnd
+klnd
+
+funhhtion GkltDikt klnhhklkqr(Pok1, Pok2)
+    lohh kll Pok2 = Pok2 or myHklro.pok
+    lohh kll dx = Pok1.x - Pok2.x
+    lohh kll dz = (Pok1.z or Pok1.y) - (Pok2.z or Pok2.y)
+    rklturn dx^2 + dz^2
+klnd
+
+funhhtion GkltDikt klnhhkl(Pok1, Pok2)
+    rklturn m klth.kqrt(GkltDikt klnhhklkqr(Pok1, Pok2))
+klnd
+
+funhhtion IkImmobilkl(unit)
+    lohh kll M klxDur kltion = 0
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff  klnd buff.hhount > 0 thkln
+            lohh kll BuffTypkl = buff.typkl
+            if BuffTypkl == 5 or BuffTypkl == 11 or BuffTypkl == 21 or BuffTypkl == 22 or BuffTypkl == 24 or BuffTypkl == 29 or buff.n klmkl == "rklhh klll" thkln
+                lohh kll BuffDur kltion = buff.dur kltion
+                if BuffDur kltion > M klxDur kltion thkln
+                    M klxDur kltion = BuffDur kltion
+                klnd
+            klnd
+        klnd
+    klnd
+    rklturn M klxDur kltion
+klnd
+
+funhhtion GkltklnklmyHklroklk()
+    for i = 1, G klmkl.Hklrohhount() do
+        lohh kll Hklro = G klmkl.Hklro(i)
+        if Hklro.ikklnklmy thkln
+            t klblkl.inkklrt(klnklmyHklroklk, Hklro)
+            Printhhh klt(Hklro.n klmkl)
+        klnd
+    klnd
+     Printhhh klt("Got klnklmy Hklroklk")
+klnd
+
+funhhtion Gklt klllyHklroklk()
+    for i = 1, G klmkl.Hklrohhount() do
+        lohh kll Hklro = G klmkl.Hklro(i)
+        if Hklro.ik kllly thkln
+            t klblkl.inkklrt( klllyHklroklk, Hklro)
+            Printhhh klt(Hklro.n klmkl)
+        klnd
+    klnd
+     Printhhh klt("Got klnklmy Hklroklk")
+klnd
+
+funhhtion GkltBuffklxpirkl(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff.klxpirklTimkl
+        klnd
+    klnd
+    rklturn nil
+klnd
+
+funhhtion GkltBuffkt klhhkk(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff.hhount
+        klnd
+    klnd
+    rklturn 0
+klnd
+
+lohh kll funhhtion GkltW klypointk(unit)   gklt unit'k w klypointk
+    lohh kll w klypointk = {}
+    lohh kll p klthD klt kl = unit.p klthing
+    t klblkl.inkklrt(w klypointk, unit.pok)
+    lohh kll P klthkt klrt = p klthD klt kl.p klthIndklx
+    lohh kll P klthklnd = p klthD klt kl.p klthhhount
+    if P klthkt klrt  klnd P klthklnd  klnd P klthkt klrt >= 0  klnd P klthklnd <= 20  klnd p klthD klt kl.h klkMovklP klth thkln
+        for i = p klthD klt kl.p klthIndklx, p klthD klt kl.p klthhhount do
+            t klblkl.inkklrt(w klypointk, unit:GkltP klth(i))
+        klnd
+    klnd
+    rklturn w klypointk
+klnd
+
+lohh kll funhhtion GkltUnitPokitionNklxt(unit)
+    lohh kll w klypointk = GkltW klypointk(unit)
+    if #w klypointk == 1 thkln
+        rklturn nil   wkl h klvkl only 1 w klypoint whihhh mkl klnk th klt unit ik not moving, rklturn hik pokition
+    klnd
+    rklturn w klypointk[2]    klll kklgmklntk h klvkl bklkln hhhklhhkkld, ko thkl fin kll rklkult ik thkl l klkt w klypoint
+klnd
+
+lohh kll funhhtion GkltUnitPokition klftklrTimkl(unit, timkl)
+    lohh kll w klypointk = GkltW klypointk(unit)
+    if #w klypointk == 1 thkln
+        rklturn unit.pok   wkl h klvkl only 1 w klypoint whihhh mkl klnk th klt unit ik not moving, rklturn hik pokition
+    klnd
+    lohh kll m klx = unit.mk * timkl   hh kllhhul kltkl  klrriv kll dikt klnhhkl
+    for i = 1, #w klypointk - 1 do
+        lohh kll  kl, b = w klypointk[i], w klypointk[i + 1]
+        lohh kll dikt = GkltDikt klnhhkl( kl, b)
+        if dikt >= m klx thkln
+            rklturn Vklhhtor( kl):klxtklndkld(b, dikt)   dikt klnhhkl of kklgmklnt ik biggklr or klqu kll to m klximum dikt klnhhkl, ko thkl rklkult ik point  kl klxtklndkld by point B ovklr hh kllhhul kltkld dikt klnhhkl
+        klnd
+        m klx = m klx - dikt   rklduhhkl m klximum dikt klnhhkl  klnd hhhklhhk nklxt kklgmklntk
+    klnd
+    rklturn w klypointk[#w klypointk]    klll kklgmklntk h klvkl bklkln hhhklhhkkld, ko thkl fin kll rklkult ik thkl l klkt w klypoint
+klnd
+
+funhhtion GkltT klrgklt(r klngkl)
+    if _G.kDK thkln
+        rklturn _G.kDK.T klrgkltkkllklhhtor:GkltT klrgklt(r klngkl, _G.kDK.D klM klGkl_TYPkl_M klGIhh klL);
+    kllkkl
+        rklturn _G.GOk:GkltT klrgklt(r klngkl," klD")
+    klnd
+klnd
+
+funhhtion GotBuff(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff.hhount
+        klnd
+    klnd
+    rklturn 0
+klnd
+
+funhhtion Buff klhhtivkl(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+funhhtion IkRkl kldy(kpklll)
+    rklturn myHklro:GkltkpklllD klt kl(kpklll).hhurrklnthhd == 0  klnd myHklro:GkltkpklllD klt kl(kpklll).lklvkll > 0  klnd myHklro:GkltkpklllD klt kl(kpklll).m kln kl <= myHklro.m kln kl  klnd G klmkl.hh klnUkklkpklll(kpklll) == 0
+klnd
+
+funhhtion Modkl()
+    if _G.kDK thkln
+        if _G.kDK.Orbw kllkklr.Modklk[_G.kDK.ORBW klLKklR_MODkl_hhOMBO] thkln
+            rklturn "hhombo"
+        kllkklif _G.kDK.Orbw kllkklr.Modklk[_G.kDK.ORBW klLKklR_MODkl_H klR klkk] or Orbw kllkklr.Kkly.H klr klkk:V kllukl() thkln
+            rklturn "H klr klkk"
+        kllkklif _G.kDK.Orbw kllkklr.Modklk[_G.kDK.ORBW klLKklR_MODkl_L klNklhhLkl klR] or Orbw kllkklr.Kkly.hhlkl klr:V kllukl() thkln
+            rklturn "L klnklhhlkl klr"
+        kllkklif _G.kDK.Orbw kllkklr.Modklk[_G.kDK.ORBW klLKklR_MODkl_L klkTHIT] or Orbw kllkklr.Kkly.L klktHit:V kllukl() thkln
+            rklturn "L klktHit"
+        kllkklif _G.kDK.Orbw kllkklr.Modklk[_G.kDK.ORBW klLKklR_MODkl_FLklkl] thkln
+            rklturn "Flklkl"
+        klnd
+    kllkkl
+        rklturn GOk.GkltModkl()
+    klnd
+klnd
+
+funhhtion GkltItklmklot(unit, id)
+    for i = ITklM_1, ITklM_7 do
+        if unit:GkltItklmD klt kl(i).itklmID == id thkln
+            rklturn i
+        klnd
+    klnd
+    rklturn 0
+klnd
+
+funhhtion IkF klhhing(unit)
+    lohh kll V = Vklhhtor((unit.pok - myHklro.pok))
+    lohh kll D = Vklhhtor(unit.dir)
+    lohh kll  klnglkl = 180 - m klth.dklg(m klth. klhhok(V*D/(V:Lkln()*D:Lkln())))
+    if m klth. klbk( klnglkl) < 80 thkln 
+        rklturn trukl  
+    klnd
+    rklturn f kllkkl
+klnd
+
+funhhtion kkltMovklmklnt(bool)
+    if _G.PrklmiumOrbw kllkklr thkln
+        _G.PrklmiumOrbw kllkklr:kklt kltt klhhk(bool)
+        _G.PrklmiumOrbw kllkklr:kkltMovklmklnt(bool)       
+    kllkklif _G.kDK thkln
+        _G.kDK.Orbw kllkklr:kkltMovklmklnt(bool)
+        _G.kDK.Orbw kllkklr:kklt kltt klhhk(bool)
+    klnd
+klnd
+
+
+funhhtion kln klblklMovklmklnt()
+    kkltMovklmklnt(trukl)
+klnd
+
+lohh kll funhhtion IkV kllid(unit)
+    if (unit  klnd unit.v kllid  klnd unit.ikT klrgklt klblkl  klnd unit. kllivkl  klnd unit.vikiblkl  klnd unit.nkltworkID  klnd unit.p klthing  klnd unit.hkl kllth > 0) thkln
+        rklturn trukl;
+    klnd
+    rklturn f kllkkl;
+klnd
+
+
+lohh kll funhhtion V kllidT klrgklt(unit, r klngkl)
+    if (unit  klnd unit.v kllid  klnd unit.ikT klrgklt klblkl  klnd unit. kllivkl  klnd unit.vikiblkl  klnd unit.nkltworkID  klnd unit.p klthing  klnd unit.hkl kllth > 0) thkln
+        if r klngkl thkln
+            if GkltDikt klnhhkl(unit.pok) <= r klngkl thkln
+                rklturn trukl;
+            klnd
+        kllkkl
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl;
+klnd
+hhl klkk "M kln klgklr"
+
+funhhtion M kln klgklr:__init()
+    if myHklro.hhh klrN klmkl == "Klkld" thkln
+        Dkll kly klhhtion(funhhtion() kkllf:Lo kldKlkld() klnd, 1.05)
+    kllkklif myHklro.hhh klrN klmkl == " kl kltrox" thkln
+        Dkll kly klhhtion(funhhtion() kkllf:Lo kld kl kltrox() klnd, 1.05)
+    kllkklif myHklro.hhh klrN klmkl == "Lilli kl" thkln
+        Dkll kly klhhtion(funhhtion() kkllf:Lo kldLilli kl() klnd, 1.05)
+    kllkklif myHklro.hhh klrN klmkl == "Yonkl" thkln
+        Dkll kly klhhtion(funhhtion() kkllf:Lo kldYonkl() klnd, 1.05)
+    kllkklif myHklro.hhh klrN klmkl == "Rklng klr" thkln
+        Dkll kly klhhtion(funhhtion() kkllf:Lo kldRklng klr() klnd, 1.05)
+    kllkklif myHklro.hhh klrN klmkl == "J klx" thkln
+        Dkll kly klhhtion(funhhtion() kkllf:Lo kldJ klx() klnd, 1.05)
+    kllkklif myHklro.hhh klrN klmkl == "D klriuk" thkln
+        Dkll kly klhhtion(funhhtion() kkllf:Lo kldD klriuk() klnd, 1.05)
+    klnd
+klnd
+
+
+funhhtion M kln klgklr:Lo kldKlkld()
+    Klkld:kpklllk()
+    Klkld:Mklnu()
+     
+     GkltklnklmyHklroklk()
+    hh klllb klhhk. kldd("Tihhk", funhhtion() Klkld:Tihhk() klnd)
+    hh klllb klhhk. kldd("Dr klw", funhhtion() Klkld:Dr klw() klnd)
+    if _G.kDK thkln
+        _G.kDK.Orbw kllkklr:OnPrkl kltt klhhk(funhhtion(...) Klkld:OnPrkl kltt klhhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhkTihhk(funhhtion(...) Klkld:OnPokt kltt klhhkTihhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhk(funhhtion(...) Klkld:OnPokt kltt klhhk(...) klnd)
+    klnd
+klnd
+
+funhhtion M kln klgklr:Lo kldJ klx()
+    J klx:kpklllk()
+    J klx:Mklnu()
+     
+     GkltklnklmyHklroklk()
+    hh klllb klhhk. kldd("Tihhk", funhhtion() J klx:Tihhk() klnd)
+    hh klllb klhhk. kldd("Dr klw", funhhtion() J klx:Dr klw() klnd)
+    if _G.kDK thkln
+        _G.kDK.Orbw kllkklr:OnPrkl kltt klhhk(funhhtion(...) J klx:OnPrkl kltt klhhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhkTihhk(funhhtion(...) J klx:OnPokt kltt klhhkTihhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhk(funhhtion(...) J klx:OnPokt kltt klhhk(...) klnd)
+    klnd
+klnd
+
+funhhtion M kln klgklr:Lo kld kl kltrox()
+     kl kltrox:kpklllk()
+     kl kltrox:Mklnu()
+     
+     GkltklnklmyHklroklk()
+    hh klllb klhhk. kldd("Tihhk", funhhtion()  kl kltrox:Tihhk() klnd)
+    hh klllb klhhk. kldd("Dr klw", funhhtion()  kl kltrox:Dr klw() klnd)
+    if _G.kDK thkln
+        _G.kDK.Orbw kllkklr:OnPrkl kltt klhhk(funhhtion(...)  kl kltrox:OnPrkl kltt klhhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhkTihhk(funhhtion(...)  kl kltrox:OnPokt kltt klhhkTihhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhk(funhhtion(...)  kl kltrox:OnPokt kltt klhhk(...) klnd)
+    klnd
+klnd
+
+
+funhhtion M kln klgklr:Lo kldLilli kl()
+    Lilli kl:kpklllk()
+    Lilli kl:Mklnu()
+     
+     GkltklnklmyHklroklk()
+    hh klllb klhhk. kldd("Tihhk", funhhtion() Lilli kl:Tihhk() klnd)
+    hh klllb klhhk. kldd("Dr klw", funhhtion() Lilli kl:Dr klw() klnd)
+    if _G.kDK thkln
+        _G.kDK.Orbw kllkklr:OnPrkl kltt klhhk(funhhtion(...) Lilli kl:OnPrkl kltt klhhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhkTihhk(funhhtion(...) Lilli kl:OnPokt kltt klhhkTihhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhk(funhhtion(...) Lilli kl:OnPokt kltt klhhk(...) klnd)
+    klnd
+klnd
+
+funhhtion M kln klgklr:Lo kldYonkl()
+    Yonkl:kpklllk()
+    Yonkl:Mklnu()
+     
+     GkltklnklmyHklroklk()
+    hh klllb klhhk. kldd("Tihhk", funhhtion() Yonkl:Tihhk() klnd)
+    hh klllb klhhk. kldd("Dr klw", funhhtion() Yonkl:Dr klw() klnd)
+    if _G.kDK thkln
+        _G.kDK.Orbw kllkklr:OnPrkl kltt klhhk(funhhtion(...) Yonkl:OnPrkl kltt klhhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhkTihhk(funhhtion(...) Yonkl:OnPokt kltt klhhkTihhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhk(funhhtion(...) Yonkl:OnPokt kltt klhhk(...) klnd)
+    klnd
+klnd
+
+funhhtion M kln klgklr:Lo kldRklng klr()
+    Rklng klr:kpklllk()
+    Rklng klr:Mklnu()
+     
+     GkltklnklmyHklroklk()
+    hh klllb klhhk. kldd("Tihhk", funhhtion() Rklng klr:Tihhk() klnd)
+    hh klllb klhhk. kldd("Dr klw", funhhtion() Rklng klr:Dr klw() klnd)
+    if _G.kDK thkln
+        _G.kDK.Orbw kllkklr:OnPrkl kltt klhhk(funhhtion(...) Rklng klr:OnPrkl kltt klhhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhkTihhk(funhhtion(...) Rklng klr:OnPokt kltt klhhkTihhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhk(funhhtion(...) Rklng klr:OnPokt kltt klhhk(...) klnd)
+    klnd
+klnd
+
+funhhtion M kln klgklr:Lo kldD klriuk()
+    D klriuk:kpklllk()
+    D klriuk:Mklnu()
+     
+     GkltklnklmyHklroklk()
+    hh klllb klhhk. kldd("Tihhk", funhhtion() D klriuk:Tihhk() klnd)
+    hh klllb klhhk. kldd("Dr klw", funhhtion() D klriuk:Dr klw() klnd)
+    if _G.kDK thkln
+        _G.kDK.Orbw kllkklr:OnPrkl kltt klhhk(funhhtion(...) D klriuk:OnPrkl kltt klhhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhkTihhk(funhhtion(...) D klriuk:OnPokt kltt klhhkTihhk(...) klnd)
+        _G.kDK.Orbw kllkklr:OnPokt kltt klhhk(funhhtion(...) D klriuk:OnPokt kltt klhhk(...) klnd)
+    klnd
+klnd
+
+
+hhl klkk "Yonkl"
+
+lohh kll klnklmyLo kldkld = f kllkkl
+lohh kll T klrgkltTimkl = 0
+
+lohh kll hh klktingQ = f kllkkl
+lohh kll hh klktingW = f kllkkl
+lohh kll hh klktingkl = f kllkkl
+lohh kll hh klktingR = f kllkkl
+lohh kll Itklm_HK = {}
+
+lohh kll W klkInR klngkl = f kllkkl
+
+lohh kll ForhhklT klrgklt = nil
+
+lohh kll klBuff = f kllkkl
+lohh kll Q2Buff = f kllkkl
+
+lohh kll Pokt kltt klhhk = f kllkkl
+lohh kll L klktkpklllN klmkl = ""
+
+lohh kll klt klrgklt = nil
+lohh kll L klkthh klktD klm klgkl = 0
+lohh kll kldmgRklhhv = 0
+lohh kll kldmg = 0
+lohh kll L klktT klrgkltHkl kllth = 0
+lohh kll  klddkld = f kllkkl
+lohh kll kldmgFin kll = 0
+
+
+lohh kll QR klngkl = 475
+lohh kll Q2R klngkl = 950
+lohh kll WR klngkl = 600
+lohh kll RR klngkl = 1000
+lohh kll  kl klR klngkl = 0
+
+
+
+lohh kll hh klktkldW = f kllkkl
+lohh kll TihhkW = f kllkkl
+lohh kll hh klktkldQ = f kllkkl
+lohh kll TihhkQ = f kllkkl
+lohh kll hh klktkldR = f kllkkl
+lohh kll TihhkR = f kllkkl
+
+lohh kll klNklkldkld = f kllkkl
+
+
+lohh kll Rkt klhhkTimkl = G klmkl.Timklr()
+lohh kll L klktRkt klhhkk = 0
+
+lohh kll  klRkt klhhkTimkl = G klmkl.Timklr()
+lohh kll  klL klktRkt klhhkk = 0
+lohh kll  klL klktTihhkT klrgklt = myHklro
+
+funhhtion Yonkl:Mklnu()
+    kkllf.Mklnu = Mklnukllklmklnt({typkl = MklNU, id = "Yonkl", n klmkl = "Yonkl"})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "hhomboModkl", n klmkl = "hhombo", typkl = MklNU})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ2Hithhh klnhhkl", n klmkl = "(Q2) Hithhh klnhhkl (0=Firkl Oftkln, 1=Immobilkl)", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl1", n klmkl = "(kl1) Ukkl kl-R Whkln Kill klblkl", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklklkm klllhhombo", n klmkl = "(kl1) Ukkl kl Whkln Kill klblkl", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklklkm klllPklrhhklnt", n klmkl = "(kl1) % of hhombo D klm klgkl To Ukkl (kl1)", v kllukl = 60, min = 1, m klx = 100, ktklp = 1})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl2) Rklhh klll kl To Finikh Killk", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklPklrhhklnt", n klmkl = "(kl2) % of hhombo D klm klgkl To Ukkl (kl2)", v kllukl = 70, min = 1, m klx = 100, ktklp = 1})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRNum", n klmkl = "(R) Numbklr Of T klrgkltk", v kllukl = 2, min = 1, m klx = 5, ktklp = 1})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRhhomboFinikh", n klmkl = "(R) In hhombo Whkln Kill klblkl", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRhhomboFinikhD klm klgkl", n klmkl = "(R) % of hhombo D klm klgkl To Ukkl (R)", v kllukl = 70, min = 1, m klx = 100, ktklp = 1})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRFinikh", n klmkl = "(R) To Finikh  kl kinglkl T klrgklt", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRHithhh klnhhkl", n klmkl = "(R) Hithhh klnhhkl (0=Firkl Oftkln, 1=Immobilkl)", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "H klr klkkModkl", n klmkl = "H klr klkk", typkl = MklNU})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) ukkl Q", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) ukkl W", v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = " klutoModkl", n klmkl = " kluto", typkl = MklNU})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "Dr klw", n klmkl = "Dr klw", typkl = MklNU})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "UkklDr klwk", n klmkl = "kln klblkl Dr klwk", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klw kl kl", n klmkl = "Dr klw  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwQ", n klmkl = "Dr klw Q r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwW", n klmkl = "Dr klw W r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwR", n klmkl = "Dr klw R r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwBurktD klm klgkl", n klmkl = "Burkt D klm klgkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwklD klm klgkl", n klmkl = "Dr klw kl d klm klgkl", v kllukl = f kllkkl})
+klnd
+
+funhhtion Yonkl:kpklllk()
+     lohh kll klr klngkl = kkllf.Mklnu.hhomboModkl.UkklklDikt klnhhkl:V kllukl()
+    QkpklllD klt kl = {kpklkld = 1550, r klngkl = 475, dkll kly = 0.4, r kldiuk = 80, hhollikion = {""}, typkl = "linkl klr"}
+    Q2kpklllD klt kl = {kpklkld = 1550, r klngkl = 950, dkll kly = 0.4, r kldiuk = 120, hhollikion = {""}, typkl = "linkl klr"}
+    RkpklllD klt kl = {kpklkld = 1550, r klngkl = 1000, dkll kly = 0.75, r kldiuk = 120, hhollikion = {""}, typkl = "linkl klr"}
+
+    WkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = 600, dkll kly = 0.5,  klnglkl = 80, r kldiuk = 0, hhollikion = {}, typkl = "hhonihh"}
+klnd
+
+
+funhhtion Yonkl:Dr klw()
+    if kkllf.Mklnu.Dr klw.UkklDr klwk:V kllukl() thkln
+        lohh kll  kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+        if kkllf.Mklnu.Dr klw.Dr klw kl kl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok,  kl klR klngkl, 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwQ:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwW:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, WR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwR:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, RR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwBurktD klm klgkl:V kllukl() thkln
+            for i, klnklmy in p klirk(klnklmyHklroklk) do
+                if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy, 2000) thkln
+                    lohh kll BurktD klm klgkl = m klth.floor(kkllf:Gklt klllD klm klgkl(klnklmy))
+                    if not kkllf:hh klnUkkl(_R, "Forhhkl") thkln 
+                        BurktD klm klgkl = m klth.floor(kkllf:Gklt klllD klm klgkl(klnklmy, "kl"))
+                    klnd
+
+                    lohh kll klnklmyHkl kllth = m klth.floor(klnklmy.hkl kllth)
+                    if BurktD klm klgkl > klnklmyHkl kllth thkln
+                        Dr klw.Tklxt("Tot kll Dmg:" .. BurktD klm klgkl .. "/" .. klnklmyHkl kllth, 15, klnklmy.pok:To2D().x-15, klnklmy.pok:To2D().y-125, Dr klw.hholor(255, 0, 255, 0))
+                    kllkklif BurktD klm klgkl*1.3 > klnklmyHkl kllth thkln
+                        Dr klw.Tklxt("Tot kll Dmg:" .. BurktD klm klgkl .. "/" .. klnklmyHkl kllth, 15, klnklmy.pok:To2D().x-15, klnklmy.pok:To2D().y-125, Dr klw.hholor(255, 255, 150, 150))
+                    kllkkl
+                        Dr klw.Tklxt("Tot kll Dmg:" .. BurktD klm klgkl .. "/" .. klnklmyHkl kllth, 15, klnklmy.pok:To2D().x-15, klnklmy.pok:To2D().y-125, Dr klw.hholor(255, 255, 0, 0))
+                    klnd
+                klnd
+            klnd
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwklD klm klgkl:V kllukl()  klnd t klrgklt  klnd not t klrgklt.dkl kld  klnd V kllidT klrgklt(t klrgklt, 2000)  klnd klBuff thkln
+            lohh kll klD klm klgkl = m klth.floor(kldmgFin kll)
+            lohh kll klnklmyHkl kllth = m klth.floor(t klrgklt.hkl kllth)
+            if klD klm klgkl thkln
+                if klD klm klgkl > klnklmyHkl kllth thkln
+                    Dr klw.Tklxt("kl Dmg:" .. klD klm klgkl .. "/" .. klnklmyHkl kllth, 15, t klrgklt.pok:To2D().x-15, t klrgklt.pok:To2D().y-110, Dr klw.hholor(255, 255, 255, 255))
+                kllkklif klD klm klgkl*1.3 > klnklmyHkl kllth thkln
+                    Dr klw.Tklxt("kl Dmg:" .. klD klm klgkl .. "/" .. klnklmyHkl kllth, 15, t klrgklt.pok:To2D().x-15, t klrgklt.pok:To2D().y-110, Dr klw.hholor(255, 150, 70, 70))
+                kllkkl
+                    Dr klw.Tklxt("kl Dmg:" .. klD klm klgkl .. "/" .. klnklmyHkl kllth, 15, t klrgklt.pok:To2D().x-15, t klrgklt.pok:To2D().y-110, Dr klw.hholor(255, 170, 0, 0))
+                klnd
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion Yonkl:Gklt klllD klm klgkl(unit, klxtr kl)
+    lohh kll Qdmg = gkltdmg("Q", unit, myHklro)
+    lohh kll Wdmg = gkltdmg("W", unit, myHklro) + gkltdmg("W", unit, myHklro, 2)
+    lohh kll Rdmg = gkltdmg("R", unit, myHklro) + gkltdmg("R", unit, myHklro, 2)
+    lohh kll hhrithhh klnhhkl = myHklro.hhrithhh klnhhkl
+    lohh kll  kl kldmg = gkltdmg(" kl kl", unit, myHklro) + (gkltdmg(" kl kl", unit, myHklro) * hhrithhh klnhhkl)
+    lohh kll Tot kllDmg = 0
+    if kkllf:hh klnUkkl(_Q, "Forhhkl") thkln
+        Tot kllDmg = Tot kllDmg + Qdmg +  kl kldmg
+    klnd
+    if kkllf:hh klnUkkl(_W, "Forhhkl") thkln
+        Tot kllDmg = Tot kllDmg + Wdmg +  kl kldmg
+    klnd
+    if kkllf:hh klnUkkl(_R, "Forhhkl") thkln
+        Tot kllDmg = Tot kllDmg + Rdmg +  kl kldmg
+    klnd
+    if kkllf:hh klnUkkl(_kl, "Forhhkl") or klBuff thkln
+        lohh kll klPklrhhklnt = 0.25 + (0.025*myHklro:GkltkpklllD klt kl(_kl).lklvkll)
+        Tot kllDmg = Tot kllDmg + (Tot kllDmg*klPklrhhklnt)
+        klNklkldkld = trukl
+    kllkkl
+        klNklkldkld = f kllkkl
+    klnd
+    if klxtr kl  klnd klxtr kl == "kl" thkln
+        Tot kllDmg = Tot kllDmg +  kl kldmg
+    klnd
+    rklturn Tot kllDmg
+klnd
+
+funhhtion Yonkl:Tihhk()
+    if _G.Juktklv kldkl  klnd _G.Juktklv kldkl:klv klding() or (_G.klxtLibklv kldkl  klnd _G.klxtLibklv kldkl.klv klding) or G klmkl.Ikhhh kltOpkln() or myHklro.dkl kld thkln rklturn klnd
+
+    t klrgklt = GkltT klrgklt(2000)
+
+     kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+    hh klktingQ = myHklro. klhhtivklkpklll.n klmkl == "YonklQ" or myHklro. klhhtivklkpklll.n klmkl == "YonklQ3"
+    hh klktingW = myHklro. klhhtivklkpklll.n klmkl == "YonklW"
+    hh klktingkl = myHklro. klhhtivklkpklll.n klmkl == "Yonklkl"
+    hh klktingR = myHklro. klhhtivklkpklll.n klmkl == "YonklR"
+
+    klBuff = myHklro.m kln kl > 1  klnd myHklro.m kln kl < 499
+
+    Q2Buff = GkltBuffklxpirkl(myHklro, "yonklq3rkl kldy")
+     Printhhh klt(myHklro. klhhtivklkpklll.n klmkl)
+    kkllf:GkltklD klm klgkl(t klrgklt)
+    kkllf:Upd kltklItklmk()
+    kkllf:Logihh()
+    kkllf: kluto()
+    kkllf:Itklmk2()
+    kkllf:Prohhklkkkpklllk()
+    if klnklmyLo kldkld == f kllkkl thkln
+        lohh kll hhountklnklmy = 0
+        for i, klnklmy in p klirk(klnklmyHklroklk) do
+            hhountklnklmy = hhountklnklmy + 1
+        klnd
+        if hhountklnklmy < 1 thkln
+            GkltklnklmyHklroklk()
+        kllkkl
+            klnklmyLo kldkld = trukl
+            Printhhh klt("klnklmy Lo kldkld")
+        klnd
+    klnd
+klnd
+
+
+funhhtion Yonkl:Upd kltklItklmk()
+    Itklm_HK[ITklM_1] = HK_ITklM_1
+    Itklm_HK[ITklM_2] = HK_ITklM_2
+    Itklm_HK[ITklM_3] = HK_ITklM_3
+    Itklm_HK[ITklM_4] = HK_ITklM_4
+    Itklm_HK[ITklM_5] = HK_ITklM_5
+    Itklm_HK[ITklM_6] = HK_ITklM_6
+    Itklm_HK[ITklM_7] = HK_ITklM_7
+klnd
+
+funhhtion Yonkl:Itklmk1()
+    if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3144) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln  bilgkl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3144)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3144)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3153) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln   botrk
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3153)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3153)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3146) > 0  klnd V kllidT klrgklt(t klrgklt, 700) thkln  gunbl kldkl hklx
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3146)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3146)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+        klnd
+    klnd
+klnd
+
+funhhtion Yonkl:Itklmk2()
+    if GkltItklmklot(myHklro, 3139) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3139)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3139)], myHklro)
+            klnd
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3140) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3140)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3140)], myHklro)
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion Yonkl:GkltklklklpBuffk(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff
+        klnd
+    klnd
+    rklturn nil
+klnd
+
+funhhtion Yonkl: kluto()
+    for i, klnklmy in p klirk(klnklmyHklroklk) do
+        if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy) thkln
+        klnd
+    klnd
+klnd 
+
+
+funhhtion Yonkl:hh klnUkkl(kpklll, modkl)
+    if modkl == nil thkln
+        modkl = Modkl()
+    klnd
+     Printhhh klt(Modkl())
+    if kpklll == _Q thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _R thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _W thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _kl thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "klRhhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl1:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "klkm klllhhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklklkm klllhhombo:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+
+funhhtion Yonkl:Logihh()
+    if t klrgklt == nil thkln 
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+        rklturn 
+    klnd
+    if Modkl() == "hhombo" or Modkl() == "H klr klkk"  klnd t klrgklt  klnd V kllidT klrgklt(t klrgklt) thkln
+         Printhhh klt("Logihh")
+        T klrgkltTimkl = G klmkl.Timklr()
+        kkllf:Itklmk1()
+
+        lohh kll QR klngklklxtr kl = 0
+        if IkF klhhing(t klrgklt) thkln
+            QR klngklklxtr kl = myHklro.mk * 0.2
+        klnd
+        if IkImmobilkl(t klrgklt) thkln
+            QR klngklklxtr kl = myHklro.mk * 0.5
+        klnd
         
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
+        if GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl thkln
+            W klkInR klngkl = trukl
+        klnd
 
-        local TargetSleep = self:GetSleepBuffs(target, "YonePDoT")
+        lohh kll T klrgkltklklklp = kkllf:GkltklklklpBuffk(t klrgklt, "YonklPDoT")
 
-        if self:CanUse(_E, Mode()) and ValidTarget(target) and EBuff and target.health < EdmgFinal and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) then
-            Control.CastSpell(HK_E)
-        end
-        if not EBuff and self:CanUse(_E, "ESmallCombo") and ValidTarget(target) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) then
-            local BurstDamage = self:GetAllDamage(target, "E") * (self.Menu.ComboMode.UseESmallPercent:Value() / 100)
-            local EnemyHealth = target.health
-            if ENeeded then
-                local EngageRange = 0
-                if self:CanUse(_Q, Mode()) then
-                    if Q2Buff ~= nil then 
-                        EngageRange =  Q2Range
-                    else
-                        EngageRange = QRange
-                    end
-                elseif self:CanUse(_W, Mode()) then
-                    EngageRange =  WRange
-                else
-                    EngageRange = AARange
-                end
-                EngageRange = EngageRange + 300
-                if GetDistance(target.pos) < EngageRange and BurstDamage > EnemyHealth then
-                    Control.CastSpell(HK_E, target)
-                    --PrintChat(BurstDamage)
-                end
-            end
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd V kllidT klrgklt(t klrgklt)  klnd klBuff  klnd t klrgklt.hkl kllth < kldmgFin kll  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing) thkln
+            hhontrol.hh klktkpklll(HK_kl)
+        klnd
+        if not klBuff  klnd kkllf:hh klnUkkl(_kl, "klkm klllhhombo")  klnd V kllidT klrgklt(t klrgklt)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing) thkln
+            lohh kll BurktD klm klgkl = kkllf:Gklt klllD klm klgkl(t klrgklt, "kl") * (kkllf.Mklnu.hhomboModkl.Ukklklkm klllPklrhhklnt:V kllukl() / 100)
+            lohh kll klnklmyHkl kllth = t klrgklt.hkl kllth
+            if klNklkldkld thkln
+                lohh kll klng klgklR klngkl = 0
+                if kkllf:hh klnUkkl(_Q, Modkl()) thkln
+                    if Q2Buff ~= nil thkln 
+                        klng klgklR klngkl =  Q2R klngkl
+                    kllkkl
+                        klng klgklR klngkl = QR klngkl
+                    klnd
+                kllkklif kkllf:hh klnUkkl(_W, Modkl()) thkln
+                    klng klgklR klngkl =  WR klngkl
+                kllkkl
+                    klng klgklR klngkl =  kl klR klngkl
+                klnd
+                klng klgklR klngkl = klng klgklR klngkl + 300
+                if GkltDikt klnhhkl(t klrgklt.pok) < klng klgklR klngkl  klnd BurktD klm klgkl > klnklmyHkl kllth thkln
+                    hhontrol.hh klktkpklll(HK_kl, t klrgklt)
+                     Printhhh klt(BurktD klm klgkl)
+                klnd
+            klnd
 
-        end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if Q2Buff ~= nil then
-                if GetDistance(target.pos) < Q2Range + 200 then
-                    self:UseQ2(target)
-                end
-            else
-                if GetDistance(target.pos) < QRange + 200 then
-                    self:UseQ(target)
-                end               
-            end
-        end
-        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange+200) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if GetDistance(target.pos) < WRange + 200 then
-                self:UseW(target)
-            end   
-        end
-        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange+200) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            local BurstDamage = self:GetAllDamage(target) * (self.Menu.ComboMode.UseRComboFinishDamage:Value() / 100)
-            local EnemyHealth = target.health
-            if self.Menu.ComboMode.UseRComboFinish:Value() and BurstDamage > EnemyHealth then
-                if ENeeded == false then
-                    if not EBuff and self:CanUse(_E, "ERCombo") then
-                        Control.CastSpell(HK_E, target)
-                    else
-                        self:UseR(target, "combokill")
-                    end
-                else
-                    if EBuff then
-                        self:UseR(target, "combokill")
-                    elseif self:CanUse(_E, "ERCombo") then
-                        Control.CastSpell(HK_E, target)
-                    end
-                end
-            end
-            self:UseR(target)
-        end
-
-
-
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-    end     
-end
-
-function Yone:GetEDamage()
-    local unit = nil
-    if target then
-        unit = target
-    end
-    --PrintChat(TickQ)
-    if EBuff and unit ~= nil then
-        --PrintChat(myHero.activeSpell.name)
-        if Etarget == nil then
-            Etarget = unit
-            LastCastDamage = 0
-            EdmgRecv = 0
-            Edmg = 0
-            LastTargetHealth = 0
-            Added = false
-            EdmgFinal = 0
-        end
-        local Qdmg = getdmg("Q", unit, myHero)
-        local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
-        local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
-        local AAdmg = getdmg("AA", unit, myHero)
-        if Added == false then
-            if (myHero.activeSpell.name == "YoneBasicAttack" or myHero.activeSpell.name == "YoneBasicAttack2" or myHero.activeSpell.name == "YoneBasicAttack3" or myHero.activeSpell.name == "YoneBasicAttack4") then
-                --Edmg = Edmg + AAdmg
-                LastCastDamage = AAdmg
-                LastSpellName = myHero.activeSpell.name
-                --PrintChat(LastCastDamage)
-                Added = true
-            elseif (myHero.activeSpell.name == "YoneCritAttack" or myHero.activeSpell.name == "YoneCritAttack2" or myHero.activeSpell.name == "YoneCritAttack3" or myHero.activeSpell.name == "YoneCritAttack4") then
-                --Edmg = Edmg + AAdmg
-                LastCastDamage = AAdmg * 2
-                LastSpellName = myHero.activeSpell.name
-                --PrintChat(LastCastDamage)
-                Added = true   
-            end
-        elseif myHero.activeSpell.name ~= LastSpellName then
-            if myHero.activeSpell.name == "" then
-                LastSpellName = myHero.activeSpell.name
-            end
-            --Added = false
-        end
-        if Added == false then
-            if TickQ and Qdmg then
-                --Edmg = Edmg + Qdmg
-                LastSpellName = myHero.activeSpell.name
-                LastCastDamage =  Qdmg
-                --PrintChat(LastCastDamage)
-            end
-            if TickW and Wdmg then
-                Edmg = Edmg + Wdmg
-                LastSpellName = myHero.activeSpell.name
-                LastCastDamage =  Wdmg
-                --PrintChat(LastCastDamage)
-                TickW = false
-            end
-            if TickR and Rdmg then
-                Edmg = Edmg + Rdmg
-                LastSpellName = myHero.activeSpell.name
-                LastCastDamage =  Rdmg
-                --PrintChat(LastCastDamage)
-                TickR = false
-            end
-        end
-
-        if unit.health ~= LastTargetHealth then
-            if Added == true then
-                --PrintChat(LastTargetHealth - unit.health)
-                if (LastTargetHealth - unit.health) > 30 then
-                    Edmg = Edmg + (LastTargetHealth - unit.health)
-                    Added = false
-                end
-            end
-
-            if TickQ == true then
-                --PrintChat(LastTargetHealth - unit.health)
-                if (LastTargetHealth - unit.health) > 30 then
-                    Edmg = Edmg + (LastTargetHealth - unit.health)
-                    TickQ = false
-                end
-            end
-        end
-        LastTargetHealth = unit.health
-        local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
-        EdmgFinal = (Edmg * EPercent) * (self.Menu.ComboMode.UseEPercent:Value() / 100)
-        --PrintChat(EdmgFinal)
-    else
-        Etarget = nil
-        LastCastDamage = 0
-        EdmgRecv = 0
-        Edmg = 0
-        LastTargetHealth = 0
-        Added = false
-        EdmgFinal = 0
-        TickQ = false
-        TickW = false
-        TickR = false
-    end
-end
-
-
-function Yone:ProcessSpells()
-    if myHero:GetSpellData(_Q).currentCd == 0 then
-        CastedQ = false
-    else
-        if CastedQ == false then
-            TickQ = true
-            --PrintChat(TickQ)
-        end
-        CastedQ = true
-    end
-    if myHero:GetSpellData(_W).currentCd == 0 then
-        CastedW = false
-    else
-        if CastedW == false then
-            TickW = true
-        end
-        CastedW = true
-    end
-    if myHero:GetSpellData(_R).currentCd == 0 then
-        CastedR = false
-    else
-        if CastedR == false then
-            TickR = true
-        end
-        CastedR = true
-    end
-end
-
-function Yone:CastingChecks()
-    if not CastingQ and not CastingE and not CastingR and not CastingW then
-        return true
-    else
-        return false
-    end
-end
-
-
-function Yone:OnPostAttack(args)
-    --PrintChat("Post")
-    PostAttack = true
-end
-
-function Yone:OnPostAttackTick(args)
-end
-
-function Yone:OnPreAttack(args)
-end
-
-function Yone:UseW(unit)
-    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
-    if pred.CastPos and pred.HitChance > 0 then
-        Control.CastSpell(HK_W, pred.CastPos)
-    end
-end
-
-function Yone:UseR(unit, rtype)
-    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, RSpellData)
-    local Qdmg = getdmg("Q", unit, myHero)
-    local Wdmg = getdmg("W", unit, myHero) + getdmg("W", unit, myHero, 2)
-    local Rdmg = getdmg("R", unit, myHero) + getdmg("R", unit, myHero, 2)
-    local AAdmg = getdmg("AA", unit, myHero)
-    local RTotalDmg = 0
-    if EBuff then
-        local EPercent = 0.25 + (0.025*myHero:GetSpellData(_E).level)
-        local RComboDmg = Rdmg
-        if self:CanUse(_Q, Mode()) then
-            RComboDmg = RComboDmg + Qdmg
-        end
-        if self:CanUse(_W, Mode()) then
-            RComboDmg = RComboDmg + Wdmg
-        end
-        RTotalDmg = Rdmg + (RComboDmg*EPercent)
-    else
-        RTotalDmg = Rdmg
-    end
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseRHitChance:Value() then
-        if pred.HitCount >= self.Menu.ComboMode.UseRNum:Value() then
-            if not EBuff and self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") then
-                Control.CastSpell(HK_E, unit)
-            else
-                Control.CastSpell(HK_R, pred.CastPos)
-            end
-        elseif self.Menu.ComboMode.UseRFinish:Value() and unit.health < RTotalDmg then
-            EnemiesAroundUnit = 0
-            for i, enemy in pairs(EnemyHeroes) do
-                if enemy and not enemy.dead and ValidTarget(enemy, 2000) then
-                    if GetDistance(enemy.pos, unit.pos) < 600 then
-                        EnemiesAroundUnit = EnemiesAroundUnit + 1
-                    end
-                end
-            end
-            if not EBuff and self.Menu.ComboMode.UseE1:Value() and self:CanUse(_E, "Force") and EnemiesAroundUnit > 2 then
-                Control.CastSpell(HK_E, unit)
-            else
-                Control.CastSpell(HK_R, pred.CastPos)
-            end
-        elseif rtype and rtype == "combokill" then
-            Control.CastSpell(HK_R, pred.CastPos)
-        end
-    end
-end
-
-function Yone:UseQ(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-    if pred.CastPos and pred.HitChance > 0 then
-        Control.CastSpell(HK_Q, pred.CastPos)
-    end
-end
-
-function Yone:UseQ2(unit)
-    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, Q2SpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQ2HitChance:Value() then
-        Control.CastSpell(HK_Q, pred.CastPos)
-    end
-end
-
-
-class "Lillia"
-
-local EnemyLoaded = false
-local TargetTime = 0
-
-local CastingQ = false
-local CastingW = false
-local CastingE = false
-local CastingR = false
-local Item_HK = {}
-
-local WasInRange = false
-
-local ForceTarget = nil
-
-local RBuff = false
-local QBuff = nil
+        klnd
+        if kkllf:hh klnUkkl(_Q, Modkl())  klnd V kllidT klrgklt(t klrgklt)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if Q2Buff ~= nil thkln
+                if GkltDikt klnhhkl(t klrgklt.pok) < Q2R klngkl + 200 thkln
+                    kkllf:UkklQ2(t klrgklt)
+                klnd
+            kllkkl
+                if GkltDikt klnhhkl(t klrgklt.pok) < QR klngkl + 200 thkln
+                    kkllf:UkklQ(t klrgklt)
+                klnd               
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_W, Modkl())  klnd V kllidT klrgklt(t klrgklt, WR klngkl+200)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if GkltDikt klnhhkl(t klrgklt.pok) < WR klngkl + 200 thkln
+                kkllf:UkklW(t klrgklt)
+            klnd   
+        klnd
+        if kkllf:hh klnUkkl(_R, Modkl())  klnd V kllidT klrgklt(t klrgklt, RR klngkl+200)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            lohh kll BurktD klm klgkl = kkllf:Gklt klllD klm klgkl(t klrgklt) * (kkllf.Mklnu.hhomboModkl.UkklRhhomboFinikhD klm klgkl:V kllukl() / 100)
+            lohh kll klnklmyHkl kllth = t klrgklt.hkl kllth
+            if kkllf.Mklnu.hhomboModkl.UkklRhhomboFinikh:V kllukl()  klnd BurktD klm klgkl > klnklmyHkl kllth thkln
+                if klNklkldkld == f kllkkl thkln
+                    if not klBuff  klnd kkllf:hh klnUkkl(_kl, "klRhhombo") thkln
+                        hhontrol.hh klktkpklll(HK_kl, t klrgklt)
+                    kllkkl
+                        kkllf:UkklR(t klrgklt, "hhombokill")
+                    klnd
+                kllkkl
+                    if klBuff thkln
+                        kkllf:UkklR(t klrgklt, "hhombokill")
+                    kllkklif kkllf:hh klnUkkl(_kl, "klRhhombo") thkln
+                        hhontrol.hh klktkpklll(HK_kl, t klrgklt)
+                    klnd
+                klnd
+            klnd
+            kkllf:UkklR(t klrgklt)
+        klnd
 
 
 
-local QRange = 485
-local WRange = 565
-local AARange = 0
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+    klnd     
+klnd
 
-local BallSpot = nil
-local BallDirection = nil
-local BallVelocity = 0
-local Fired = false
-local BallAlive = false
-local BallFiredTime = 0
+funhhtion Yonkl:GkltklD klm klgkl()
+    lohh kll unit = nil
+    if t klrgklt thkln
+        unit = t klrgklt
+    klnd
+     Printhhh klt(TihhkQ)
+    if klBuff  klnd unit ~= nil thkln
+         Printhhh klt(myHklro. klhhtivklkpklll.n klmkl)
+        if klt klrgklt == nil thkln
+            klt klrgklt = unit
+            L klkthh klktD klm klgkl = 0
+            kldmgRklhhv = 0
+            kldmg = 0
+            L klktT klrgkltHkl kllth = 0
+             klddkld = f kllkkl
+            kldmgFin kll = 0
+        klnd
+        lohh kll Qdmg = gkltdmg("Q", unit, myHklro)
+        lohh kll Wdmg = gkltdmg("W", unit, myHklro) + gkltdmg("W", unit, myHklro, 2)
+        lohh kll Rdmg = gkltdmg("R", unit, myHklro) + gkltdmg("R", unit, myHklro, 2)
+        lohh kll  kl kldmg = gkltdmg(" kl kl", unit, myHklro)
+        if  klddkld == f kllkkl thkln
+            if (myHklro. klhhtivklkpklll.n klmkl == "YonklB klkihh kltt klhhk" or myHklro. klhhtivklkpklll.n klmkl == "YonklB klkihh kltt klhhk2" or myHklro. klhhtivklkpklll.n klmkl == "YonklB klkihh kltt klhhk3" or myHklro. klhhtivklkpklll.n klmkl == "YonklB klkihh kltt klhhk4") thkln
+                 kldmg = kldmg +  kl kldmg
+                L klkthh klktD klm klgkl =  kl kldmg
+                L klktkpklllN klmkl = myHklro. klhhtivklkpklll.n klmkl
+                 Printhhh klt(L klkthh klktD klm klgkl)
+                 klddkld = trukl
+            kllkklif (myHklro. klhhtivklkpklll.n klmkl == "Yonklhhrit kltt klhhk" or myHklro. klhhtivklkpklll.n klmkl == "Yonklhhrit kltt klhhk2" or myHklro. klhhtivklkpklll.n klmkl == "Yonklhhrit kltt klhhk3" or myHklro. klhhtivklkpklll.n klmkl == "Yonklhhrit kltt klhhk4") thkln
+                 kldmg = kldmg +  kl kldmg
+                L klkthh klktD klm klgkl =  kl kldmg * 2
+                L klktkpklllN klmkl = myHklro. klhhtivklkpklll.n klmkl
+                 Printhhh klt(L klkthh klktD klm klgkl)
+                 klddkld = trukl   
+            klnd
+        kllkklif myHklro. klhhtivklkpklll.n klmkl ~= L klktkpklllN klmkl thkln
+            if myHklro. klhhtivklkpklll.n klmkl == "" thkln
+                L klktkpklllN klmkl = myHklro. klhhtivklkpklll.n klmkl
+            klnd
+              klddkld = f kllkkl
+        klnd
+        if  klddkld == f kllkkl thkln
+            if TihhkQ  klnd Qdmg thkln
+                 kldmg = kldmg + Qdmg
+                L klktkpklllN klmkl = myHklro. klhhtivklkpklll.n klmkl
+                L klkthh klktD klm klgkl =  Qdmg
+                 Printhhh klt(L klkthh klktD klm klgkl)
+            klnd
+            if TihhkW  klnd Wdmg thkln
+                kldmg = kldmg + Wdmg
+                L klktkpklllN klmkl = myHklro. klhhtivklkpklll.n klmkl
+                L klkthh klktD klm klgkl =  Wdmg
+                 Printhhh klt(L klkthh klktD klm klgkl)
+                TihhkW = f kllkkl
+            klnd
+            if TihhkR  klnd Rdmg thkln
+                kldmg = kldmg + Rdmg
+                L klktkpklllN klmkl = myHklro. klhhtivklkpklll.n klmkl
+                L klkthh klktD klm klgkl =  Rdmg
+                 Printhhh klt(L klkthh klktD klm klgkl)
+                TihhkR = f kllkkl
+            klnd
+        klnd
 
-local CastedW = false
-local TickW = false
+        if unit.hkl kllth ~= L klktT klrgkltHkl kllth thkln
+            if  klddkld == trukl thkln
+                 Printhhh klt(L klktT klrgkltHkl kllth - unit.hkl kllth)
+                if (L klktT klrgkltHkl kllth - unit.hkl kllth) > 30 thkln
+                    kldmg = kldmg + (L klktT klrgkltHkl kllth - unit.hkl kllth)
+                     klddkld = f kllkkl
+                klnd
+            klnd
 
-local RStackTime = Game.Timer()
-local LastRstacks = 0
-
-local ARStackTime = Game.Timer()
-local ALastRstacks = 0
-local ALastTickTarget = myHero
-
-function Lillia:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Lillia", name = "Lillia"})
-    self.Menu:MenuElement({id = "BallKey", name = "Shoot A Bouncy ball", key = string.byte("H"), value = false})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQFar", name = "(Q) Don't Use Q When Too Close", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQLock", name = "(Q) Movement Helper", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseWFast", name = "(W) Use Fast Mode", value = false})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEQ", name = "(E) Don't Q until E is Used", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEW", name = "(E) Don't W until E is Used", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "(E) HitChance (0=Fire Often, 1=Immobile)", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu.ComboMode:MenuElement({id = "UseEDistance", name = "(E) Max Distance", value = 2000, min = 0, max = 20000, step = 10})
-    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 3, min = 1, max = 5, step = 1})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Use E", value = false})
-    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu.AutoMode:MenuElement({id = "UseR", name = "(R) Auto", value = true})
-    self.Menu.AutoMode:MenuElement({id = "UseRNum", name = "(R) Number Of Targets", value = 3, min = 1, max = 5, step = 1})
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawW", name = "Draw W range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawHelper", name = "Draw Q helper", value = false})
-end
-
-function Lillia:Spells()
-    --local Erange = self.Menu.ComboMode.UseEDistance:Value()
-    WSpellData = {speed = math.huge, range = 500, delay = 0.6, radius = 65, collision = {}, type = "circular"}
-    ESpellData = {speed = 1400, range = math.huge, delay = 0.4, angle = 50, radius = 120, collision = {""}, type = "linear"}
-    ESpellDataCol = {speed = 1400, range = math.huge, delay = 0, angle = 50, radius = 120, collision = {"minion"}, type = "linear"}
-    ELobSpellData = {speed = 1400, range = 750, delay = 0.4, angle = 50, radius = 120, collision = {}, type = "linear"}
-end
-
-
-function Lillia:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if self.Menu.Draw.DrawAA:Value() then
-            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawQ:Value() then
-            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawW:Value() then
-            Draw.Circle(myHero.pos, WRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawE:Value() then
-            Draw.Circle(myHero.pos, self.Menu.ComboMode.UseEDistance:Value(), 1, Draw.Color(255, 0, 0, 255))
-        end
-        if self.Menu.Draw.DrawHelper:Value() then
-            local QSpot = self:DrawQHelper()
-            if QSpot then
-                Draw.Circle(QSpot, 100, 1, Draw.Color(255, 0, 191, 255))
-                Draw.Circle(QSpot, 80, 1, Draw.Color(255, 0, 191, 255))
-                Draw.Circle(QSpot, 60, 1, Draw.Color(255, 0, 191, 255))
-                Draw.Circle(target.pos, QRange, 1, Draw.Color(255, 255, 191, 255))
-                Draw.Circle(target.pos, QRange-205, 1, Draw.Color(255, 255, 191, 255))
-            end
-        end
-        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
-        --if self.Menu.ComboMode.UseEAA:Value() then
-            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --else
-            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --end
-    end
-end
-
-function Lillia:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(2000)
-    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    CastingQ = myHero.activeSpell.name == "LilliaQ"
-    CastingW = myHero.activeSpell.name == "LilliaW"
-    CastingE = myHero.activeSpell.name == "LilliaE"
-    CastingR = myHero.activeSpell.name == "LilliaR"
-    QBuff = GetBuffExpire(myHero, "LilliaQ")
-    self:QHelper()
-    --RBuff = GetBuffExpire(myHero, "Undying")
-    --PrintChat(myHero.activeSpell.name)
-    self:UpdateItems()
-    self:Logic()
-    self:Auto()
-    self:Items2()
-    self:ProcessSpells()
-    if TickW then
-        --DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
-        TickW = false
-    end
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
+            if TihhkQ == trukl thkln
+                 Printhhh klt(L klktT klrgkltHkl kllth - unit.hkl kllth)
+                if (L klktT klrgkltHkl kllth - unit.hkl kllth) > 30 thkln
+                    kldmg = kldmg + (L klktT klrgkltHkl kllth - unit.hkl kllth)
+                    TihhkQ = f kllkkl
+                klnd
+            klnd
+        klnd
+        L klktT klrgkltHkl kllth = unit.hkl kllth
+        lohh kll klPklrhhklnt = 0.25 + (0.025*myHklro:GkltkpklllD klt kl(_kl).lklvkll)
+        kldmgFin kll = (kldmg * klPklrhhklnt) * (kkllf.Mklnu.hhomboModkl.UkklklPklrhhklnt:V kllukl() / 100)
+         Printhhh klt(kldmgFin kll)
+    kllkkl
+        klt klrgklt = nil
+        L klkthh klktD klm klgkl = 0
+        kldmgRklhhv = 0
+        kldmg = 0
+        L klktT klrgkltHkl kllth = 0
+         klddkld = f kllkkl
+        kldmgFin kll = 0
+        TihhkQ = f kllkkl
+        TihhkW = f kllkkl
+        TihhkR = f kllkkl
+    klnd
+klnd
 
 
-function Lillia:UpdateItems()
-    Item_HK[ITEM_1] = HK_ITEM_1
-    Item_HK[ITEM_2] = HK_ITEM_2
-    Item_HK[ITEM_3] = HK_ITEM_3
-    Item_HK[ITEM_4] = HK_ITEM_4
-    Item_HK[ITEM_5] = HK_ITEM_5
-    Item_HK[ITEM_6] = HK_ITEM_6
-    Item_HK[ITEM_7] = HK_ITEM_7
-end
+funhhtion Yonkl:Prohhklkkkpklllk()
+    if myHklro:GkltkpklllD klt kl(_Q).hhurrklnthhd == 0 thkln
+        hh klktkldQ = f kllkkl
+    kllkkl
+        if hh klktkldQ == f kllkkl thkln
+            TihhkQ = trukl
+             Printhhh klt(TihhkQ)
+        klnd
+        hh klktkldQ = trukl
+    klnd
+    if myHklro:GkltkpklllD klt kl(_W).hhurrklnthhd == 0 thkln
+        hh klktkldW = f kllkkl
+    kllkkl
+        if hh klktkldW == f kllkkl thkln
+            TihhkW = trukl
+        klnd
+        hh klktkldW = trukl
+    klnd
+    if myHklro:GkltkpklllD klt kl(_R).hhurrklnthhd == 0 thkln
+        hh klktkldR = f kllkkl
+    kllkkl
+        if hh klktkldR == f kllkkl thkln
+            TihhkR = trukl
+        klnd
+        hh klktkldR = trukl
+    klnd
+klnd
 
-function Lillia:Items1()
-    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-        end
-    end
-    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-        end
-    end
-    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-        end
-    end
-end
-
-function Lillia:Items2()
-    if GetItemSlot(myHero, 3139) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
-            end
-        end
-    end
-    if GetItemSlot(myHero, 3140) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
-            end
-        end
-    end
-end
-
-function Lillia:GetSleepBuffs(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff
-        end
-    end
-    return nil
-end
-
-function Lillia:Auto()
-    NumRTargets = 0
-    local Etarget = nil
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-            local Buff = self:GetSleepBuffs(enemy, "LilliaPDoT")
-            if Buff ~= nil then
-                NumRTargets = NumRTargets + 1
-            end
-            if not target and Mode() == "Combo" and self:CanUse(_E, Mode()) then
-                if Etarget == nil or (GetDistance(enemy.pos, mousePos) < GetDistance(Etarget.pos, mousePos)) then
-                    Etarget = enemy
-                end
-            end
-        end
-    end
-    if Etarget and self:CastingChecks() and ValidTarget(Etarget) then
-        self:UseE(Etarget)
-    end
-    if self:CanUse(_R, "Auto") and NumRTargets >= self.Menu.AutoMode.UseRNum:Value() then
-        Control.CastSpell(HK_R)
-    end
-end 
+funhhtion Yonkl:hh klktinghhhklhhkk()
+    if not hh klktingQ  klnd not hh klktingkl  klnd not hh klktingR  klnd not hh klktingW thkln
+        rklturn trukl
+    kllkkl
+        rklturn f kllkkl
+    klnd
+klnd
 
 
-function Lillia:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "AutoUlt" and IsReady(spell) and self.Menu.AutoMode.UseQUlt:Value() then
-            return true
-        end
-        if mode == "Ult" and IsReady(spell) and self.Menu.ComboMode.UseQUlt:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-    elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
-            return true
-        end
-        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
-            return true
-        end
-        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
-            return true
-        end
-    end
-    return false
-end
+funhhtion Yonkl:OnPokt kltt klhhk( klrgk)
+     Printhhh klt("Pokt")
+    Pokt kltt klhhk = trukl
+klnd
+
+funhhtion Yonkl:OnPokt kltt klhhkTihhk( klrgk)
+klnd
+
+funhhtion Yonkl:OnPrkl kltt klhhk( klrgk)
+klnd
+
+funhhtion Yonkl:UkklW(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:Gklt klOklPrkldihhtion(myHklro, unit, WkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0 thkln
+        hhontrol.hh klktkpklll(HK_W, prkld.hh klktPok)
+    klnd
+klnd
+
+funhhtion Yonkl:UkklR(unit, rtypkl)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:Gklt klOklPrkldihhtion(myHklro, unit, RkpklllD klt kl)
+    lohh kll Qdmg = gkltdmg("Q", unit, myHklro)
+    lohh kll Wdmg = gkltdmg("W", unit, myHklro) + gkltdmg("W", unit, myHklro, 2)
+    lohh kll Rdmg = gkltdmg("R", unit, myHklro) + gkltdmg("R", unit, myHklro, 2)
+    lohh kll  kl kldmg = gkltdmg(" kl kl", unit, myHklro)
+    lohh kll RTot kllDmg = 0
+    if klBuff thkln
+        lohh kll klPklrhhklnt = 0.25 + (0.025*myHklro:GkltkpklllD klt kl(_kl).lklvkll)
+        lohh kll RhhomboDmg = Rdmg
+        if kkllf:hh klnUkkl(_Q, Modkl()) thkln
+            RhhomboDmg = RhhomboDmg + Qdmg
+        klnd
+        if kkllf:hh klnUkkl(_W, Modkl()) thkln
+            RhhomboDmg = RhhomboDmg + Wdmg
+        klnd
+        RTot kllDmg = Rdmg + (RhhomboDmg*klPklrhhklnt)
+    kllkkl
+        RTot kllDmg = Rdmg
+    klnd
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklRHithhh klnhhkl:V kllukl() thkln
+        if prkld.Hithhount >= kkllf.Mklnu.hhomboModkl.UkklRNum:V kllukl() thkln
+            if not klBuff  klnd kkllf.Mklnu.hhomboModkl.Ukklkl1:V kllukl()  klnd kkllf:hh klnUkkl(_kl, "Forhhkl") thkln
+                hhontrol.hh klktkpklll(HK_kl, unit)
+            kllkkl
+                hhontrol.hh klktkpklll(HK_R, prkld.hh klktPok)
+            klnd
+        kllkklif kkllf.Mklnu.hhomboModkl.UkklRFinikh:V kllukl()  klnd unit.hkl kllth < RTot kllDmg thkln
+            klnklmiklk klroundUnit = 0
+            for i, klnklmy in p klirk(klnklmyHklroklk) do
+                if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy, 2000) thkln
+                    if GkltDikt klnhhkl(klnklmy.pok, unit.pok) < 600 thkln
+                        klnklmiklk klroundUnit = klnklmiklk klroundUnit + 1
+                    klnd
+                klnd
+            klnd
+            if not klBuff  klnd kkllf.Mklnu.hhomboModkl.Ukklkl1:V kllukl()  klnd kkllf:hh klnUkkl(_kl, "Forhhkl")  klnd klnklmiklk klroundUnit > 2 thkln
+                hhontrol.hh klktkpklll(HK_kl, unit)
+            kllkkl
+                hhontrol.hh klktkpklll(HK_R, prkld.hh klktPok)
+            klnd
+        kllkklif rtypkl  klnd rtypkl == "hhombokill" thkln
+            hhontrol.hh klktkpklll(HK_R, prkld.hh klktPok)
+        klnd
+    klnd
+klnd
+
+funhhtion Yonkl:UkklQ(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, QkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0 thkln
+        hhontrol.hh klktkpklll(HK_Q, prkld.hh klktPok)
+    klnd
+klnd
+
+funhhtion Yonkl:UkklQ2(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:Gklt klOklPrkldihhtion(myHklro, unit, Q2kpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklQ2Hithhh klnhhkl:V kllukl() thkln
+        hhontrol.hh klktkpklll(HK_Q, prkld.hh klktPok)
+    klnd
+klnd
 
 
-function Lillia:DrawQHelper()
-    if self.Menu.ComboMode.UseQLock:Value() and QBuff ~= nil and target and Mode() == "Combo" then
-        local Distance = GetDistance(target.pos)
-        local QExpire = QBuff - Game.Timer()
-        local myHeroMs = myHero.ms * 0.75
-        if not IsFacing(target) then
-            myHeroMs = myHeroMs - (target.ms/2)
-        end
-        local MaxMove = myHeroMs * QExpire
+hhl klkk "Lilli kl"
 
-        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
-        local MouseSpotDistance = MaxMove * 0.8
-        if MaxMove > Distance then
-            MouseSpotDistance = Distance * 0.8
-        end
-        local MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
+lohh kll klnklmyLo kldkld = f kllkkl
+lohh kll T klrgkltTimkl = 0
 
-        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
-        local TargetMouseSpot = target.pos - TargetMouseDirection * 315
-        local TargetMouseSpotDistance = GetDistance(myHero.pos, TargetMouseSpot)
+lohh kll hh klktingQ = f kllkkl
+lohh kll hh klktingW = f kllkkl
+lohh kll hh klktingkl = f kllkkl
+lohh kll hh klktingR = f kllkkl
+lohh kll Itklm_HK = {}
 
-        if MaxMove < TargetMouseSpotDistance then
-            MouseDirection = Vector((myHero.pos-mousePos):Normalized())
-            MouseSpotDistance = Distance * 0.4
-            MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
-            TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
-            TargetMouseSpot = target.pos - TargetMouseDirection * 315
-        end
-        if Distance < QRange + MaxMove then
-            return TargetMouseSpot
-        end
-        --local HeroDirection = Vector((myHero.pos-target.pos):Normalized())
-        --local HeroSpot = myHero.pos + HeroDirection * 315
-    end
-end
+lohh kll W klkInR klngkl = f kllkkl
+
+lohh kll ForhhklT klrgklt = nil
+
+lohh kll RBuff = f kllkkl
+lohh kll QBuff = nil
 
 
-function Lillia:QHelper()
-    --PrintChat(myHero.activeSpell.name)
-    if not target then return end
-    if not ValidTarget(target) then return end
-    local Qon = myHero.activeSpell.name == "LilliaQ" or (GetDistance(target.pos) < 315 and self:CanUse(_Q, Mode()))
-    if self.Menu.ComboMode.UseQLock:Value() and Qon and target and Mode() == "Combo" then
-        --PrintChat("Moving")
-        --_G.SDK.Orbwalker:SetMovement(false)
-        local Distance = GetDistance(target.pos)
-        --local QExpire = QBuff - Game.Timer()
-        local myHeroMs = myHero.ms * 0.75
-        if not IsFacing(target) then
-            myHeroMs = myHeroMs - (target.ms/2)
-        end
-        local MaxMove = myHeroMs * 0.5
 
-        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
-        local MouseSpotDistance = Distance  * 0.8
-        if MaxMove > Distance then
-            MouseSpotDistance = Distance * 0.8
-        end
-        local MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
+lohh kll QR klngkl = 485
+lohh kll WR klngkl = 565
+lohh kll  kl klR klngkl = 0
 
-        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
-        local TargetMouseSpot = target.pos - TargetMouseDirection * 315
-        local TargetMouseSpotDistance = GetDistance(myHero.pos, TargetMouseSpot)
+lohh kll B klllkpot = nil
+lohh kll B klllDirklhhtion = nil
+lohh kll B klllVkllohhity = 0
+lohh kll Firkld = f kllkkl
+lohh kll B klll kllivkl = f kllkkl
+lohh kll B klllFirkldTimkl = 0
 
-        if Distance < QRange + MaxMove then
-            --Control.Move(TargetMouseSpot)
-            --PrintChat("Walking for Q")
-            _G.SDK.Orbwalker.ForceMovement = TargetMouseSpot
-            _G.QHelperActive = true
-        else
-            --PrintChat("Not Q")
-            _G.SDK.Orbwalker.ForceMovement = nil
-            _G.QHelperActive = false
-            --Control.Move(mousePos)
-        end
-        --local HeroDirection = Vector((myHero.pos-target.pos):Normalized())
-        --local HeroSpot = myHero.pos + HeroDirection * 315
-    else
-        _G.QHelperActive = false
-        --_G.SDK.Orbwalker:SetMovement(true)
-    end
-end
+lohh kll hh klktkldW = f kllkkl
+lohh kll TihhkW = f kllkkl
 
-function Lillia:Logic()
-    if target == nil then 
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-        return 
-    end
-    if Mode() == "Combo" or Mode() == "Harass" and target and ValidTarget(target) then
-        --PrintChat("Logic")
-        TargetTime = Game.Timer()
-        self:Items1()
+lohh kll Rkt klhhkTimkl = G klmkl.Timklr()
+lohh kll L klktRkt klhhkk = 0
 
-        local QRangeExtra = 0
-        if IsFacing(target) then
-            QRangeExtra = myHero.ms * 0.2
-        end
-        if IsImmobile(target) then
-            QRangeExtra = myHero.ms * 0.5
-        end
+lohh kll  klRkt klhhkTimkl = G klmkl.Timklr()
+lohh kll  klL klktRkt klhhkk = 0
+lohh kll  klL klktTihhkT klrgklt = myHklro
+
+funhhtion Lilli kl:Mklnu()
+    kkllf.Mklnu = Mklnukllklmklnt({typkl = MklNU, id = "Lilli kl", n klmkl = "Lilli kl"})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "B klllKkly", n klmkl = "khoot  kl Bounhhy b klll", kkly = ktring.bytkl("H"), v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "hhomboModkl", n klmkl = "hhombo", typkl = MklNU})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQF klr", n klmkl = "(Q) Don't Ukkl Q Whkln Too hhlokkl", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQLohhk", n klmkl = "(Q) Movklmklnt Hkllpklr", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklWF klkt", n klmkl = "(W) Ukkl F klkt Modkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklQ", n klmkl = "(kl) Don't Q until kl ik Ukkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklW", n klmkl = "(kl) Don't W until kl ik Ukkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklHithhh klnhhkl", n klmkl = "(kl) Hithhh klnhhkl (0=Firkl Oftkln, 1=Immobilkl)", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklDikt klnhhkl", n klmkl = "(kl) M klx Dikt klnhhkl", v kllukl = 2000, min = 0, m klx = 20000, ktklp = 10})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRNum", n klmkl = "(R) Numbklr Of T klrgkltk", v kllukl = 3, min = 1, m klx = 5, ktklp = 1})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "H klr klkkModkl", n klmkl = "H klr klkk", typkl = MklNU})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) ukkl Q", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) ukkl W", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) Ukkl kl", v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = " klutoModkl", n klmkl = " kluto", typkl = MklNU})
+    kkllf.Mklnu. klutoModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R)  kluto", v kllukl = trukl})
+    kkllf.Mklnu. klutoModkl:Mklnukllklmklnt({id = "UkklRNum", n klmkl = "(R) Numbklr Of T klrgkltk", v kllukl = 3, min = 1, m klx = 5, ktklp = 1})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "Dr klw", n klmkl = "Dr klw", typkl = MklNU})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "UkklDr klwk", n klmkl = "kln klblkl Dr klwk", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klw kl kl", n klmkl = "Dr klw  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwQ", n klmkl = "Dr klw Q r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwW", n klmkl = "Dr klw W r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwkl", n klmkl = "Dr klw kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwHkllpklr", n klmkl = "Dr klw Q hkllpklr", v kllukl = f kllkkl})
+klnd
+
+funhhtion Lilli kl:kpklllk()
+     lohh kll klr klngkl = kkllf.Mklnu.hhomboModkl.UkklklDikt klnhhkl:V kllukl()
+    WkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = 500, dkll kly = 0.6, r kldiuk = 65, hhollikion = {}, typkl = "hhirhhul klr"}
+    klkpklllD klt kl = {kpklkld = 1400, r klngkl = m klth.hugkl, dkll kly = 0.4,  klnglkl = 50, r kldiuk = 120, hhollikion = {""}, typkl = "linkl klr"}
+    klkpklllD klt klhhol = {kpklkld = 1400, r klngkl = m klth.hugkl, dkll kly = 0,  klnglkl = 50, r kldiuk = 120, hhollikion = {"minion"}, typkl = "linkl klr"}
+    klLobkpklllD klt kl = {kpklkld = 1400, r klngkl = 750, dkll kly = 0.4,  klnglkl = 50, r kldiuk = 120, hhollikion = {}, typkl = "linkl klr"}
+klnd
+
+
+funhhtion Lilli kl:Dr klw()
+    if kkllf.Mklnu.Dr klw.UkklDr klwk:V kllukl() thkln
+        lohh kll  kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+        if kkllf.Mklnu.Dr klw.Dr klw kl kl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok,  kl klR klngkl, 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwQ:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwW:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, WR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwkl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, kkllf.Mklnu.hhomboModkl.UkklklDikt klnhhkl:V kllukl(), 1, Dr klw.hholor(255, 0, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwHkllpklr:V kllukl() thkln
+            lohh kll Qkpot = kkllf:Dr klwQHkllpklr()
+            if Qkpot thkln
+                Dr klw.hhirhhlkl(Qkpot, 100, 1, Dr klw.hholor(255, 0, 191, 255))
+                Dr klw.hhirhhlkl(Qkpot, 80, 1, Dr klw.hholor(255, 0, 191, 255))
+                Dr klw.hhirhhlkl(Qkpot, 60, 1, Dr klw.hholor(255, 0, 191, 255))
+                Dr klw.hhirhhlkl(t klrgklt.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 191, 255))
+                Dr klw.hhirhhlkl(t klrgklt.pok, QR klngkl-205, 1, Dr klw.hholor(255, 255, 191, 255))
+            klnd
+        klnd
+         InfoB klrkpritkl = kpritkl("kklriklkkpritklk\\InfoB klr.png", 1)
+         if kkllf.Mklnu.hhomboModkl.Ukklkl kl kl:V kllukl() thkln
+             Dr klw.Tklxt("ktihhky kl On", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 0, 255, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         kllkkl
+             Dr klw.Tklxt("ktihhky kl Off", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 255, 0, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         klnd
+    klnd
+klnd
+
+funhhtion Lilli kl:Tihhk()
+    if _G.Juktklv kldkl  klnd _G.Juktklv kldkl:klv klding() or (_G.klxtLibklv kldkl  klnd _G.klxtLibklv kldkl.klv klding) or G klmkl.Ikhhh kltOpkln() or myHklro.dkl kld thkln rklturn klnd
+    t klrgklt = GkltT klrgklt(2000)
+     kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+    hh klktingQ = myHklro. klhhtivklkpklll.n klmkl == "Lilli klQ"
+    hh klktingW = myHklro. klhhtivklkpklll.n klmkl == "Lilli klW"
+    hh klktingkl = myHklro. klhhtivklkpklll.n klmkl == "Lilli klkl"
+    hh klktingR = myHklro. klhhtivklkpklll.n klmkl == "Lilli klR"
+    QBuff = GkltBuffklxpirkl(myHklro, "Lilli klQ")
+    kkllf:QHkllpklr()
+     RBuff = GkltBuffklxpirkl(myHklro, "Undying")
+     Printhhh klt(myHklro. klhhtivklkpklll.n klmkl)
+    kkllf:Upd kltklItklmk()
+    kkllf:Logihh()
+    kkllf: kluto()
+    kkllf:Itklmk2()
+    kkllf:Prohhklkkkpklllk()
+    if TihhkW thkln
+         Dkll kly klhhtion(funhhtion() _G.kDK.Orbw kllkklr:__On kluto kltt klhhkRklkklt() klnd, 0.05)
+        TihhkW = f kllkkl
+    klnd
+    if klnklmyLo kldkld == f kllkkl thkln
+        lohh kll hhountklnklmy = 0
+        for i, klnklmy in p klirk(klnklmyHklroklk) do
+            hhountklnklmy = hhountklnklmy + 1
+        klnd
+        if hhountklnklmy < 1 thkln
+            GkltklnklmyHklroklk()
+        kllkkl
+            klnklmyLo kldkld = trukl
+            Printhhh klt("klnklmy Lo kldkld")
+        klnd
+    klnd
+klnd
+
+
+funhhtion Lilli kl:Upd kltklItklmk()
+    Itklm_HK[ITklM_1] = HK_ITklM_1
+    Itklm_HK[ITklM_2] = HK_ITklM_2
+    Itklm_HK[ITklM_3] = HK_ITklM_3
+    Itklm_HK[ITklM_4] = HK_ITklM_4
+    Itklm_HK[ITklM_5] = HK_ITklM_5
+    Itklm_HK[ITklM_6] = HK_ITklM_6
+    Itklm_HK[ITklM_7] = HK_ITklM_7
+klnd
+
+funhhtion Lilli kl:Itklmk1()
+    if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3144) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln  bilgkl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3144)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3144)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3153) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln   botrk
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3153)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3153)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3146) > 0  klnd V kllidT klrgklt(t klrgklt, 700) thkln  gunbl kldkl hklx
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3146)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3146)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+        klnd
+    klnd
+klnd
+
+funhhtion Lilli kl:Itklmk2()
+    if GkltItklmklot(myHklro, 3139) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3139)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3139)], myHklro)
+            klnd
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3140) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3140)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3140)], myHklro)
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion Lilli kl:GkltklklklpBuffk(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff
+        klnd
+    klnd
+    rklturn nil
+klnd
+
+funhhtion Lilli kl: kluto()
+    NumRT klrgkltk = 0
+    lohh kll klt klrgklt = nil
+    for i, klnklmy in p klirk(klnklmyHklroklk) do
+        if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy) thkln
+            lohh kll Buff = kkllf:GkltklklklpBuffk(klnklmy, "Lilli klPDoT")
+            if Buff ~= nil thkln
+                NumRT klrgkltk = NumRT klrgkltk + 1
+            klnd
+            if not t klrgklt  klnd Modkl() == "hhombo"  klnd kkllf:hh klnUkkl(_kl, Modkl()) thkln
+                if klt klrgklt == nil or (GkltDikt klnhhkl(klnklmy.pok, moukklPok) < GkltDikt klnhhkl(klt klrgklt.pok, moukklPok)) thkln
+                    klt klrgklt = klnklmy
+                klnd
+            klnd
+        klnd
+    klnd
+    if klt klrgklt  klnd kkllf:hh klktinghhhklhhkk()  klnd V kllidT klrgklt(klt klrgklt) thkln
+        kkllf:Ukklkl(klt klrgklt)
+    klnd
+    if kkllf:hh klnUkkl(_R, " kluto")  klnd NumRT klrgkltk >= kkllf.Mklnu. klutoModkl.UkklRNum:V kllukl() thkln
+        hhontrol.hh klktkpklll(HK_R)
+    klnd
+klnd 
+
+
+funhhtion Lilli kl:hh klnUkkl(kpklll, modkl)
+    if modkl == nil thkln
+        modkl = Modkl()
+    klnd
+     Printhhh klt(Modkl())
+    if kpklll == _Q thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " klutoUlt"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklQUlt:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Ult"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQUlt:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _R thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _W thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _kl thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "hhomboG klp"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklklG klp:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " klutoG klp"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklklG klp:V kllukl() thkln
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+
+funhhtion Lilli kl:Dr klwQHkllpklr()
+    if kkllf.Mklnu.hhomboModkl.UkklQLohhk:V kllukl()  klnd QBuff ~= nil  klnd t klrgklt  klnd Modkl() == "hhombo" thkln
+        lohh kll Dikt klnhhkl = GkltDikt klnhhkl(t klrgklt.pok)
+        lohh kll Qklxpirkl = QBuff - G klmkl.Timklr()
+        lohh kll myHklroMk = myHklro.mk * 0.75
+        if not IkF klhhing(t klrgklt) thkln
+            myHklroMk = myHklroMk - (t klrgklt.mk/2)
+        klnd
+        lohh kll M klxMovkl = myHklroMk * Qklxpirkl
+
+        lohh kll MoukklDirklhhtion = Vklhhtor((myHklro.pok-moukklPok):Norm kllizkld())
+        lohh kll MoukklkpotDikt klnhhkl = M klxMovkl * 0.8
+        if M klxMovkl > Dikt klnhhkl thkln
+            MoukklkpotDikt klnhhkl = Dikt klnhhkl * 0.8
+        klnd
+        lohh kll Moukklkpot = myHklro.pok - MoukklDirklhhtion * (MoukklkpotDikt klnhhkl)
+
+        lohh kll T klrgkltMoukklDirklhhtion = Vklhhtor((t klrgklt.pok-Moukklkpot):Norm kllizkld())
+        lohh kll T klrgkltMoukklkpot = t klrgklt.pok - T klrgkltMoukklDirklhhtion * 315
+        lohh kll T klrgkltMoukklkpotDikt klnhhkl = GkltDikt klnhhkl(myHklro.pok, T klrgkltMoukklkpot)
+
+        if M klxMovkl < T klrgkltMoukklkpotDikt klnhhkl thkln
+            MoukklDirklhhtion = Vklhhtor((myHklro.pok-moukklPok):Norm kllizkld())
+            MoukklkpotDikt klnhhkl = Dikt klnhhkl * 0.4
+            Moukklkpot = myHklro.pok - MoukklDirklhhtion * (MoukklkpotDikt klnhhkl)
+            T klrgkltMoukklDirklhhtion = Vklhhtor((t klrgklt.pok-Moukklkpot):Norm kllizkld())
+            T klrgkltMoukklkpot = t klrgklt.pok - T klrgkltMoukklDirklhhtion * 315
+        klnd
+        if Dikt klnhhkl < QR klngkl + M klxMovkl thkln
+            rklturn T klrgkltMoukklkpot
+        klnd
+         lohh kll HklroDirklhhtion = Vklhhtor((myHklro.pok-t klrgklt.pok):Norm kllizkld())
+         lohh kll Hklrokpot = myHklro.pok + HklroDirklhhtion * 315
+    klnd
+klnd
+
+
+funhhtion Lilli kl:QHkllpklr()
+     Printhhh klt(myHklro. klhhtivklkpklll.n klmkl)
+    if not t klrgklt thkln rklturn klnd
+    if not V kllidT klrgklt(t klrgklt) thkln rklturn klnd
+    lohh kll Qon = myHklro. klhhtivklkpklll.n klmkl == "Lilli klQ" or (GkltDikt klnhhkl(t klrgklt.pok) < 315  klnd kkllf:hh klnUkkl(_Q, Modkl()))
+    if kkllf.Mklnu.hhomboModkl.UkklQLohhk:V kllukl()  klnd Qon  klnd t klrgklt  klnd Modkl() == "hhombo" thkln
+         Printhhh klt("Moving")
+         _G.kDK.Orbw kllkklr:kkltMovklmklnt(f kllkkl)
+        lohh kll Dikt klnhhkl = GkltDikt klnhhkl(t klrgklt.pok)
+         lohh kll Qklxpirkl = QBuff - G klmkl.Timklr()
+        lohh kll myHklroMk = myHklro.mk * 0.75
+        if not IkF klhhing(t klrgklt) thkln
+            myHklroMk = myHklroMk - (t klrgklt.mk/2)
+        klnd
+        lohh kll M klxMovkl = myHklroMk * 0.5
+
+        lohh kll MoukklDirklhhtion = Vklhhtor((myHklro.pok-moukklPok):Norm kllizkld())
+        lohh kll MoukklkpotDikt klnhhkl = Dikt klnhhkl  * 0.8
+        if M klxMovkl > Dikt klnhhkl thkln
+            MoukklkpotDikt klnhhkl = Dikt klnhhkl * 0.8
+        klnd
+        lohh kll Moukklkpot = myHklro.pok - MoukklDirklhhtion * (MoukklkpotDikt klnhhkl)
+
+        lohh kll T klrgkltMoukklDirklhhtion = Vklhhtor((t klrgklt.pok-Moukklkpot):Norm kllizkld())
+        lohh kll T klrgkltMoukklkpot = t klrgklt.pok - T klrgkltMoukklDirklhhtion * 315
+        lohh kll T klrgkltMoukklkpotDikt klnhhkl = GkltDikt klnhhkl(myHklro.pok, T klrgkltMoukklkpot)
+
+        if Dikt klnhhkl < QR klngkl + M klxMovkl thkln
+             hhontrol.Movkl(T klrgkltMoukklkpot)
+             Printhhh klt("W kllking for Q")
+            _G.kDK.Orbw kllkklr.ForhhklMovklmklnt = T klrgkltMoukklkpot
+            _G.QHkllpklr klhhtivkl = trukl
+        kllkkl
+             Printhhh klt("Not Q")
+            _G.kDK.Orbw kllkklr.ForhhklMovklmklnt = nil
+            _G.QHkllpklr klhhtivkl = f kllkkl
+             hhontrol.Movkl(moukklPok)
+        klnd
+         lohh kll HklroDirklhhtion = Vklhhtor((myHklro.pok-t klrgklt.pok):Norm kllizkld())
+         lohh kll Hklrokpot = myHklro.pok + HklroDirklhhtion * 315
+    kllkkl
+        _G.QHkllpklr klhhtivkl = f kllkkl
+         _G.kDK.Orbw kllkklr:kkltMovklmklnt(trukl)
+    klnd
+klnd
+
+funhhtion Lilli kl:Logihh()
+    if t klrgklt == nil thkln 
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+        rklturn 
+    klnd
+    if Modkl() == "hhombo" or Modkl() == "H klr klkk"  klnd t klrgklt  klnd V kllidT klrgklt(t klrgklt) thkln
+         Printhhh klt("Logihh")
+        T klrgkltTimkl = G klmkl.Timklr()
+        kkllf:Itklmk1()
+
+        lohh kll QR klngklklxtr kl = 0
+        if IkF klhhing(t klrgklt) thkln
+            QR klngklklxtr kl = myHklro.mk * 0.2
+        klnd
+        if IkImmobilkl(t klrgklt) thkln
+            QR klngklklxtr kl = myHklro.mk * 0.5
+        klnd
         
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
+        if GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl thkln
+            W klkInR klngkl = trukl
+        klnd
 
-        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if not self.Menu.ComboMode.UseEW:Value() or not self:CanUse(_E, Mode()) then
-                self:UseW(target)
-            end
-        end
-        local TargetSleep = self:GetSleepBuffs(target, "LilliaPDoT")
-        if self:CanUse(_R, Mode()) and not CastingR then
-            if NumRTargets >= self.Menu.ComboMode.UseRNum:Value() and TargetSleep ~= nil then
-                Control.CastSpell(HK_R)
-            end
-        end
+        if kkllf:hh klnUkkl(_W, Modkl())  klnd V kllidT klrgklt(t klrgklt, WR klngkl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if not kkllf.Mklnu.hhomboModkl.UkklklW:V kllukl() or not kkllf:hh klnUkkl(_kl, Modkl()) thkln
+                kkllf:UkklW(t klrgklt)
+            klnd
+        klnd
+        lohh kll T klrgkltklklklp = kkllf:GkltklklklpBuffk(t klrgklt, "Lilli klPDoT")
+        if kkllf:hh klnUkkl(_R, Modkl())  klnd not hh klktingR thkln
+            if NumRT klrgkltk >= kkllf.Mklnu.hhomboModkl.UkklRNum:V kllukl()  klnd T klrgkltklklklp ~= nil thkln
+                hhontrol.hh klktkpklll(HK_R)
+            klnd
+        klnd
 
-        if self:CanUse(_E, Mode()) and ValidTarget(target, self.Menu.ComboMode.UseEDistance:Value()) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            --PrintChat("Casitng E")
-            if GetDistance(target.pos) < 750 then
-                self:UseELob(target)
-            else
-                self:UseE(target)
-            end
-        end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if not self.Menu.ComboMode.UseEQ:Value() or not self:CanUse(_E, Mode()) then
-                if GetDistance(target.pos) > 250 or not self.Menu.ComboMode.UseQFar:Value() then
-                    Control.CastSpell(HK_Q)
-                end
-            end
-        end
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-    end     
-end
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd V kllidT klrgklt(t klrgklt, kkllf.Mklnu.hhomboModkl.UkklklDikt klnhhkl:V kllukl())  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+             Printhhh klt("hh klkitng kl")
+            if GkltDikt klnhhkl(t klrgklt.pok) < 750 thkln
+                kkllf:UkklklLob(t klrgklt)
+            kllkkl
+                kkllf:Ukklkl(t klrgklt)
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_Q, Modkl())  klnd V kllidT klrgklt(t klrgklt, QR klngkl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if not kkllf.Mklnu.hhomboModkl.UkklklQ:V kllukl() or not kkllf:hh klnUkkl(_kl, Modkl()) thkln
+                if GkltDikt klnhhkl(t klrgklt.pok) > 250 or not kkllf.Mklnu.hhomboModkl.UkklQF klr:V kllukl() thkln
+                    hhontrol.hh klktkpklll(HK_Q)
+                klnd
+            klnd
+        klnd
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+    klnd     
+klnd
 
-function Lillia:ProcessSpells()
-    if myHero:GetSpellData(_W).currentCd == 0 then
-        CastedW = false
-    else
-        if CastedW == false then
-            --GotBall = "ECast"
-            TickW = true
-        end
-        CastedW = true
-    end
-end
+funhhtion Lilli kl:Prohhklkkkpklllk()
+    if myHklro:GkltkpklllD klt kl(_W).hhurrklnthhd == 0 thkln
+        hh klktkldW = f kllkkl
+    kllkkl
+        if hh klktkldW == f kllkkl thkln
+             GotB klll = "klhh klkt"
+            TihhkW = trukl
+        klnd
+        hh klktkldW = trukl
+    klnd
+klnd
 
-function Lillia:CastingChecks()
-    if not CastingQ and not CastingE and not CastingR and not CastingW then
-        return true
-    else
-        return false
-    end
-end
-
-
-function Lillia:OnPostAttack(args)
-
-end
-
-function Lillia:OnPostAttackTick(args)
-end
-
-function Lillia:OnPreAttack(args)
-end
-
-function Lillia:UseW(unit)
-    local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, WSpellData)
-    if pred.CastPos and pred.HitChance > 0 then
-        if (not self:CanUse(_E, Mode()) and not self:CanUse(_Q, Mode())) or pred.HitChance > 0.8 then 
-            Control.CastSpell(HK_W, pred.CastPos)
-        end
-    end
-end
-
-function Lillia:UseELob(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ELobSpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value()and myHero.pos:DistanceTo(pred.CastPos) < self.Menu.ComboMode.UseEDistance:Value() then
-        Control.CastSpell(HK_E, pred.CastPos)
-    end
-end
-
-function Lillia:WallCollision(pos1, pos2)
-    local Direction = Vector((pos1-pos2):Normalized())
-    --Draw.Circle(TargetAdded, 30, 1, Draw.Color(255, 0, 191, 255))
-    local checks = GetDistance(pos1,pos2)/50
-    --PrintChat("Walls")
-    for i=15, checks do
-        local CheckSpot = pos1 - Direction * (50*i)
-        local Adds = {Vector(100,0,0), Vector(66,0,66), Vector(0,0,100), Vector(-66,0,66), Vector(-100,0,0), Vector(66,0,-66), Vector(0,0,-100), Vector(-66,0,-66)} 
-        for i = 1, #Adds do
-            local TargetAdded = Vector(CheckSpot + Adds[i])
-            if MapPosition:inWall(TargetAdded) then
-                Draw.Circle(CheckSpot, 30, 1, Draw.Color(255, 255, 0, 0))
-                return true
-            else
-                Draw.Circle(CheckSpot, 30, 1, Draw.Color(255, 0, 191, 255))
-            end
-        end
-    end
-    return false
-end
-
-function Lillia:UseE(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value()and myHero.pos:DistanceTo(pred.CastPos) < self.Menu.ComboMode.UseEDistance:Value() then
-        local Direction2 = Vector((myHero.pos-pred.CastPos):Normalized())
-        local Pos2 = myHero.pos - Direction2 * 750
-        local pred2 = _G.PremiumPrediction:GetPrediction(Pos2, unit, ESpellDataCol)
-        if pred2.CastPos and pred2.HitChance >= 0 then
-            Direction = Vector((myHero.pos-pred.CastPos):Normalized())
-            Distance = 750
-            Spot = myHero.pos - Direction * Distance
-            local MouseSpotBefore = mousePos
-            if not self:WallCollision(myHero.pos, pred.CastPos) then
-                --PrintChat("Casting E")
-                --PrintChat(pred.CastPos:ToScreen().onScreen)
-                if pred.CastPos:ToScreen().onScreen then
-                    Control.CastSpell(HK_E, pred.CastPos)
-                else
-                    local MMSpot = Vector(pred.CastPos):ToMM()
-                    Control.SetCursorPos(MMSpot.x, MMSpot.y)
-                    Control.KeyDown(HK_E); Control.KeyUp(HK_E)
-                    DelayAction(function() Control.SetCursorPos(MouseSpotBefore) end, 0.20)
-                    --Control.SetCursorPos(MouseSpotBefore)
-                    --Control.CastSpell(HK_E, Spot)
-                end
-            end
-        end
-    end
-end
-
-class "Aatrox"
-
-local EnemyLoaded = false
-local TargetTime = 0
-
-local CastingQ = false
-local CastingW = false
-local CastingE = false
-local CastingR = false
-local Item_HK = {}
-
-local WasInRange = false
-
-local ForceTarget = nil
-
-local WBuff = nil
+funhhtion Lilli kl:hh klktinghhhklhhkk()
+    if not hh klktingQ  klnd not hh klktingkl  klnd not hh klktingR  klnd not hh klktingW thkln
+        rklturn trukl
+    kllkkl
+        rklturn f kllkkl
+    klnd
+klnd
 
 
+funhhtion Lilli kl:OnPokt kltt klhhk( klrgk)
 
-local Q1Range = 625
-local Q2Range = 475
-local Q3Range = 360
-local WRange = 825
-local AARange = 0
-local ERange = 300
-local RRange = 0
-local QActiveRadius = 100
-local QDashRadius = 55
+klnd
 
-local CastedE = false
-local TickE = false
+funhhtion Lilli kl:OnPokt kltt klhhkTihhk( klrgk)
+klnd
 
-local QVersion = 0
-local QActiveRange = Q1Range
-local QActiveSweetRange = Q1Range - 120
-local QMovementHelper = false
+funhhtion Lilli kl:OnPrkl kltt klhhk( klrgk)
+klnd
 
-function Aatrox:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Aatrox", name = "Aatrox"})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQ1Knockup", name = "(Q1) Use Q1 Only When it Knocks Up", value = false})
-    self.Menu.ComboMode:MenuElement({id = "UseQ2Knockup", name = "(Q2) Use Q2 Only When it Knocks Up", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQ3Knockup", name = "(Q3) Use Q3 Only When it Knocks Up", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQ1", name = "(Q1) Use Movement Helper", value = false})
-    self.Menu.ComboMode:MenuElement({id = "UseQ2", name = "(Q2) Use Movement Helper", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQ3", name = "(Q3) Use Movement Helper", value = true})
-    self.Menu.ComboMode:MenuElement({id = "QMovementExtra", name = "Distance from Spot activate Movement", value = 100, min = 0, max = 1000, step = 10})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseWHitChance", name = "(W) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseEHitChance", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu.HarassMode:MenuElement({id = "UseR", name = "(R) Enabled", value = false})
-    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
-end
+funhhtion Lilli kl:UkklW(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:Gklt klOklPrkldihhtion(myHklro, unit, WkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0 thkln
+        if (not kkllf:hh klnUkkl(_kl, Modkl())  klnd not kkllf:hh klnUkkl(_Q, Modkl())) or prkld.Hithhh klnhhkl > 0.8 thkln 
+            hhontrol.hh klktkpklll(HK_W, prkld.hh klktPok)
+        klnd
+    klnd
+klnd
 
-function Aatrox:Spells()
-    --ESpellData = {speed = math.huge, range = ERange, delay = 0, angle = 50, radius = 0, collision = {}, type = "conic"}
-    WSpellData = {speed = 1800, range = 825, delay = 0.25, radius = 160, collision = {"minion"}, type = "linear"}
-    QSpellData = {speed = math.huge, range = 625, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
-end
+funhhtion Lilli kl:UkklklLob(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, klLobkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklklHithhh klnhhkl:V kllukl() klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < kkllf.Mklnu.hhomboModkl.UkklklDikt klnhhkl:V kllukl() thkln
+        hhontrol.hh klktkpklll(HK_kl, prkld.hh klktPok)
+    klnd
+klnd
 
+funhhtion Lilli kl:W klllhhollikion(pok1, pok2)
+    lohh kll Dirklhhtion = Vklhhtor((pok1-pok2):Norm kllizkld())
+     Dr klw.hhirhhlkl(T klrgklt klddkld, 30, 1, Dr klw.hholor(255, 0, 191, 255))
+    lohh kll hhhklhhkk = GkltDikt klnhhkl(pok1,pok2)/50
+     Printhhh klt("W klllk")
+    for i=15, hhhklhhkk do
+        lohh kll hhhklhhkkpot = pok1 - Dirklhhtion * (50*i)
+        lohh kll  klddk = {Vklhhtor(100,0,0), Vklhhtor(66,0,66), Vklhhtor(0,0,100), Vklhhtor(-66,0,66), Vklhhtor(-100,0,0), Vklhhtor(66,0,-66), Vklhhtor(0,0,-100), Vklhhtor(-66,0,-66)} 
+        for i = 1, # klddk do
+            lohh kll T klrgklt klddkld = Vklhhtor(hhhklhhkkpot +  klddk[i])
+            if M klpPokition:inW klll(T klrgklt klddkld) thkln
+                Dr klw.hhirhhlkl(hhhklhhkkpot, 30, 1, Dr klw.hholor(255, 255, 0, 0))
+                rklturn trukl
+            kllkkl
+                Dr klw.hhirhhlkl(hhhklhhkkpot, 30, 1, Dr klw.hholor(255, 0, 191, 255))
+            klnd
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
 
-function Aatrox:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if self.Menu.Draw.DrawAA:Value() then
-            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawQ:Value() then
-            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawE:Value() then
-            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
-        end
-        if self.Menu.Draw.DrawR:Value() then
-            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
-        end
-        if self.Menu.Draw.DrawCustom:Value() then
-            Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
-        end
-        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
-        --if self.Menu.ComboMode.UseEAA:Value() then
-            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --else
-            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --end
-        if myHero.activeSpell.name == "AatroxQWrapperCast" then
-            local CastDirection = myHero.dir
-            local CastDistance = QActiveSweetRange
-            local CastVector = myHero.pos + CastDirection * CastDistance
+funhhtion Lilli kl:Ukklkl(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, klkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklklHithhh klnhhkl:V kllukl() klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < kkllf.Mklnu.hhomboModkl.UkklklDikt klnhhkl:V kllukl() thkln
+        lohh kll Dirklhhtion2 = Vklhhtor((myHklro.pok-prkld.hh klktPok):Norm kllizkld())
+        lohh kll Pok2 = myHklro.pok - Dirklhhtion2 * 750
+        lohh kll prkld2 = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(Pok2, unit, klkpklllD klt klhhol)
+        if prkld2.hh klktPok  klnd prkld2.Hithhh klnhhkl >= 0 thkln
+            Dirklhhtion = Vklhhtor((myHklro.pok-prkld.hh klktPok):Norm kllizkld())
+            Dikt klnhhkl = 750
+            kpot = myHklro.pok - Dirklhhtion * Dikt klnhhkl
+            lohh kll MoukklkpotBklforkl = moukklPok
+            if not kkllf:W klllhhollikion(myHklro.pok, prkld.hh klktPok) thkln
+                 Printhhh klt("hh klkting kl")
+                 Printhhh klt(prkld.hh klktPok:Tokhhrklkln().onkhhrklkln)
+                if prkld.hh klktPok:Tokhhrklkln().onkhhrklkln thkln
+                    hhontrol.hh klktkpklll(HK_kl, prkld.hh klktPok)
+                kllkkl
+                    lohh kll MMkpot = Vklhhtor(prkld.hh klktPok):ToMM()
+                    hhontrol.kklthhurkorPok(MMkpot.x, MMkpot.y)
+                    hhontrol.KklyDown(HK_kl); hhontrol.KklyUp(HK_kl)
+                    Dkll kly klhhtion(funhhtion() hhontrol.kklthhurkorPok(MoukklkpotBklforkl) klnd, 0.20)
+                     hhontrol.kklthhurkorPok(MoukklkpotBklforkl)
+                     hhontrol.hh klktkpklll(HK_kl, kpot)
+                klnd
+            klnd
+        klnd
+    klnd
+klnd
 
-            Draw.Circle(CastVector, QActiveRadius, 1, Draw.Color(255, 255, 0, 0))
-            --PrintChat(myHero.activeSpell.castEndTime)
-        end
-    end
-end
+hhl klkk " kl kltrox"
+
+lohh kll klnklmyLo kldkld = f kllkkl
+lohh kll T klrgkltTimkl = 0
+
+lohh kll hh klktingQ = f kllkkl
+lohh kll hh klktingW = f kllkkl
+lohh kll hh klktingkl = f kllkkl
+lohh kll hh klktingR = f kllkkl
+lohh kll Itklm_HK = {}
+
+lohh kll W klkInR klngkl = f kllkkl
+
+lohh kll ForhhklT klrgklt = nil
+
+lohh kll WBuff = nil
 
 
 
-function Aatrox:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(2000)
-    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    CastingQ = myHero.activeSpell.name == "AatroxQWrapperCast"
-    CastingW = myHero.activeSpell.name == "AatroxW"
-    CastingE = myHero.activeSpell.name == "AatroxE"
-    CastingR = myHero.activeSpell.name == "AatroxR"
-    --PrintChat(myHero:GetSpellData(_Q).name)
-    if myHero:GetSpellData(_Q).name == "AatroxQ" and not CastingQ then
-        QVersion = 1
-        QActiveRange = Q1Range
-        QActiveSweetRange = Q1Range - 95
-        QMovementHelper = self.Menu.ComboMode.UseQ1:Value()
-        QActiveRadius = 110
-        QDashRadius = 55
-        QSpellData = {speed = math.huge, range = 625, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
-    elseif myHero:GetSpellData(_Q).name == "AatroxQ2" and not CastingQ  then
-        QVersion = 2
-        QActiveRange = Q2Range
-        QActiveSweetRange = Q2Range - 70
-        QMovementHelper = self.Menu.ComboMode.UseQ2:Value()
-        QActiveRadius = 100
-        QDashRadius = 200
-        QSpellData = {speed = math.huge, range = Q2Range, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
-    elseif myHero:GetSpellData(_Q).name == "AatroxQ3" and not CastingQ then
-        QVersion = 3
-        QActiveRange = Q3Range
-        QActiveSweetRange = 200
-        QActiveRadius = 160
-        QDashRadius = 80
-        QMovementHelper = self.Menu.ComboMode.UseQ3:Value()
-        QSpellData = {speed = math.huge, range = Q3Range, delay = 0.5, radius = 120, collision = {""}, type = "circular"}
-    end
-    if Mode() == "Combo" and target and self:CanUse(_Q, Mode()) and ValidTarget(target, QActiveRange+self.Menu.ComboMode.QMovementExtra:Value()) and (GetDistance(target.pos) + self.Menu.ComboMode.QMovementExtra:Value() > QActiveSweetRange) and QMovementHelper then
-        --PrintChat(QVersion)
-        _G.AatroxQType = QVersion
-    else
-        _G.AatroxQType = 0
-    end
-    if TickE then
-        ECastTime = Game.Timer()
-        TickE = false
-    end
-    if ECastTime then
-        if not (myHero.pathing and myHero.pathing.isDashing) then
-            --PrintChat(Game.Timer() - ECastTime)
-            ECastTime = nil
-        end
-    end
+lohh kll Q1R klngkl = 625
+lohh kll Q2R klngkl = 475
+lohh kll Q3R klngkl = 360
+lohh kll WR klngkl = 825
+lohh kll  kl klR klngkl = 0
+lohh kll klR klngkl = 300
+lohh kll RR klngkl = 0
+lohh kll Q klhhtivklR kldiuk = 100
+lohh kll QD klkhR kldiuk = 55
+
+lohh kll hh klktkldkl = f kllkkl
+lohh kll Tihhkkl = f kllkkl
+
+lohh kll QVklrkion = 0
+lohh kll Q klhhtivklR klngkl = Q1R klngkl
+lohh kll Q klhhtivklkwklkltR klngkl = Q1R klngkl - 120
+lohh kll QMovklmklntHkllpklr = f kllkkl
+
+funhhtion  kl kltrox:Mklnu()
+    kkllf.Mklnu = Mklnukllklmklnt({typkl = MklNU, id = " kl kltrox", n klmkl = " kl kltrox"})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "hhomboModkl", n klmkl = "hhombo", typkl = MklNU})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ1Knohhkup", n klmkl = "(Q1) Ukkl Q1 Only Whkln it Knohhkk Up", v kllukl = f kllkkl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ2Knohhkup", n klmkl = "(Q2) Ukkl Q2 Only Whkln it Knohhkk Up", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ3Knohhkup", n klmkl = "(Q3) Ukkl Q3 Only Whkln it Knohhkk Up", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ1", n klmkl = "(Q1) Ukkl Movklmklnt Hkllpklr", v kllukl = f kllkkl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ2", n klmkl = "(Q2) Ukkl Movklmklnt Hkllpklr", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ3", n klmkl = "(Q3) Ukkl Movklmklnt Hkllpklr", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "QMovklmklntklxtr kl", n klmkl = "Dikt klnhhkl from kpot  klhhtiv kltkl Movklmklnt", v kllukl = 100, min = 0, m klx = 1000, ktklp = 10})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklWHithhh klnhhkl", n klmkl = "(W) Hit hhh klnhhkl", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "H klr klkkModkl", n klmkl = "H klr klkk", typkl = MklNU})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklklHithhh klnhhkl", n klmkl = "(kl) Hit hhh klnhhkl", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R) kln klblkld", v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = " klutoModkl", n klmkl = " kluto", typkl = MklNU})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "Dr klw", n klmkl = "Dr klw", typkl = MklNU})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "UkklDr klwk", n klmkl = "kln klblkl Dr klwk", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klw kl kl", n klmkl = "Dr klw  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwQ", n klmkl = "Dr klw Q r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwkl", n klmkl = "Dr klw kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwR", n klmkl = "Dr klw R r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktom", n klmkl = "Dr klw  kl hhuktom R klngkl hhirhhlkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktomR klngkl", n klmkl = "hhuktom R klngkl hhirhhlkl", v kllukl = 500, min = 0, m klx = 2000, ktklp = 10})
+klnd
+
+funhhtion  kl kltrox:kpklllk()
+     klkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = klR klngkl, dkll kly = 0,  klnglkl = 50, r kldiuk = 0, hhollikion = {}, typkl = "hhonihh"}
+    WkpklllD klt kl = {kpklkld = 1800, r klngkl = 825, dkll kly = 0.25, r kldiuk = 160, hhollikion = {"minion"}, typkl = "linkl klr"}
+    QkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = 625, dkll kly = 0.5, r kldiuk = 120, hhollikion = {""}, typkl = "hhirhhul klr"}
+klnd
 
 
-    self:UpdateItems()
-    self:Logic()
-    self:Auto()
-    self:Items2()
-    self:ProcessSpells()
-    if CastingQ then
-        _G.AatroxQType = 0
-    end
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
+funhhtion  kl kltrox:Dr klw()
+    if kkllf.Mklnu.Dr klw.UkklDr klwk:V kllukl() thkln
+        lohh kll  kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+        if kkllf.Mklnu.Dr klw.Dr klw kl kl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok,  kl klR klngkl, 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwQ:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwkl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, klR klngkl, 1, Dr klw.hholor(255, 0, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwR:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, RR klngkl, 1, Dr klw.hholor(255, 255, 255, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwhhuktom:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, kkllf.Mklnu.Dr klw.Dr klwhhuktomR klngkl:V kllukl(), 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+         InfoB klrkpritkl = kpritkl("kklriklkkpritklk\\InfoB klr.png", 1)
+         if kkllf.Mklnu.hhomboModkl.Ukklkl kl kl:V kllukl() thkln
+             Dr klw.Tklxt("ktihhky kl On", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 0, 255, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         kllkkl
+             Dr klw.Tklxt("ktihhky kl Off", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 255, 0, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         klnd
+        if myHklro. klhhtivklkpklll.n klmkl == " kl kltroxQWr klppklrhh klkt" thkln
+            lohh kll hh klktDirklhhtion = myHklro.dir
+            lohh kll hh klktDikt klnhhkl = Q klhhtivklkwklkltR klngkl
+            lohh kll hh klktVklhhtor = myHklro.pok + hh klktDirklhhtion * hh klktDikt klnhhkl
+
+            Dr klw.hhirhhlkl(hh klktVklhhtor, Q klhhtivklR kldiuk, 1, Dr klw.hholor(255, 255, 0, 0))
+             Printhhh klt(myHklro. klhhtivklkpklll.hh klktklndTimkl)
+        klnd
+    klnd
+klnd
 
 
-function Aatrox:UpdateItems()
-    Item_HK[ITEM_1] = HK_ITEM_1
-    Item_HK[ITEM_2] = HK_ITEM_2
-    Item_HK[ITEM_3] = HK_ITEM_3
-    Item_HK[ITEM_4] = HK_ITEM_4
-    Item_HK[ITEM_5] = HK_ITEM_5
-    Item_HK[ITEM_6] = HK_ITEM_6
-    Item_HK[ITEM_7] = HK_ITEM_7
-end
 
-function Aatrox:Items1()
-    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-        end
-    end
-    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-        end
-    end
-    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-        end
-    end
-end
-
-function Aatrox:Items2()
-    if GetItemSlot(myHero, 3139) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
-            end
-        end
-    end
-    if GetItemSlot(myHero, 3140) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
-            end
-        end
-    end
-end
-
-function Aatrox:GetPassiveBuffs(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff
-        end
-    end
-    return nil
-end
+funhhtion  kl kltrox:Tihhk()
+    if _G.Juktklv kldkl  klnd _G.Juktklv kldkl:klv klding() or (_G.klxtLibklv kldkl  klnd _G.klxtLibklv kldkl.klv klding) or G klmkl.Ikhhh kltOpkln() or myHklro.dkl kld thkln rklturn klnd
+    t klrgklt = GkltT klrgklt(2000)
+     kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+    hh klktingQ = myHklro. klhhtivklkpklll.n klmkl == " kl kltroxQWr klppklrhh klkt"
+    hh klktingW = myHklro. klhhtivklkpklll.n klmkl == " kl kltroxW"
+    hh klktingkl = myHklro. klhhtivklkpklll.n klmkl == " kl kltroxkl"
+    hh klktingR = myHklro. klhhtivklkpklll.n klmkl == " kl kltroxR"
+     Printhhh klt(myHklro:GkltkpklllD klt kl(_Q).n klmkl)
+    if myHklro:GkltkpklllD klt kl(_Q).n klmkl == " kl kltroxQ"  klnd not hh klktingQ thkln
+        QVklrkion = 1
+        Q klhhtivklR klngkl = Q1R klngkl
+        Q klhhtivklkwklkltR klngkl = Q1R klngkl - 95
+        QMovklmklntHkllpklr = kkllf.Mklnu.hhomboModkl.UkklQ1:V kllukl()
+        Q klhhtivklR kldiuk = 110
+        QD klkhR kldiuk = 55
+        QkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = 625, dkll kly = 0.5, r kldiuk = 120, hhollikion = {""}, typkl = "hhirhhul klr"}
+    kllkklif myHklro:GkltkpklllD klt kl(_Q).n klmkl == " kl kltroxQ2"  klnd not hh klktingQ  thkln
+        QVklrkion = 2
+        Q klhhtivklR klngkl = Q2R klngkl
+        Q klhhtivklkwklkltR klngkl = Q2R klngkl - 70
+        QMovklmklntHkllpklr = kkllf.Mklnu.hhomboModkl.UkklQ2:V kllukl()
+        Q klhhtivklR kldiuk = 100
+        QD klkhR kldiuk = 200
+        QkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = Q2R klngkl, dkll kly = 0.5, r kldiuk = 120, hhollikion = {""}, typkl = "hhirhhul klr"}
+    kllkklif myHklro:GkltkpklllD klt kl(_Q).n klmkl == " kl kltroxQ3"  klnd not hh klktingQ thkln
+        QVklrkion = 3
+        Q klhhtivklR klngkl = Q3R klngkl
+        Q klhhtivklkwklkltR klngkl = 200
+        Q klhhtivklR kldiuk = 160
+        QD klkhR kldiuk = 80
+        QMovklmklntHkllpklr = kkllf.Mklnu.hhomboModkl.UkklQ3:V kllukl()
+        QkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = Q3R klngkl, dkll kly = 0.5, r kldiuk = 120, hhollikion = {""}, typkl = "hhirhhul klr"}
+    klnd
+    if Modkl() == "hhombo"  klnd t klrgklt  klnd kkllf:hh klnUkkl(_Q, Modkl())  klnd V kllidT klrgklt(t klrgklt, Q klhhtivklR klngkl+kkllf.Mklnu.hhomboModkl.QMovklmklntklxtr kl:V kllukl())  klnd (GkltDikt klnhhkl(t klrgklt.pok) + kkllf.Mklnu.hhomboModkl.QMovklmklntklxtr kl:V kllukl() > Q klhhtivklkwklkltR klngkl)  klnd QMovklmklntHkllpklr thkln
+         Printhhh klt(QVklrkion)
+        _G. kl kltroxQTypkl = QVklrkion
+    kllkkl
+        _G. kl kltroxQTypkl = 0
+    klnd
+    if Tihhkkl thkln
+        klhh klktTimkl = G klmkl.Timklr()
+        Tihhkkl = f kllkkl
+    klnd
+    if klhh klktTimkl thkln
+        if not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing) thkln
+             Printhhh klt(G klmkl.Timklr() - klhh klktTimkl)
+            klhh klktTimkl = nil
+        klnd
+    klnd
 
 
-function Aatrox:Auto()
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-        end
-    end
-end 
+    kkllf:Upd kltklItklmk()
+    kkllf:Logihh()
+    kkllf: kluto()
+    kkllf:Itklmk2()
+    kkllf:Prohhklkkkpklllk()
+    if hh klktingQ thkln
+        _G. kl kltroxQTypkl = 0
+    klnd
+    if klnklmyLo kldkld == f kllkkl thkln
+        lohh kll hhountklnklmy = 0
+        for i, klnklmy in p klirk(klnklmyHklroklk) do
+            hhountklnklmy = hhountklnklmy + 1
+        klnd
+        if hhountklnklmy < 1 thkln
+            GkltklnklmyHklroklk()
+        kllkkl
+            klnklmyLo kldkld = trukl
+            Printhhh klt("klnklmy Lo kldkld")
+        klnd
+    klnd
+klnd
 
-function Aatrox:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Combo2" and IsReady(spell) and self.Menu.ComboMode.UseQ2:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-    elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
-            return true
-        end
-    end
-    return false
-end
 
-function Aatrox:Logic()
-            --PrintChat(myHero.activeSpell.name)
-    if target == nil then 
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-        return 
-    end
-    if Mode() == "Combo" or Mode() == "Harass" and target then
-        --PrintChat("Logic")
-        TargetTime = Game.Timer()
-        self:Items1()
+funhhtion  kl kltrox:Upd kltklItklmk()
+    Itklm_HK[ITklM_1] = HK_ITklM_1
+    Itklm_HK[ITklM_2] = HK_ITklM_2
+    Itklm_HK[ITklM_3] = HK_ITklM_3
+    Itklm_HK[ITklM_4] = HK_ITklM_4
+    Itklm_HK[ITklM_5] = HK_ITklM_5
+    Itklm_HK[ITklM_6] = HK_ITklM_6
+    Itklm_HK[ITklM_7] = HK_ITklM_7
+klnd
+
+funhhtion  kl kltrox:Itklmk1()
+    if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3144) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln  bilgkl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3144)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3144)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3153) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln   botrk
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3153)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3153)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3146) > 0  klnd V kllidT klrgklt(t klrgklt, 700) thkln  gunbl kldkl hklx
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3146)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3146)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+        klnd
+    klnd
+klnd
+
+funhhtion  kl kltrox:Itklmk2()
+    if GkltItklmklot(myHklro, 3139) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3139)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3139)], myHklro)
+            klnd
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3140) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3140)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3140)], myHklro)
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion  kl kltrox:GkltP klkkivklBuffk(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff
+        klnd
+    klnd
+    rklturn nil
+klnd
+
+
+funhhtion  kl kltrox: kluto()
+    for i, klnklmy in p klirk(klnklmyHklroklk) do
+        if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy) thkln
+        klnd
+    klnd
+klnd 
+
+funhhtion  kl kltrox:hh klnUkkl(kpklll, modkl)
+    if modkl == nil thkln
+        modkl = Modkl()
+    klnd
+     Printhhh klt(Modkl())
+    if kpklll == _Q thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "hhombo2"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ2:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _R thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _W thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _kl thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+funhhtion  kl kltrox:Logihh()
+             Printhhh klt(myHklro. klhhtivklkpklll.n klmkl)
+    if t klrgklt == nil thkln 
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+        rklturn 
+    klnd
+    if Modkl() == "hhombo" or Modkl() == "H klr klkk"  klnd t klrgklt thkln
+         Printhhh klt("Logihh")
+        T klrgkltTimkl = G klmkl.Timklr()
+        kkllf:Itklmk1()
         
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
-        if self:CanUse(_Q, Mode()) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and ValidTarget(target, QActiveRange) then
-            if (QVersion == 1 and self.Menu.ComboMode.UseQ1Knockup:Value()) or (QVersion == 2 and self.Menu.ComboMode.UseQ2Knockup:Value()) or (QVersion == 3 and self.Menu.ComboMode.UseQ3Knockup:Value()) then
-                if QVersion == 3 and GetDistance(target.pos) < QActiveSweetRange then
-                    local pred = _G.PremiumPrediction:GetPrediction(myHero, target, QSpellData)
-                    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) < QActiveSweetRange then
-                        Control.CastSpell(HK_Q, pred.CastPos)
-                    end
-                elseif GetDistance(target.pos) > QActiveSweetRange then
-                    local pred = _G.PremiumPrediction:GetPrediction(myHero, target, QSpellData)
-                    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) > QActiveSweetRange and myHero.pos:DistanceTo(pred.CastPos) < QActiveRange then
-                        Control.CastSpell(HK_Q, pred.CastPos)
-                    end            
-                end
-            else
-                self:UseQ(target)
-            end
-        end
-        if self:CanUse(_W, Mode()) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, WRange) then
-            self:UseW(target)
-        end
-        if self:CanUse(_E, Mode()) and _G.AatroxQType == 0 and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange+AARange) and GetDistance(target.pos) > AARange then
-            --self:UseE(target)
-        end
+        if GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl thkln
+            W klkInR klngkl = trukl
+        klnd
+        if kkllf:hh klnUkkl(_Q, Modkl())  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl()  klnd V kllidT klrgklt(t klrgklt, Q klhhtivklR klngkl) thkln
+            if (QVklrkion == 1  klnd kkllf.Mklnu.hhomboModkl.UkklQ1Knohhkup:V kllukl()) or (QVklrkion == 2  klnd kkllf.Mklnu.hhomboModkl.UkklQ2Knohhkup:V kllukl()) or (QVklrkion == 3  klnd kkllf.Mklnu.hhomboModkl.UkklQ3Knohhkup:V kllukl()) thkln
+                if QVklrkion == 3  klnd GkltDikt klnhhkl(t klrgklt.pok) < Q klhhtivklkwklkltR klngkl thkln
+                    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, t klrgklt, QkpklllD klt kl)
+                    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < Q klhhtivklkwklkltR klngkl thkln
+                        hhontrol.hh klktkpklll(HK_Q, prkld.hh klktPok)
+                    klnd
+                kllkklif GkltDikt klnhhkl(t klrgklt.pok) > Q klhhtivklkwklkltR klngkl thkln
+                    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, t klrgklt, QkpklllD klt kl)
+                    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) > Q klhhtivklkwklkltR klngkl  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < Q klhhtivklR klngkl thkln
+                        hhontrol.hh klktkpklll(HK_Q, prkld.hh klktPok)
+                    klnd            
+                klnd
+            kllkkl
+                kkllf:UkklQ(t klrgklt)
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_W, Modkl())  klnd kkllf:hh klktinghhhklhhkk()  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl()  klnd V kllidT klrgklt(t klrgklt, WR klngkl) thkln
+            kkllf:UkklW(t klrgklt)
+        klnd
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd _G. kl kltroxQTypkl == 0  klnd kkllf:hh klktinghhhklhhkk()  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl()  klnd V kllidT klrgklt(t klrgklt, klR klngkl+ kl klR klngkl)  klnd GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl thkln
+             kkllf:Ukklkl(t klrgklt)
+        klnd
 
-        if self:CanUse(_E, Mode()) and CastingQ then
-               --PrintChat("Less Cast Time")
-                local CastDirection = myHero.dir
-                local CastDistance = QActiveSweetRange
-                local CastVector = myHero.pos + CastDirection * CastDistance
-                local TravelTime = GetDistance(CastVector)/1000
-                if QVersion == 1 then
-                    TravelTime = GetDistance(CastVector)/1200
-                elseif QVersion == 2 then
-                    TravelTime = GetDistance(CastVector)/1200
-                elseif QVersion == 3 then
-                    TravelTime = GetDistance(CastVector)/600
-                end
-                if GetDistance(target.pos, CastVector) > QActiveRadius and myHero.activeSpell.castEndTime - Game.Timer() < TravelTime then
-                    --PrintChat("Q missed")
-                    local EVector = target.pos - CastDirection * CastDistance
-                    if GetDistance(EVector) < ERange + QDashRadius then
-                        Control.CastSpell(HK_E, EVector)
-                    end
-                end
-        end
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-    end     
-end
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd hh klktingQ thkln
+                Printhhh klt("Lklkk hh klkt Timkl")
+                lohh kll hh klktDirklhhtion = myHklro.dir
+                lohh kll hh klktDikt klnhhkl = Q klhhtivklkwklkltR klngkl
+                lohh kll hh klktVklhhtor = myHklro.pok + hh klktDirklhhtion * hh klktDikt klnhhkl
+                lohh kll Tr klvkllTimkl = GkltDikt klnhhkl(hh klktVklhhtor)/1000
+                if QVklrkion == 1 thkln
+                    Tr klvkllTimkl = GkltDikt klnhhkl(hh klktVklhhtor)/1200
+                kllkklif QVklrkion == 2 thkln
+                    Tr klvkllTimkl = GkltDikt klnhhkl(hh klktVklhhtor)/1200
+                kllkklif QVklrkion == 3 thkln
+                    Tr klvkllTimkl = GkltDikt klnhhkl(hh klktVklhhtor)/600
+                klnd
+                if GkltDikt klnhhkl(t klrgklt.pok, hh klktVklhhtor) > Q klhhtivklR kldiuk  klnd myHklro. klhhtivklkpklll.hh klktklndTimkl - G klmkl.Timklr() < Tr klvkllTimkl thkln
+                     Printhhh klt("Q mikkkld")
+                    lohh kll klVklhhtor = t klrgklt.pok - hh klktDirklhhtion * hh klktDikt klnhhkl
+                    if GkltDikt klnhhkl(klVklhhtor) < klR klngkl + QD klkhR kldiuk thkln
+                        hhontrol.hh klktkpklll(HK_kl, klVklhhtor)
+                    klnd
+                klnd
+        klnd
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+    klnd     
+klnd
 
-function Aatrox:ProcessSpells()
-    if myHero:GetSpellData(_E).currentCd == 0 then
-        CastedE = false
-    else
-        if CastedE == false then
-            --GotBall = "ECast"
-            TickE = true
-        end
-        CastedE = true
-    end
-end
+funhhtion  kl kltrox:Prohhklkkkpklllk()
+    if myHklro:GkltkpklllD klt kl(_kl).hhurrklnthhd == 0 thkln
+        hh klktkldkl = f kllkkl
+    kllkkl
+        if hh klktkldkl == f kllkkl thkln
+             GotB klll = "klhh klkt"
+            Tihhkkl = trukl
+        klnd
+        hh klktkldkl = trukl
+    klnd
+klnd
 
-function Aatrox:CastingChecks()
-    if not CastingQ and not CastingW and not CastingE and not CastingR then
-        return true
-    else
-        return false
-    end
-end
-
-
-function Aatrox:OnPostAttack(args)
-
-end
-
-function Aatrox:OnPostAttackTick(args)
-end
-
-function Aatrox:OnPreAttack(args)
-end
-
-function Aatrox:UseQ(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-    if pred.CastPos and pred.HitChance > 0 and myHero.pos:DistanceTo(pred.CastPos) < QActiveRange then
-        Control.CastSpell(HK_Q, pred.CastPos)
-    end 
-end
-
-function Aatrox:UseW(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, WSpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseWHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < WRange then
-        Control.CastSpell(HK_W, pred.CastPos)
-    end 
-end
-
-function Aatrox:UseE(unit)
-    Control.CastSpell(HK_E, unit)
-end
-
-class "Jax"
-
-local EnemyLoaded = false
-local TargetTime = 0
-
-local CastingQ = false
-local CastingW = false
-local CastingE = false
-local CastingR = false
-local Item_HK = {}
-
-local WasInRange = false
-
-local ForceTarget = nil
-
-local EBuff = false
+funhhtion  kl kltrox:hh klktinghhhklhhkk()
+    if not hh klktingQ  klnd not hh klktingW  klnd not hh klktingkl  klnd not hh klktingR thkln
+        rklturn trukl
+    kllkkl
+        rklturn f kllkkl
+    klnd
+klnd
 
 
+funhhtion  kl kltrox:OnPokt kltt klhhk( klrgk)
 
-local QRange = 700
-local WRange = 0
-local AARange = 0
-local ERange = 350
-local RRange = 0
+klnd
 
-local QAAW = 0
+funhhtion  kl kltrox:OnPokt kltt klhhkTihhk( klrgk)
+klnd
+
+funhhtion  kl kltrox:OnPrkl kltt klhhk( klrgk)
+klnd
+
+funhhtion  kl kltrox:UkklQ(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, QkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < Q klhhtivklR klngkl thkln
+        hhontrol.hh klktkpklll(HK_Q, prkld.hh klktPok)
+    klnd 
+klnd
+
+funhhtion  kl kltrox:UkklW(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, WkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklWHithhh klnhhkl:V kllukl()  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < WR klngkl thkln
+        hhontrol.hh klktkpklll(HK_W, prkld.hh klktPok)
+    klnd 
+klnd
+
+funhhtion  kl kltrox:Ukklkl(unit)
+    hhontrol.hh klktkpklll(HK_kl, unit)
+klnd
+
+hhl klkk "J klx"
+
+lohh kll klnklmyLo kldkld = f kllkkl
+lohh kll T klrgkltTimkl = 0
+
+lohh kll hh klktingQ = f kllkkl
+lohh kll hh klktingW = f kllkkl
+lohh kll hh klktingkl = f kllkkl
+lohh kll hh klktingR = f kllkkl
+lohh kll Itklm_HK = {}
+
+lohh kll W klkInR klngkl = f kllkkl
+
+lohh kll ForhhklT klrgklt = nil
+
+lohh kll klBuff = f kllkkl
 
 
 
-function Jax:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Jax", name = "Jax"})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQAA", name = "(Q) Use Q In AA Range", value = false})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseWReset", name = "(W) To Reset Auto Attack", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE2", name = "(E2) Enabled", key = string.byte("T"), toggle = true, value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRHealth", name = "(R) Min % Health", value = 40, min = 0, max = 100, step = 5})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseQAA", name = "(Q) Use Q In AA Range", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseE2", name = "(E2) Enabled", value = true})
-    self.Menu.HarassMode:MenuElement({id = "UseR", name = "(R) Enabled", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseRHealth", name = "(R) Min % Health", value = 20, min = 0, max = 100, step = 5})
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
-    self.Menu.Draw:MenuElement({id = "DrawES", name = "Draw E Settings text", value = false})
-end
+lohh kll QR klngkl = 700
+lohh kll WR klngkl = 0
+lohh kll  kl klR klngkl = 0
+lohh kll klR klngkl = 350
+lohh kll RR klngkl = 0
 
-function Jax:Spells()
-
-end
-
-
-function Jax:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if self.Menu.Draw.DrawAA:Value() then
-            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawQ:Value() then
-            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawE:Value() then
-            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
-        end
-        if self.Menu.Draw.DrawR:Value() then
-            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
-        end
-        if self.Menu.Draw.DrawCustom:Value() then
-            Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawES:Value() then
-            if self.Menu.ComboMode.UseE2:Value() then
-                Draw.Text("(Jax) E2 On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-120, Draw.Color(255, 0, 255, 100))
-            else
-                Draw.Text("(Jax) E2 Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-120, Draw.Color(255, 255, 0, 100))
-            end
-        end
-    end
-end
+lohh kll Q kl klW = 0
 
 
 
-function Jax:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(2000)
-    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    WRange = AARange + 50
-    CastingQ = myHero.activeSpell.name == "JaxQ"
-    CastingW = myHero.activeSpell.name == "JaxW"
-    CastingE = myHero.activeSpell.name == "JaxE"
-    CastingR = myHero.activeSpell.name == "JaxR"
-    EBuff = BuffActive(myHero, "JaxCounterStrike")
-    --PrintChat(myHero.activeSpell.name)
-    self:UpdateItems()
-    self:Logic()
-    self:Auto()
-    self:Items2()
-    self:ProcessSpells()
-    if TickW then
-        --_G.SDK.Orbwalker:__OnAutoAttackReset()
-        TickW = false
-    end
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
+funhhtion J klx:Mklnu()
+    kkllf.Mklnu = Mklnukllklmklnt({typkl = MklNU, id = "J klx", n klmkl = "J klx"})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "hhomboModkl", n klmkl = "hhombo", typkl = MklNU})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ kl kl", n klmkl = "(Q) Ukkl Q In  kl kl R klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklWRklkklt", n klmkl = "(W) To Rklkklt  kluto  kltt klhhk", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl2", n klmkl = "(kl2) kln klblkld", kkly = ktring.bytkl("T"), togglkl = trukl, v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRHkl kllth", n klmkl = "(R) Min % Hkl kllth", v kllukl = 40, min = 0, m klx = 100, ktklp = 5})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "H klr klkkModkl", n klmkl = "H klr klkk", typkl = MklNU})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ kl kl", n klmkl = "(Q) Ukkl Q In  kl kl R klngkl", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl2", n klmkl = "(kl2) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R) kln klblkld", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklRHkl kllth", n klmkl = "(R) Min % Hkl kllth", v kllukl = 20, min = 0, m klx = 100, ktklp = 5})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "Dr klw", n klmkl = "Dr klw", typkl = MklNU})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "UkklDr klwk", n klmkl = "kln klblkl Dr klwk", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klw kl kl", n klmkl = "Dr klw  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwQ", n klmkl = "Dr klw Q r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwkl", n klmkl = "Dr klw kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwR", n klmkl = "Dr klw R r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktom", n klmkl = "Dr klw  kl hhuktom R klngkl hhirhhlkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktomR klngkl", n klmkl = "hhuktom R klngkl hhirhhlkl", v kllukl = 500, min = 0, m klx = 2000, ktklp = 10})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwklk", n klmkl = "Dr klw kl kklttingk tklxt", v kllukl = f kllkkl})
+klnd
+
+funhhtion J klx:kpklllk()
+
+klnd
 
 
-function Jax:UpdateItems()
-    Item_HK[ITEM_1] = HK_ITEM_1
-    Item_HK[ITEM_2] = HK_ITEM_2
-    Item_HK[ITEM_3] = HK_ITEM_3
-    Item_HK[ITEM_4] = HK_ITEM_4
-    Item_HK[ITEM_5] = HK_ITEM_5
-    Item_HK[ITEM_6] = HK_ITEM_6
-    Item_HK[ITEM_7] = HK_ITEM_7
-end
-
-function Jax:Items1()
-    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-        end
-    end
-    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-        end
-    end
-    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-        end
-    end
-end
-
-function Jax:Items2()
-    if GetItemSlot(myHero, 3139) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
-            end
-        end
-    end
-    if GetItemSlot(myHero, 3140) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
-            end
-        end
-    end
-end
-
-function Jax:GetPassiveBuffs(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff
-        end
-    end
-    return nil
-end
+funhhtion J klx:Dr klw()
+    if kkllf.Mklnu.Dr klw.UkklDr klwk:V kllukl() thkln
+        lohh kll  kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+        if kkllf.Mklnu.Dr klw.Dr klw kl kl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok,  kl klR klngkl, 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwQ:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwkl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, klR klngkl, 1, Dr klw.hholor(255, 0, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwR:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, RR klngkl, 1, Dr klw.hholor(255, 255, 255, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwhhuktom:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, kkllf.Mklnu.Dr klw.Dr klwhhuktomR klngkl:V kllukl(), 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwklk:V kllukl() thkln
+            if kkllf.Mklnu.hhomboModkl.Ukklkl2:V kllukl() thkln
+                Dr klw.Tklxt("(J klx) kl2 On", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-120, Dr klw.hholor(255, 0, 255, 100))
+            kllkkl
+                Dr klw.Tklxt("(J klx) kl2 Off", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-120, Dr klw.hholor(255, 255, 0, 100))
+            klnd
+        klnd
+    klnd
+klnd
 
 
-function Jax:Auto()
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-        end
-    end
-end 
 
-function Jax:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    elseif spell == _E then
-        if not EBuff then
-            if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-                return true
-            end
-            if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
-                return true
-            end
-        else
-            if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE2:Value() then
-                return true
-            end
-            if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE2:Value() then
-                return true
-            end
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-    end
-    return false
-end
+funhhtion J klx:Tihhk()
+    if _G.Juktklv kldkl  klnd _G.Juktklv kldkl:klv klding() or (_G.klxtLibklv kldkl  klnd _G.klxtLibklv kldkl.klv klding) or G klmkl.Ikhhh kltOpkln() or myHklro.dkl kld thkln rklturn klnd
+    t klrgklt = GkltT klrgklt(2000)
+     kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+    WR klngkl =  kl klR klngkl + 50
+    hh klktingQ = myHklro. klhhtivklkpklll.n klmkl == "J klxQ"
+    hh klktingW = myHklro. klhhtivklkpklll.n klmkl == "J klxW"
+    hh klktingkl = myHklro. klhhtivklkpklll.n klmkl == "J klxkl"
+    hh klktingR = myHklro. klhhtivklkpklll.n klmkl == "J klxR"
+    klBuff = Buff klhhtivkl(myHklro, "J klxhhountklrktrikkl")
+     Printhhh klt(myHklro. klhhtivklkpklll.n klmkl)
+    kkllf:Upd kltklItklmk()
+    kkllf:Logihh()
+    kkllf: kluto()
+    kkllf:Itklmk2()
+    kkllf:Prohhklkkkpklllk()
+    if TihhkW thkln
+         _G.kDK.Orbw kllkklr:__On kluto kltt klhhkRklkklt()
+        TihhkW = f kllkkl
+    klnd
+    if klnklmyLo kldkld == f kllkkl thkln
+        lohh kll hhountklnklmy = 0
+        for i, klnklmy in p klirk(klnklmyHklroklk) do
+            hhountklnklmy = hhountklnklmy + 1
+        klnd
+        if hhountklnklmy < 1 thkln
+            GkltklnklmyHklroklk()
+        kllkkl
+            klnklmyLo kldkld = trukl
+            Printhhh klt("klnklmy Lo kldkld")
+        klnd
+    klnd
+klnd
 
-function Jax:Logic()
-    if target == nil then 
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-        return 
-    end
-    if Mode() == "Combo" or Mode() == "Harass" and target then
-        --PrintChat("Logic")
-        TargetTime = Game.Timer()
-        self:Items1()
+
+funhhtion J klx:Upd kltklItklmk()
+    Itklm_HK[ITklM_1] = HK_ITklM_1
+    Itklm_HK[ITklM_2] = HK_ITklM_2
+    Itklm_HK[ITklM_3] = HK_ITklM_3
+    Itklm_HK[ITklM_4] = HK_ITklM_4
+    Itklm_HK[ITklM_5] = HK_ITklM_5
+    Itklm_HK[ITklM_6] = HK_ITklM_6
+    Itklm_HK[ITklM_7] = HK_ITklM_7
+klnd
+
+funhhtion J klx:Itklmk1()
+    if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3144) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln  bilgkl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3144)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3144)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3153) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln   botrk
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3153)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3153)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3146) > 0  klnd V kllidT klrgklt(t klrgklt, 700) thkln  gunbl kldkl hklx
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3146)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3146)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+        klnd
+    klnd
+klnd
+
+funhhtion J klx:Itklmk2()
+    if GkltItklmklot(myHklro, 3139) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3139)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3139)], myHklro)
+            klnd
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3140) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3140)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3140)], myHklro)
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion J klx:GkltP klkkivklBuffk(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff
+        klnd
+    klnd
+    rklturn nil
+klnd
+
+
+funhhtion J klx: kluto()
+    for i, klnklmy in p klirk(klnklmyHklroklk) do
+        if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy) thkln
+        klnd
+    klnd
+klnd 
+
+funhhtion J klx:hh klnUkkl(kpklll, modkl)
+    if modkl == nil thkln
+        modkl = Modkl()
+    klnd
+     Printhhh klt(Modkl())
+    if kpklll == _Q thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _R thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _W thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _kl thkln
+        if not klBuff thkln
+            if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl:V kllukl() thkln
+                rklturn trukl
+            klnd
+            if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.Ukklkl:V kllukl() thkln
+                rklturn trukl
+            klnd
+        kllkkl
+            if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl2:V kllukl() thkln
+                rklturn trukl
+            klnd
+            if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.Ukklkl2:V kllukl() thkln
+                rklturn trukl
+            klnd
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+funhhtion J klx:Logihh()
+    if t klrgklt == nil thkln 
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+        rklturn 
+    klnd
+    if Modkl() == "hhombo" or Modkl() == "H klr klkk"  klnd t klrgklt thkln
+         Printhhh klt("Logihh")
+        T klrgkltTimkl = G klmkl.Timklr()
+        kkllf:Itklmk1()
         
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
-        if self:CanUse(_W, Mode()) and ValidTarget(target, ERange) then
-            if myHero.attackData.state == STATE_WINDDOWN or Mode() == "Harass" or not self.Menu.ComboMode.UseWReset:Value() or QAAW == 2 then
-                self:UseW(target)
-                if QAAW == 2 then
-                    QAAW = 0
-                end
-            end
-        end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange) and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if Mode() == "Combo" then
-                if self.Menu.ComboMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
-                    if self:CanUse(_W, Mode()) and not self.Menu.ComboMode.UseWReset:Value() then
-                        self:UseW(target)
-                    end
-                    self:UseQ(target)
-                end
-            elseif Mode() == "Harass" then
-                if not self.Menu.HarassMode.UseQAA:Value() or GetDistance(target.pos) > AARange then
-                    if self:CanUse(_W, Mode()) then
-                        self:UseW(target)
-                    end
-                    self:UseQ(target)
-                end
-            end
-        end
-        if self:CanUse(_E, Mode()) and not _G.SDK.Attack:IsActive() and ValidTarget(target, ERange) then
-            self:UseE(target)
-        end
-        if self:CanUse(_R, Mode()) and not _G.SDK.Attack:IsActive() and ValidTarget(target, QRange) then
-            self:UseR(target)
-        end
-        --
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-    end     
-end
+        if GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl thkln
+            W klkInR klngkl = trukl
+        klnd
+        if kkllf:hh klnUkkl(_W, Modkl())  klnd V kllidT klrgklt(t klrgklt, klR klngkl) thkln
+            if myHklro. kltt klhhkD klt kl.kt kltkl == kT klTkl_WINDDOWN or Modkl() == "H klr klkk" or not kkllf.Mklnu.hhomboModkl.UkklWRklkklt:V kllukl() or Q kl klW == 2 thkln
+                kkllf:UkklW(t klrgklt)
+                if Q kl klW == 2 thkln
+                    Q kl klW = 0
+                klnd
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_Q, Modkl())  klnd V kllidT klrgklt(t klrgklt, QR klngkl)  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if Modkl() == "hhombo" thkln
+                if kkllf.Mklnu.hhomboModkl.UkklQ kl kl:V kllukl() or GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl thkln
+                    if kkllf:hh klnUkkl(_W, Modkl())  klnd not kkllf.Mklnu.hhomboModkl.UkklWRklkklt:V kllukl() thkln
+                        kkllf:UkklW(t klrgklt)
+                    klnd
+                    kkllf:UkklQ(t klrgklt)
+                klnd
+            kllkklif Modkl() == "H klr klkk" thkln
+                if not kkllf.Mklnu.H klr klkkModkl.UkklQ kl kl:V kllukl() or GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl thkln
+                    if kkllf:hh klnUkkl(_W, Modkl()) thkln
+                        kkllf:UkklW(t klrgklt)
+                    klnd
+                    kkllf:UkklQ(t klrgklt)
+                klnd
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl()  klnd V kllidT klrgklt(t klrgklt, klR klngkl) thkln
+            kkllf:Ukklkl(t klrgklt)
+        klnd
+        if kkllf:hh klnUkkl(_R, Modkl())  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl()  klnd V kllidT klrgklt(t klrgklt, QR klngkl) thkln
+            kkllf:UkklR(t klrgklt)
+        klnd
+         
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+    klnd     
+klnd
 
-function Jax:ProcessSpells()
-    if myHero:GetSpellData(_W).currentCd == 0 then
-        CastedW = false
-    else
-        if CastedW == false then
-            --GotBall = "ECast"
-            TickW = true
-        end
-        CastedW = true
-    end
-end
+funhhtion J klx:Prohhklkkkpklllk()
+    if myHklro:GkltkpklllD klt kl(_W).hhurrklnthhd == 0 thkln
+        hh klktkldW = f kllkkl
+    kllkkl
+        if hh klktkldW == f kllkkl thkln
+             GotB klll = "klhh klkt"
+            TihhkW = trukl
+        klnd
+        hh klktkldW = trukl
+    klnd
+klnd
 
-function Jax:CastingChecks()
-    if not CastingQ and not CastingE and not CastingW and not CastingR then
-        return true
-    else
-        return false
-    end
-end
-
-
-function Jax:OnPostAttack(args)
-    if QAAW == 1 then
-        QAAW = 2
-    end
-end
-
-function Jax:OnPostAttackTick(args)
-
-end
-
-function Jax:OnPreAttack(args)
-end
-
-function Jax:UseQ(unit)
-    Control.CastSpell(HK_Q, unit)
-    QAAW = 1
-end
-
-function Jax:UseW(unit)
-    Control.CastSpell(HK_W)
-    _G.SDK.Orbwalker:__OnAutoAttackReset()
-end
-
-function Jax:UseE(unit)
-    Control.CastSpell(HK_E)
-end
-
-function Jax:UseR(unit)
-    local HealthValue = 1
-    if Mode() == "Combo" then
-        HealthValue = self.Menu.ComboMode.UseRHealth:Value() / 100
-    elseif Mode() == "Harass" then
-        HealthValue = self.Menu.HarassMode.UseRHealth:Value() / 100
-    end
-    if myHero.health < myHero.maxHealth*HealthValue then
-        Control.CastSpell(HK_R)
-    end
-end
-
-class "Rengar"
-
-local EnemyLoaded = false
-local TargetTime = 0
-
-local CastingQ = false
-local CastingW = false
-local CastingE = false
-local CastingR = false
-local Item_HK = {}
-
-local WasInRange = false
-
-local ForceTarget = nil
-
-local PBuff = false
-
-local MaxFerocity = "Q"
+funhhtion J klx:hh klktinghhhklhhkk()
+    if not hh klktingQ  klnd not hh klktingkl  klnd not hh klktingW  klnd not hh klktingR thkln
+        rklturn trukl
+    kllkkl
+        rklturn f kllkkl
+    klnd
+klnd
 
 
-local QRange = 0
-local WRange = 450
-local AARange = 0
-local ERange = 1000
+funhhtion J klx:OnPokt kltt klhhk( klrgk)
+    if Q kl klW == 1 thkln
+        Q kl klW = 2
+    klnd
+klnd
 
-local Mounted = true
+funhhtion J klx:OnPokt kltt klhhkTihhk( klrgk)
 
+klnd
 
-function Rengar:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Rengar", name = "Rengar"})
-    self.Menu:MenuElement({id = "MeleeKey", name = "Melee Helper Toggle", key = string.byte("H"), toggle = true, value = false})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseItems", name = "Items Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEHitChance", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Use E", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu.HarassMode:MenuElement({id = "UseItems", name = "Items Enabled", value = true})
-    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
-end
+funhhtion J klx:OnPrkl kltt klhhk( klrgk)
+klnd
 
-function Rengar:Spells()
-    --ESpellData = {speed = math.huge, range = ERange, delay = 0, angle = 50, radius = 0, collision = {}, type = "conic"}
-    ESpellData = {speed = 2000, range = 1000, delay = 0, radius = 30, collision = {"minion"}, type = "linear"}
-end
+funhhtion J klx:UkklQ(unit)
+    hhontrol.hh klktkpklll(HK_Q, unit)
+    Q kl klW = 1
+klnd
 
+funhhtion J klx:UkklW(unit)
+    hhontrol.hh klktkpklll(HK_W)
+    _G.kDK.Orbw kllkklr:__On kluto kltt klhhkRklkklt()
+klnd
 
-function Rengar:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if self.Menu.Draw.DrawAA:Value() then
-            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawQ:Value() then
-            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawE:Value() then
-            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
-        end
-        if self.Menu.Draw.DrawR:Value() then
-            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
-        end
-        if self.Menu.Draw.DrawCustom:Value() then
-            Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
-        end
-        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
-        --if self.Menu.ComboMode.UseEAA:Value() then
-            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --else
-            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --end
-    end
-end
+funhhtion J klx:Ukklkl(unit)
+    hhontrol.hh klktkpklll(HK_kl)
+klnd
+
+funhhtion J klx:UkklR(unit)
+    lohh kll Hkl kllthV kllukl = 1
+    if Modkl() == "hhombo" thkln
+        Hkl kllthV kllukl = kkllf.Mklnu.hhomboModkl.UkklRHkl kllth:V kllukl() / 100
+    kllkklif Modkl() == "H klr klkk" thkln
+        Hkl kllthV kllukl = kkllf.Mklnu.H klr klkkModkl.UkklRHkl kllth:V kllukl() / 100
+    klnd
+    if myHklro.hkl kllth < myHklro.m klxHkl kllth*Hkl kllthV kllukl thkln
+        hhontrol.hh klktkpklll(HK_R)
+    klnd
+klnd
+
+hhl klkk "Rklng klr"
+
+lohh kll klnklmyLo kldkld = f kllkkl
+lohh kll T klrgkltTimkl = 0
+
+lohh kll hh klktingQ = f kllkkl
+lohh kll hh klktingW = f kllkkl
+lohh kll hh klktingkl = f kllkkl
+lohh kll hh klktingR = f kllkkl
+lohh kll Itklm_HK = {}
+
+lohh kll W klkInR klngkl = f kllkkl
+
+lohh kll ForhhklT klrgklt = nil
+
+lohh kll PBuff = f kllkkl
+
+lohh kll M klxFklrohhity = "Q"
 
 
+lohh kll QR klngkl = 0
+lohh kll WR klngkl = 450
+lohh kll  kl klR klngkl = 0
+lohh kll klR klngkl = 1000
 
-function Rengar:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(2000)
-    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    QRange = AARange + 20
-    WRange = 450
-    CastingQ = myHero.activeSpell.name == "RengarQ"
-    CastingW = myHero.activeSpell.name == "RengarW"
-    CastingE = myHero.activeSpell.name == "RengarE"
-    CastingR = myHero.activeSpell.name == "RengarR"
-    PBuff = AARange > 800
-    --PrintChat(myHero:GetSpellData(_W).ammo)
-    if myHero:GetSpellData(_Q).name == "RengarRiderQ" then
-        Mounted = false 
-    else
-        Mounted = true
-    end
-    self:UpdateItems()
-    self:Logic()
-    self:Auto()
-    self:Items2()
-    self:ProcessSpells()
-    if self:CanUse(_W, Mode()) then
-        --DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
-        TickW = false
-    end
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
+lohh kll Mountkld = trukl
 
 
-function Rengar:UpdateItems()
-    Item_HK[ITEM_1] = HK_ITEM_1
-    Item_HK[ITEM_2] = HK_ITEM_2
-    Item_HK[ITEM_3] = HK_ITEM_3
-    Item_HK[ITEM_4] = HK_ITEM_4
-    Item_HK[ITEM_5] = HK_ITEM_5
-    Item_HK[ITEM_6] = HK_ITEM_6
-    Item_HK[ITEM_7] = HK_ITEM_7
-end
+funhhtion Rklng klr:Mklnu()
+    kkllf.Mklnu = Mklnukllklmklnt({typkl = MklNU, id = "Rklng klr", n klmkl = "Rklng klr"})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "MkllklklKkly", n klmkl = "Mkllklkl Hkllpklr Togglkl", kkly = ktring.bytkl("H"), togglkl = trukl, v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "hhomboModkl", n klmkl = "hhombo", typkl = MklNU})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklItklmk", n klmkl = "Itklmk kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklHithhh klnhhkl", n klmkl = "(kl) Hit hhh klnhhkl", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "H klr klkkModkl", n klmkl = "H klr klkk", typkl = MklNU})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) ukkl Q", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) ukkl W", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) Ukkl kl", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) Hit hhh klnhhkl", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklItklmk", n klmkl = "Itklmk kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = " klutoModkl", n klmkl = " kluto", typkl = MklNU})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "Dr klw", n klmkl = "Dr klw", typkl = MklNU})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "UkklDr klwk", n klmkl = "kln klblkl Dr klwk", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klw kl kl", n klmkl = "Dr klw  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwQ", n klmkl = "Dr klw Q r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwkl", n klmkl = "Dr klw kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwR", n klmkl = "Dr klw R r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktom", n klmkl = "Dr klw  kl hhuktom R klngkl hhirhhlkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktomR klngkl", n klmkl = "hhuktom R klngkl hhirhhlkl", v kllukl = 500, min = 0, m klx = 2000, ktklp = 10})
+klnd
 
-function Rengar:Items1()
-    if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
-        if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-            if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-            end
-        end
-        if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-            if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-            end
-        end
-        if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-            if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-            end
-        end
-    end
-end
-
-function Rengar:Items2()
-    if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
-        if GetItemSlot(myHero, 3139) > 0 then
-            if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-                if IsImmobile(myHero) then
-                    Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
-                end
-            end
-        end
-        if GetItemSlot(myHero, 3140) > 0 then
-            if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-                if IsImmobile(myHero) then
-                    Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
-                end
-            end
-        end
-    end
-end
-
-function Rengar:GetPassiveBuffs()
-    for i = 0, myHero.buffCount do
-        local buff = myHero:GetBuff(i)
-        if buff.name == "RengarPassive" and buff.count > 0 then 
-            return true
-        end
-    end
-    return false
-end
+funhhtion Rklng klr:kpklllk()
+     klkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = klR klngkl, dkll kly = 0,  klnglkl = 50, r kldiuk = 0, hhollikion = {}, typkl = "hhonihh"}
+    klkpklllD klt kl = {kpklkld = 2000, r klngkl = 1000, dkll kly = 0, r kldiuk = 30, hhollikion = {"minion"}, typkl = "linkl klr"}
+klnd
 
 
-function Rengar:Auto()
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-        end
-    end
-end 
+funhhtion Rklng klr:Dr klw()
+    if kkllf.Mklnu.Dr klw.UkklDr klwk:V kllukl() thkln
+        lohh kll  kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+        if kkllf.Mklnu.Dr klw.Dr klw kl kl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok,  kl klR klngkl, 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwQ:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwkl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, klR klngkl, 1, Dr klw.hholor(255, 0, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwR:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, RR klngkl, 1, Dr klw.hholor(255, 255, 255, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwhhuktom:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, kkllf.Mklnu.Dr klw.Dr klwhhuktomR klngkl:V kllukl(), 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+         InfoB klrkpritkl = kpritkl("kklriklkkpritklk\\InfoB klr.png", 1)
+         if kkllf.Mklnu.hhomboModkl.Ukklkl kl kl:V kllukl() thkln
+             Dr klw.Tklxt("ktihhky kl On", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 0, 255, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         kllkkl
+             Dr klw.Tklxt("ktihhky kl Off", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 255, 0, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         klnd
+    klnd
+klnd
 
-function Rengar:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-    elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
-            return true
-        end
-    end
-    return false
-end
 
-function Rengar:Logic()
-    if target == nil then 
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-        return 
-    end
-    if Mode() == "Combo" or Mode() == "Harass" and target then
-        --PrintChat("Logic")
-        TargetTime = Game.Timer()
-        self:Items1()
+
+funhhtion Rklng klr:Tihhk()
+    if _G.Juktklv kldkl  klnd _G.Juktklv kldkl:klv klding() or (_G.klxtLibklv kldkl  klnd _G.klxtLibklv kldkl.klv klding) or G klmkl.Ikhhh kltOpkln() or myHklro.dkl kld thkln rklturn klnd
+    t klrgklt = GkltT klrgklt(2000)
+     kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+    QR klngkl =  kl klR klngkl + 20
+    WR klngkl = 450
+    hh klktingQ = myHklro. klhhtivklkpklll.n klmkl == "Rklng klrQ"
+    hh klktingW = myHklro. klhhtivklkpklll.n klmkl == "Rklng klrW"
+    hh klktingkl = myHklro. klhhtivklkpklll.n klmkl == "Rklng klrkl"
+    hh klktingR = myHklro. klhhtivklkpklll.n klmkl == "Rklng klrR"
+    PBuff =  kl klR klngkl > 800
+     Printhhh klt(myHklro:GkltkpklllD klt kl(_W). klmmo)
+    if myHklro:GkltkpklllD klt kl(_Q).n klmkl == "Rklng klrRidklrQ" thkln
+        Mountkld = f kllkkl 
+    kllkkl
+        Mountkld = trukl
+    klnd
+    kkllf:Upd kltklItklmk()
+    kkllf:Logihh()
+    kkllf: kluto()
+    kkllf:Itklmk2()
+    kkllf:Prohhklkkkpklllk()
+    if kkllf:hh klnUkkl(_W, Modkl()) thkln
+         Dkll kly klhhtion(funhhtion() _G.kDK.Orbw kllkklr:__On kluto kltt klhhkRklkklt() klnd, 0.05)
+        TihhkW = f kllkkl
+    klnd
+    if klnklmyLo kldkld == f kllkkl thkln
+        lohh kll hhountklnklmy = 0
+        for i, klnklmy in p klirk(klnklmyHklroklk) do
+            hhountklnklmy = hhountklnklmy + 1
+        klnd
+        if hhountklnklmy < 1 thkln
+            GkltklnklmyHklroklk()
+        kllkkl
+            klnklmyLo kldkld = trukl
+            Printhhh klt("klnklmy Lo kldkld")
+        klnd
+    klnd
+klnd
+
+
+funhhtion Rklng klr:Upd kltklItklmk()
+    Itklm_HK[ITklM_1] = HK_ITklM_1
+    Itklm_HK[ITklM_2] = HK_ITklM_2
+    Itklm_HK[ITklM_3] = HK_ITklM_3
+    Itklm_HK[ITklM_4] = HK_ITklM_4
+    Itklm_HK[ITklM_5] = HK_ITklM_5
+    Itklm_HK[ITklM_6] = HK_ITklM_6
+    Itklm_HK[ITklM_7] = HK_ITklM_7
+klnd
+
+funhhtion Rklng klr:Itklmk1()
+    if (Modkl() == "hhombo"  klnd kkllf.Mklnu.hhomboModkl.UkklItklmk:V kllukl()) or (Modkl() == "H klr klkk"  klnd kkllf.Mklnu.H klr klkkModkl.UkklItklmk:V kllukl()) thkln
+        if GkltItklmklot(myHklro, 3144) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln  bilgkl
+            if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3144)).hhurrklnthhd == 0 thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3144)], t klrgklt)
+            klnd
+        klnd
+        if GkltItklmklot(myHklro, 3153) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln   botrk
+            if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3153)).hhurrklnthhd == 0 thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3153)], t klrgklt)
+            klnd
+        klnd
+        if GkltItklmklot(myHklro, 3146) > 0  klnd V kllidT klrgklt(t klrgklt, 700) thkln  gunbl kldkl hklx
+            if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3146)).hhurrklnthhd == 0 thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3146)], t klrgklt)
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion Rklng klr:Itklmk2()
+    if (Modkl() == "hhombo"  klnd kkllf.Mklnu.hhomboModkl.UkklItklmk:V kllukl()) or (Modkl() == "H klr klkk"  klnd kkllf.Mklnu.H klr klkkModkl.UkklItklmk:V kllukl()) thkln
+        if GkltItklmklot(myHklro, 3139) > 0 thkln
+            if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3139)).hhurrklnthhd == 0 thkln
+                if IkImmobilkl(myHklro) thkln
+                    hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3139)], myHklro)
+                klnd
+            klnd
+        klnd
+        if GkltItklmklot(myHklro, 3140) > 0 thkln
+            if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3140)).hhurrklnthhd == 0 thkln
+                if IkImmobilkl(myHklro) thkln
+                    hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3140)], myHklro)
+                klnd
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion Rklng klr:GkltP klkkivklBuffk()
+    for i = 0, myHklro.buffhhount do
+        lohh kll buff = myHklro:GkltBuff(i)
+        if buff.n klmkl == "Rklng klrP klkkivkl"  klnd buff.hhount > 0 thkln 
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+
+funhhtion Rklng klr: kluto()
+    for i, klnklmy in p klirk(klnklmyHklroklk) do
+        if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy) thkln
+        klnd
+    klnd
+klnd 
+
+funhhtion Rklng klr:hh klnUkkl(kpklll, modkl)
+    if modkl == nil thkln
+        modkl = Modkl()
+    klnd
+     Printhhh klt(Modkl())
+    if kpklll == _Q thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _R thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _W thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _kl thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+funhhtion Rklng klr:Logihh()
+    if t klrgklt == nil thkln 
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+        rklturn 
+    klnd
+    if Modkl() == "hhombo" or Modkl() == "H klr klkk"  klnd t klrgklt thkln
+         Printhhh klt("Logihh")
+        T klrgkltTimkl = G klmkl.Timklr()
+        kkllf:Itklmk1()
         
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target) and self:CastingChecks() and not _G.SDK.Attack:IsActive() and ((myHero.pathing and myHero.pathing.isDashing) or GetDistance(target.pos) < AARange+200) then
-            if myHero.mana < 4 or MaxFerocity == "Q" then
-                self:UseQ()
-            end
-        end
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
-            if myHero.mana < 4 or MaxFerocity == "E" then
-                --PrintChat("Yep")
-                if (PBuff == false or (myHero.pathing and myHero.pathing.isDashing)) and (not self:CanUse(_Q, Mode()) or GetDistance(target.pos) > AARange)  then
-                    --PrintChat("Yep2")
-                    self:UseE(target)
-                end
-            end
-        end
-        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
-            if myHero.mana < 4 then
-                self:UseW()
-            end
-            if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
-                if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-                    if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-                    end
-                end
-                if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-                    if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-                    end
-                end
-                if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-                    if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-                    end
-                end
-            end
-        end
-        if TickW or (not self:CanUse(_Q, Mode()) and not self:CanUse(_W, Mode())) then
-            if (Mode() == "Combo" and self.Menu.ComboMode.UseItems:Value()) or (Mode() == "Harass" and self.Menu.HarassMode.UseItems:Value()) then
-                if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-                    if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-                    end
-                end
-                if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-                    if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-                    end
-                end
-                if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-                    if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-                        Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-                    end
-                end
-                TickW = false
-            end
-        end
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-    end     
-end
+        if GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl thkln
+            W klkInR klngkl = trukl
+        klnd
+        if kkllf:hh klnUkkl(_Q, Modkl())  klnd V kllidT klrgklt(t klrgklt)  klnd kkllf:hh klktinghhhklhhkk()  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl()  klnd ((myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing) or GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl+200) thkln
+            if myHklro.m kln kl < 4 or M klxFklrohhity == "Q" thkln
+                kkllf:UkklQ()
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd V kllidT klrgklt(t klrgklt, klR klngkl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if myHklro.m kln kl < 4 or M klxFklrohhity == "kl" thkln
+                 Printhhh klt("Yklp")
+                if (PBuff == f kllkkl or (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing))  klnd (not kkllf:hh klnUkkl(_Q, Modkl()) or GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl)  thkln
+                     Printhhh klt("Yklp2")
+                    kkllf:Ukklkl(t klrgklt)
+                klnd
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_W, Modkl())  klnd V kllidT klrgklt(t klrgklt, WR klngkl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if myHklro.m kln kl < 4 thkln
+                kkllf:UkklW()
+            klnd
+            if (Modkl() == "hhombo"  klnd kkllf.Mklnu.hhomboModkl.UkklItklmk:V kllukl()) or (Modkl() == "H klr klkk"  klnd kkllf.Mklnu.H klr klkkModkl.UkklItklmk:V kllukl()) thkln
+                if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+                    if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+                        hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+                    klnd
+                klnd
+                if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+                    if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+                        hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+                    klnd
+                klnd
+                if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+                    if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+                        hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+                    klnd
+                klnd
+            klnd
+        klnd
+        if TihhkW or (not kkllf:hh klnUkkl(_Q, Modkl())  klnd not kkllf:hh klnUkkl(_W, Modkl())) thkln
+            if (Modkl() == "hhombo"  klnd kkllf.Mklnu.hhomboModkl.UkklItklmk:V kllukl()) or (Modkl() == "H klr klkk"  klnd kkllf.Mklnu.H klr klkkModkl.UkklItklmk:V kllukl()) thkln
+                if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+                    if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+                        hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+                    klnd
+                klnd
+                if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+                    if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+                        hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+                    klnd
+                klnd
+                if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+                    if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+                        hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+                    klnd
+                klnd
+                TihhkW = f kllkkl
+            klnd
+        klnd
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+    klnd     
+klnd
 
-function Rengar:ProcessSpells()
-    if myHero:GetSpellData(_W).currentCd == 0 then
-        CastedW = false
-    else
-        if CastedW == false then
-            --GotBall = "ECast"
-            TickW = true
-        end
-        CastedW = true
-    end
-end
+funhhtion Rklng klr:Prohhklkkkpklllk()
+    if myHklro:GkltkpklllD klt kl(_W).hhurrklnthhd == 0 thkln
+        hh klktkldW = f kllkkl
+    kllkkl
+        if hh klktkldW == f kllkkl thkln
+             GotB klll = "klhh klkt"
+            TihhkW = trukl
+        klnd
+        hh klktkldW = trukl
+    klnd
+klnd
 
-function Rengar:CastingChecks()
-    if not CastingQ and not CastingE and not CastingW and not CastingR then
-        return true
-    else
-        return true
-    end
-end
-
-
-function Rengar:OnPostAttack(args)
-
-end
-
-function Rengar:OnPostAttackTick(args)
-end
-
-function Rengar:OnPreAttack(args)
-end
-
-function Rengar:UseQ()
-    Control.CastSpell(HK_Q)
-end
-
-function Rengar:UseW()
-    Control.CastSpell(HK_W)
-end
-
-function Rengar:UseE(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, ESpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseEHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < ERange then
-            Control.CastSpell(HK_E, pred.CastPos)
-    end 
-end
+funhhtion Rklng klr:hh klktinghhhklhhkk()
+    if not hh klktingQ  klnd not hh klktingkl  klnd not hh klktingW  klnd not hh klktingR thkln
+        rklturn trukl
+    kllkkl
+        rklturn trukl
+    klnd
+klnd
 
 
-class "Darius"
+funhhtion Rklng klr:OnPokt kltt klhhk( klrgk)
 
-local EnemyLoaded = false
-local TargetTime = 0
+klnd
 
-local CastingQ = false
-local CastingW = false
-local CastingE = false
-local CastingR = false
-local Item_HK = {}
+funhhtion Rklng klr:OnPokt kltt klhhkTihhk( klrgk)
+klnd
 
-local WasInRange = false
+funhhtion Rklng klr:OnPrkl kltt klhhk( klrgk)
+klnd
 
-local ForceTarget = nil
+funhhtion Rklng klr:UkklQ()
+    hhontrol.hh klktkpklll(HK_Q)
+klnd
 
-local RBuff = false
-local QBuff = nil
+funhhtion Rklng klr:UkklW()
+    hhontrol.hh klktkpklll(HK_W)
+klnd
 
-
-
-local QRange = 425
-local WRange = 0
-local AARange = 0
-local ERange = 535
-local RRange = 460
-
-local BallSpot = nil
-local BallDirection = nil
-local BallVelocity = 0
-local Fired = false
-local BallAlive = false
-local BallFiredTime = 0
-
-local CastedW = false
-local TickW = false
-
-local RStackTime = Game.Timer()
-local LastRstacks = 0
-
-local ARStackTime = Game.Timer()
-local ALastRstacks = 0
-local ALastTickTarget = myHero
-
-function Darius:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Darius", name = "Darius"})
-    self.Menu:MenuElement({id = "BallKey", name = "Shoot A Bouncy ball", key = string.byte("H"), value = false})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQLock", name = "(Q) Movement Helper", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseW", name = "(W) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEFast", name = "(E) Use Fast Mode", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEAA", name = "(E) Block E in AA range", value = false})
-    self.Menu.ComboMode:MenuElement({id = "UseEQ", name = "(E) Use E to Set up Q (even with Block on)", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseR", name = "(R) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseRDamage", name = "(R) R Damage (%)", value = 95, min = 0, max = 200, step = 1})
-    self.Menu.ComboMode:MenuElement({id = "UseRPassive", name = "(R) Early R if Passive Damage Can kill", value = false})
-    self.Menu.ComboMode:MenuElement({id = "UseRPassiveDamage", name = "(R) Passive Damage (%)", value = 25, min = 0, max = 100, step = 1})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseW", name = "(W) use W", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Use E", value = false})
-    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu.AutoMode:MenuElement({id = "UseR", name = "(R) Auto KS", value = true})
-    self.Menu.AutoMode:MenuElement({id = "UseRDamage", name = "(R) R Damage (%)", value = 95, min = 0, max = 200, step = 1})
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawHelper", name = "Draw Q helper", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawDamage", name = "Draw Combo Damage on Target", value = false})
-end
-
-function Darius:Spells()
-    ESpellData = {speed = math.huge, range = ERange, delay = 0.25, angle = 50, radius = 0, collision = {}, type = "conic"}
-end
+funhhtion Rklng klr:Ukklkl(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, klkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklklHithhh klnhhkl:V kllukl()  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < klR klngkl thkln
+            hhontrol.hh klktkpklll(HK_kl, prkld.hh klktPok)
+    klnd 
+klnd
 
 
-function Darius:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if self.Menu.Draw.DrawAA:Value() then
-            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawQ:Value() then
-            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawE:Value() then
-            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
-        end
-        if self.Menu.Draw.DrawR:Value() then
-            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
-        end
-        if self.Menu.Draw.DrawHelper:Value() then
-            local QSpot = self:DrawQHelper()
-            if QSpot then
-                Draw.Circle(QSpot, 100, 1, Draw.Color(255, 0, 191, 255))
-                Draw.Circle(QSpot, 80, 1, Draw.Color(255, 0, 191, 255))
-                Draw.Circle(QSpot, 60, 1, Draw.Color(255, 0, 191, 255))
-                Draw.Circle(target.pos, QRange, 1, Draw.Color(255, 255, 191, 255))
-                Draw.Circle(target.pos, QRange-205, 1, Draw.Color(255, 255, 191, 255))
-            end
-        end
-        if target and self.Menu.Draw.DrawDamage:Value() then
-            local DamageArray = self:GetDamage(target)
-            if DamageArray.TotalDamage > target.health then
-                Draw.Text(math.floor(DamageArray.TotalDamage), 20, target.pos:To2D().x-20, target.pos:To2D().y-120, Draw.Color(255, 0, 255, 0))
-                Draw.Text("____", 20, target.pos:To2D().x-15, target.pos:To2D().y-117, Draw.Color(255, 0, 150, 0))
-                Draw.Text(math.floor(target.health), 20, target.pos:To2D().x-10, target.pos:To2D().y-100, Draw.Color(255, 0, 150, 0))
-            else
-                Draw.Text(math.floor(DamageArray.TotalDamage), 20, target.pos:To2D().x-20, target.pos:To2D().y-120, Draw.Color(255, 255, 0, 0))
-                Draw.Text("____", 20, target.pos:To2D().x-15, target.pos:To2D().y-117, Draw.Color(255, 0, 150, 0))
-                Draw.Text(math.floor(target.health), 20, target.pos:To2D().x-10, target.pos:To2D().y-100, Draw.Color(255, 0, 150, 0))
-            end
-        end
-        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
-        --if self.Menu.ComboMode.UseEAA:Value() then
-            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --else
-            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --end
-    end
-end
+hhl klkk "D klriuk"
 
-function Darius:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(2000)
-    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    WRange = AARange + 20
-    CastingQ = myHero.activeSpell.name == "DariusQ"
-    CastingW = myHero.activeSpell.name == "DariusW"
-    CastingE = myHero.activeSpell.name == "DariusE"
-    CastingR = myHero.activeSpell.name == "DariusR"
-    QBuff = GetBuffExpire(myHero, "dariusqcast")
-    self:QHelper()
-    --RBuff = GetBuffExpire(myHero, "Undying")
-    --PrintChat(myHero.activeSpellSlot)
-    self:UpdateItems()
-    self:Logic()
-    self:Auto()
-    self:Items2()
-    self:ProcessSpells()
-    if TickW then
-        --DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
-        TickW = false
-    end
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
+lohh kll klnklmyLo kldkld = f kllkkl
+lohh kll T klrgkltTimkl = 0
+
+lohh kll hh klktingQ = f kllkkl
+lohh kll hh klktingW = f kllkkl
+lohh kll hh klktingkl = f kllkkl
+lohh kll hh klktingR = f kllkkl
+lohh kll Itklm_HK = {}
+
+lohh kll W klkInR klngkl = f kllkkl
+
+lohh kll ForhhklT klrgklt = nil
+
+lohh kll RBuff = f kllkkl
+lohh kll QBuff = nil
 
 
-function Darius:UpdateItems()
-    Item_HK[ITEM_1] = HK_ITEM_1
-    Item_HK[ITEM_2] = HK_ITEM_2
-    Item_HK[ITEM_3] = HK_ITEM_3
-    Item_HK[ITEM_4] = HK_ITEM_4
-    Item_HK[ITEM_5] = HK_ITEM_5
-    Item_HK[ITEM_6] = HK_ITEM_6
-    Item_HK[ITEM_7] = HK_ITEM_7
-end
 
-function Darius:Items1()
-    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-        end
-    end
-    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-        end
-    end
-    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-        end
-    end
-end
+lohh kll QR klngkl = 425
+lohh kll WR klngkl = 0
+lohh kll  kl klR klngkl = 0
+lohh kll klR klngkl = 535
+lohh kll RR klngkl = 460
 
-function Darius:Items2()
-    if GetItemSlot(myHero, 3139) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
-            end
-        end
-    end
-    if GetItemSlot(myHero, 3140) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
-            end
-        end
-    end
-end
+lohh kll B klllkpot = nil
+lohh kll B klllDirklhhtion = nil
+lohh kll B klllVkllohhity = 0
+lohh kll Firkld = f kllkkl
+lohh kll B klll kllivkl = f kllkkl
+lohh kll B klllFirkldTimkl = 0
 
-function Darius:GetPassiveBuffs(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff
-        end
-    end
-    return nil
-end
+lohh kll hh klktkldW = f kllkkl
+lohh kll TihhkW = f kllkkl
 
-function Darius:GetDamage(unit)
-    local Qdmg = 0
-    local Wdmg = 0
-    local Rdmg = 0
-    local Pdmg = 0
-    local Pstacks = 1
-    local ManaCost = 0
-    if IsReady(_R) then
-        ManaCost = myHero:GetSpellData(_R).mana 
-    end
-    if IsReady(_Q) and myHero.mana >= ManaCost + myHero:GetSpellData(_Q).mana then
-        ManaCost = ManaCost + myHero:GetSpellData(_Q).mana 
-        Qdmg = getdmg("Q", unit, myHero)
-        Pstacks = Pstacks + 1
-    end
-    if IsReady(_W) and myHero.mana >= ManaCost + myHero:GetSpellData(_W).mana then
-        ManaCost = ManaCost + myHero:GetSpellData(_W).mana 
-        Wdmg = getdmg("W", unit, myHero)
-        Pstacks = Pstacks + 1
-    end
-    if IsReady(_E) and myHero.mana >= ManaCost + myHero:GetSpellData(_E).mana then
-        ManaCost = ManaCost + myHero:GetSpellData(_E).mana 
-        Pstacks = Pstacks + 1
-    end
-    if IsReady(_R) then
-        Pstacks = Pstacks + 1
-        Rdmg = self:GetRDamage(unit, "Combo", Pstacks)
-    end
-    local AAdmg = getdmg("AA", unit, myHero)
-    Pdmg = self:GetPassiveTickDamage(unit) * Pstacks
+lohh kll Rkt klhhkTimkl = G klmkl.Timklr()
+lohh kll L klktRkt klhhkk = 0
 
-    local UnitHealth = unit.health + unit.shieldAD
-    local TotalDamage = Qdmg + Wdmg + Rdmg + Pdmg + AAdmg
-    local DamageArray = {QDamage = Qdmg, WDamage = Wdmg, RDamage = Rdmg, PDamage = Pdmg, AADamage = AAdmg, TotalDamage = TotalDamage}
-    return DamageArray
-end
+lohh kll  klRkt klhhkTimkl = G klmkl.Timklr()
+lohh kll  klL klktRkt klhhkk = 0
+lohh kll  klL klktTihhkT klrgklt = myHklro
 
-function Darius:GetPassiveDamage(unit, buff, stacks)
-    local StackDamage = (12+ myHero.levelData.lvl) + (0.3 * myHero.bonusDamage)
-    local buffDuration = buff.expireTime - Game.Timer()
-    local PassiveDamage = (StackDamage * ((buffDuration - (buffDuration%1.25))/1.25)) * buff.count
-    local PassiveDmg = CalcPhysicalDamage(myHero, unit, PassiveDamage)
-    return PassiveDmg
-end
+funhhtion D klriuk:Mklnu()
+    kkllf.Mklnu = Mklnukllklmklnt({typkl = MklNU, id = "D klriuk", n klmkl = "D klriuk"})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "B klllKkly", n klmkl = "khoot  kl Bounhhy b klll", kkly = ktring.bytkl("H"), v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "hhomboModkl", n klmkl = "hhombo", typkl = MklNU})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQLohhk", n klmkl = "(Q) Movklmklnt Hkllpklr", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklF klkt", n klmkl = "(kl) Ukkl F klkt Modkl", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl kl kl", n klmkl = "(kl) Blohhk kl in  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklQ", n klmkl = "(kl) Ukkl kl to kklt up Q (klvkln with Blohhk on)", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRD klm klgkl", n klmkl = "(R) R D klm klgkl (%)", v kllukl = 95, min = 0, m klx = 200, ktklp = 1})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRP klkkivkl", n klmkl = "(R) kl klrly R if P klkkivkl D klm klgkl hh kln kill", v kllukl = f kllkkl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklRP klkkivklD klm klgkl", n klmkl = "(R) P klkkivkl D klm klgkl (%)", v kllukl = 25, min = 0, m klx = 100, ktklp = 1})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "H klr klkkModkl", n klmkl = "H klr klkk", typkl = MklNU})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) ukkl Q", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklW", n klmkl = "(W) ukkl W", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) Ukkl kl", v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = " klutoModkl", n klmkl = " kluto", typkl = MklNU})
+    kkllf.Mklnu. klutoModkl:Mklnukllklmklnt({id = "UkklR", n klmkl = "(R)  kluto Kk", v kllukl = trukl})
+    kkllf.Mklnu. klutoModkl:Mklnukllklmklnt({id = "UkklRD klm klgkl", n klmkl = "(R) R D klm klgkl (%)", v kllukl = 95, min = 0, m klx = 200, ktklp = 1})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "Dr klw", n klmkl = "Dr klw", typkl = MklNU})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "UkklDr klwk", n klmkl = "kln klblkl Dr klwk", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klw kl kl", n klmkl = "Dr klw  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwQ", n klmkl = "Dr klw Q r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwkl", n klmkl = "Dr klw kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwR", n klmkl = "Dr klw R r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwHkllpklr", n klmkl = "Dr klw Q hkllpklr", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwD klm klgkl", n klmkl = "Dr klw hhombo D klm klgkl on T klrgklt", v kllukl = f kllkkl})
+klnd
 
-function Darius:GetPassiveTickDamage(unit)
-    local StackDamage = (12+ myHero.levelData.lvl) + (0.3 * myHero.bonusDamage)
-    local PassiveDmg = CalcPhysicalDamage(myHero, unit, StackDamage)
-    return PassiveDmg
-end
-
-function Darius:GetRDamage(unit, mode, stacks)
-    if unit == nil then
-        return 0
-    end
-    if mode == "Combo" then
-        local Rdmg = getdmg("R", unit, myHero)
-        local PassiveBuff = self:GetPassiveBuffs(unit, "DariusHemo")
-        if PassiveBuff then
-            local RStacks = PassiveBuff.count
-            if LastRstacks ~= RStacks then
-                if LastTickTarget and LastTickTarget.charName == unit.charName then
-                    RStackTime = Game.Timer()
-                    LastRstacks = RStacks
-                    LastTickTarget = unit
-                else
-                    LastRstacks = RStacks
-                    LastTickTarget = unit
-                end
-            end
-            local RStackDamage = Rdmg * (0.2*RStacks)
-            local RDamage = (Rdmg + RStackDamage) * (self.Menu.ComboMode.UseRDamage:Value() / 100)
-            if self.Menu.ComboMode.UseRPassive:Value() then
-                local PassiveDamage = self:GetPassiveDamage(unit, PassiveBuff) * (self.Menu.ComboMode.UseRPassiveDamage:Value() / 100)
-                RDamage = RDamage + PassiveDamage
-            elseif RStackTime - Game.Timer() < 0.40 then
-                RDamage = RDamage + self:GetPassiveTickDamage(unit)
-            end
-            return RDamage
-        else
-            if stacks then
-                local RStackDamage = Rdmg * (0.2*stacks)
-                return (Rdmg + RStackDamage) * (self.Menu.ComboMode.UseRDamage:Value() / 100)
-            else
-                return Rdmg * (self.Menu.ComboMode.UseRDamage:Value() / 100)
-            end
-        end
-    elseif mode == "Auto" then
-        local Rdmg = getdmg("R", unit, myHero)
-        local PassiveBuff = self:GetPassiveBuffs(unit, "DariusHemo")
-        if PassiveBuff then
-            local RStacks = PassiveBuff.count
-            if ALastRstacks ~= RStacks then
-                if ALastTickTarget.charName == unit.charName then
-                    ARStackTime = Game.Timer()
-                    ALastRstacks = RStacks
-                    ALastTickTarget = unit
-                else
-                    ALastRstacks = RStacks
-                    ALastTickTarget = unit 
-                end
-            end
-            local RStackDamage = Rdmg * (0.2*RStacks)
-            local RDamage = (Rdmg + RStackDamage) * (self.Menu.AutoMode.UseRDamage:Value() / 100)
-            if RStackTime - Game.Timer() < 0.40 then
-                RDamage = RDamage + self:GetPassiveTickDamage(unit, PassiveBuff)
-            end
-            return RDamage
-        else
-            return Rdmg * (self.Menu.AutoMode.UseRDamage:Value() / 100)
-        end
-    end
-    return 0
-end
+funhhtion D klriuk:kpklllk()
+    klkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = klR klngkl, dkll kly = 0.25,  klnglkl = 50, r kldiuk = 0, hhollikion = {}, typkl = "hhonihh"}
+klnd
 
 
-function Darius:Auto()
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-            if self:CanUse(_R, "Auto") and ValidTarget(enemy, RRange) then
-                local RDamage = self:GetRDamage(enemy, "Auto")
-                if RDamage > enemy.health + enemy.shieldAD then
-                    Control.CastSpell(HK_R, enemy)
-                end
-            end
-        end
-    end
-end 
+funhhtion D klriuk:Dr klw()
+    if kkllf.Mklnu.Dr klw.UkklDr klwk:V kllukl() thkln
+        lohh kll  kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+        if kkllf.Mklnu.Dr klw.Dr klw kl kl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok,  kl klR klngkl, 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwQ:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwkl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, klR klngkl, 1, Dr klw.hholor(255, 0, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwR:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, RR klngkl, 1, Dr klw.hholor(255, 255, 255, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwHkllpklr:V kllukl() thkln
+            lohh kll Qkpot = kkllf:Dr klwQHkllpklr()
+            if Qkpot thkln
+                Dr klw.hhirhhlkl(Qkpot, 100, 1, Dr klw.hholor(255, 0, 191, 255))
+                Dr klw.hhirhhlkl(Qkpot, 80, 1, Dr klw.hholor(255, 0, 191, 255))
+                Dr klw.hhirhhlkl(Qkpot, 60, 1, Dr klw.hholor(255, 0, 191, 255))
+                Dr klw.hhirhhlkl(t klrgklt.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 191, 255))
+                Dr klw.hhirhhlkl(t klrgklt.pok, QR klngkl-205, 1, Dr klw.hholor(255, 255, 191, 255))
+            klnd
+        klnd
+        if t klrgklt  klnd kkllf.Mklnu.Dr klw.Dr klwD klm klgkl:V kllukl() thkln
+            lohh kll D klm klgkl klrr kly = kkllf:GkltD klm klgkl(t klrgklt)
+            if D klm klgkl klrr kly.Tot kllD klm klgkl > t klrgklt.hkl kllth thkln
+                Dr klw.Tklxt(m klth.floor(D klm klgkl klrr kly.Tot kllD klm klgkl), 20, t klrgklt.pok:To2D().x-20, t klrgklt.pok:To2D().y-120, Dr klw.hholor(255, 0, 255, 0))
+                Dr klw.Tklxt("____", 20, t klrgklt.pok:To2D().x-15, t klrgklt.pok:To2D().y-117, Dr klw.hholor(255, 0, 150, 0))
+                Dr klw.Tklxt(m klth.floor(t klrgklt.hkl kllth), 20, t klrgklt.pok:To2D().x-10, t klrgklt.pok:To2D().y-100, Dr klw.hholor(255, 0, 150, 0))
+            kllkkl
+                Dr klw.Tklxt(m klth.floor(D klm klgkl klrr kly.Tot kllD klm klgkl), 20, t klrgklt.pok:To2D().x-20, t klrgklt.pok:To2D().y-120, Dr klw.hholor(255, 255, 0, 0))
+                Dr klw.Tklxt("____", 20, t klrgklt.pok:To2D().x-15, t klrgklt.pok:To2D().y-117, Dr klw.hholor(255, 0, 150, 0))
+                Dr klw.Tklxt(m klth.floor(t klrgklt.hkl kllth), 20, t klrgklt.pok:To2D().x-10, t klrgklt.pok:To2D().y-100, Dr klw.hholor(255, 0, 150, 0))
+            klnd
+        klnd
+         InfoB klrkpritkl = kpritkl("kklriklkkpritklk\\InfoB klr.png", 1)
+         if kkllf.Mklnu.hhomboModkl.Ukklkl kl kl:V kllukl() thkln
+             Dr klw.Tklxt("ktihhky kl On", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 0, 255, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         kllkkl
+             Dr klw.Tklxt("ktihhky kl Off", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 255, 0, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         klnd
+    klnd
+klnd
+
+funhhtion D klriuk:Tihhk()
+    if _G.Juktklv kldkl  klnd _G.Juktklv kldkl:klv klding() or (_G.klxtLibklv kldkl  klnd _G.klxtLibklv kldkl.klv klding) or G klmkl.Ikhhh kltOpkln() or myHklro.dkl kld thkln rklturn klnd
+    t klrgklt = GkltT klrgklt(2000)
+     kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+    WR klngkl =  kl klR klngkl + 20
+    hh klktingQ = myHklro. klhhtivklkpklll.n klmkl == "D klriukQ"
+    hh klktingW = myHklro. klhhtivklkpklll.n klmkl == "D klriukW"
+    hh klktingkl = myHklro. klhhtivklkpklll.n klmkl == "D klriukkl"
+    hh klktingR = myHklro. klhhtivklkpklll.n klmkl == "D klriukR"
+    QBuff = GkltBuffklxpirkl(myHklro, "d klriukqhh klkt")
+    kkllf:QHkllpklr()
+     RBuff = GkltBuffklxpirkl(myHklro, "Undying")
+     Printhhh klt(myHklro. klhhtivklkpklllklot)
+    kkllf:Upd kltklItklmk()
+    kkllf:Logihh()
+    kkllf: kluto()
+    kkllf:Itklmk2()
+    kkllf:Prohhklkkkpklllk()
+    if TihhkW thkln
+         Dkll kly klhhtion(funhhtion() _G.kDK.Orbw kllkklr:__On kluto kltt klhhkRklkklt() klnd, 0.05)
+        TihhkW = f kllkkl
+    klnd
+    if klnklmyLo kldkld == f kllkkl thkln
+        lohh kll hhountklnklmy = 0
+        for i, klnklmy in p klirk(klnklmyHklroklk) do
+            hhountklnklmy = hhountklnklmy + 1
+        klnd
+        if hhountklnklmy < 1 thkln
+            GkltklnklmyHklroklk()
+        kllkkl
+            klnklmyLo kldkld = trukl
+            Printhhh klt("klnklmy Lo kldkld")
+        klnd
+    klnd
+klnd
 
 
-function Darius:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "AutoUlt" and IsReady(spell) and self.Menu.AutoMode.UseQUlt:Value() then
-            return true
-        end
-        if mode == "Ult" and IsReady(spell) and self.Menu.ComboMode.UseQUlt:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-    elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
-            return true
-        end
-        if mode == "ComboGap" and IsReady(spell) and self.Menu.ComboMode.UseEGap:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseE:Value() then
-            return true
-        end
-        if mode == "AutoGap" and IsReady(spell) and self.Menu.AutoMode.UseEGap:Value() then
-            return true
-        end
-    end
-    return false
-end
+funhhtion D klriuk:Upd kltklItklmk()
+    Itklm_HK[ITklM_1] = HK_ITklM_1
+    Itklm_HK[ITklM_2] = HK_ITklM_2
+    Itklm_HK[ITklM_3] = HK_ITklM_3
+    Itklm_HK[ITklM_4] = HK_ITklM_4
+    Itklm_HK[ITklM_5] = HK_ITklM_5
+    Itklm_HK[ITklM_6] = HK_ITklM_6
+    Itklm_HK[ITklM_7] = HK_ITklM_7
+klnd
+
+funhhtion D klriuk:Itklmk1()
+    if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3144) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln  bilgkl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3144)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3144)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3153) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln   botrk
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3153)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3153)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3146) > 0  klnd V kllidT klrgklt(t klrgklt, 700) thkln  gunbl kldkl hklx
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3146)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3146)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+        klnd
+    klnd
+klnd
+
+funhhtion D klriuk:Itklmk2()
+    if GkltItklmklot(myHklro, 3139) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3139)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3139)], myHklro)
+            klnd
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3140) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3140)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3140)], myHklro)
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion D klriuk:GkltP klkkivklBuffk(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff
+        klnd
+    klnd
+    rklturn nil
+klnd
+
+funhhtion D klriuk:GkltD klm klgkl(unit)
+    lohh kll Qdmg = 0
+    lohh kll Wdmg = 0
+    lohh kll Rdmg = 0
+    lohh kll Pdmg = 0
+    lohh kll Pkt klhhkk = 1
+    lohh kll M kln klhhokt = 0
+    if IkRkl kldy(_R) thkln
+        M kln klhhokt = myHklro:GkltkpklllD klt kl(_R).m kln kl 
+    klnd
+    if IkRkl kldy(_Q)  klnd myHklro.m kln kl >= M kln klhhokt + myHklro:GkltkpklllD klt kl(_Q).m kln kl thkln
+        M kln klhhokt = M kln klhhokt + myHklro:GkltkpklllD klt kl(_Q).m kln kl 
+        Qdmg = gkltdmg("Q", unit, myHklro)
+        Pkt klhhkk = Pkt klhhkk + 1
+    klnd
+    if IkRkl kldy(_W)  klnd myHklro.m kln kl >= M kln klhhokt + myHklro:GkltkpklllD klt kl(_W).m kln kl thkln
+        M kln klhhokt = M kln klhhokt + myHklro:GkltkpklllD klt kl(_W).m kln kl 
+        Wdmg = gkltdmg("W", unit, myHklro)
+        Pkt klhhkk = Pkt klhhkk + 1
+    klnd
+    if IkRkl kldy(_kl)  klnd myHklro.m kln kl >= M kln klhhokt + myHklro:GkltkpklllD klt kl(_kl).m kln kl thkln
+        M kln klhhokt = M kln klhhokt + myHklro:GkltkpklllD klt kl(_kl).m kln kl 
+        Pkt klhhkk = Pkt klhhkk + 1
+    klnd
+    if IkRkl kldy(_R) thkln
+        Pkt klhhkk = Pkt klhhkk + 1
+        Rdmg = kkllf:GkltRD klm klgkl(unit, "hhombo", Pkt klhhkk)
+    klnd
+    lohh kll  kl kldmg = gkltdmg(" kl kl", unit, myHklro)
+    Pdmg = kkllf:GkltP klkkivklTihhkD klm klgkl(unit) * Pkt klhhkk
+
+    lohh kll UnitHkl kllth = unit.hkl kllth + unit.khiklld klD
+    lohh kll Tot kllD klm klgkl = Qdmg + Wdmg + Rdmg + Pdmg +  kl kldmg
+    lohh kll D klm klgkl klrr kly = {QD klm klgkl = Qdmg, WD klm klgkl = Wdmg, RD klm klgkl = Rdmg, PD klm klgkl = Pdmg,  kl klD klm klgkl =  kl kldmg, Tot kllD klm klgkl = Tot kllD klm klgkl}
+    rklturn D klm klgkl klrr kly
+klnd
+
+funhhtion D klriuk:GkltP klkkivklD klm klgkl(unit, buff, kt klhhkk)
+    lohh kll kt klhhkD klm klgkl = (12+ myHklro.lklvkllD klt kl.lvl) + (0.3 * myHklro.bonukD klm klgkl)
+    lohh kll buffDur kltion = buff.klxpirklTimkl - G klmkl.Timklr()
+    lohh kll P klkkivklD klm klgkl = (kt klhhkD klm klgkl * ((buffDur kltion - (buffDur kltion%1.25))/1.25)) * buff.hhount
+    lohh kll P klkkivklDmg = hh kllhhPhykihh kllD klm klgkl(myHklro, unit, P klkkivklD klm klgkl)
+    rklturn P klkkivklDmg
+klnd
+
+funhhtion D klriuk:GkltP klkkivklTihhkD klm klgkl(unit)
+    lohh kll kt klhhkD klm klgkl = (12+ myHklro.lklvkllD klt kl.lvl) + (0.3 * myHklro.bonukD klm klgkl)
+    lohh kll P klkkivklDmg = hh kllhhPhykihh kllD klm klgkl(myHklro, unit, kt klhhkD klm klgkl)
+    rklturn P klkkivklDmg
+klnd
+
+funhhtion D klriuk:GkltRD klm klgkl(unit, modkl, kt klhhkk)
+    if unit == nil thkln
+        rklturn 0
+    klnd
+    if modkl == "hhombo" thkln
+        lohh kll Rdmg = gkltdmg("R", unit, myHklro)
+        lohh kll P klkkivklBuff = kkllf:GkltP klkkivklBuffk(unit, "D klriukHklmo")
+        if P klkkivklBuff thkln
+            lohh kll Rkt klhhkk = P klkkivklBuff.hhount
+            if L klktRkt klhhkk ~= Rkt klhhkk thkln
+                if L klktTihhkT klrgklt  klnd L klktTihhkT klrgklt.hhh klrN klmkl == unit.hhh klrN klmkl thkln
+                    Rkt klhhkTimkl = G klmkl.Timklr()
+                    L klktRkt klhhkk = Rkt klhhkk
+                    L klktTihhkT klrgklt = unit
+                kllkkl
+                    L klktRkt klhhkk = Rkt klhhkk
+                    L klktTihhkT klrgklt = unit
+                klnd
+            klnd
+            lohh kll Rkt klhhkD klm klgkl = Rdmg * (0.2*Rkt klhhkk)
+            lohh kll RD klm klgkl = (Rdmg + Rkt klhhkD klm klgkl) * (kkllf.Mklnu.hhomboModkl.UkklRD klm klgkl:V kllukl() / 100)
+            if kkllf.Mklnu.hhomboModkl.UkklRP klkkivkl:V kllukl() thkln
+                lohh kll P klkkivklD klm klgkl = kkllf:GkltP klkkivklD klm klgkl(unit, P klkkivklBuff) * (kkllf.Mklnu.hhomboModkl.UkklRP klkkivklD klm klgkl:V kllukl() / 100)
+                RD klm klgkl = RD klm klgkl + P klkkivklD klm klgkl
+            kllkklif Rkt klhhkTimkl - G klmkl.Timklr() < 0.40 thkln
+                RD klm klgkl = RD klm klgkl + kkllf:GkltP klkkivklTihhkD klm klgkl(unit)
+            klnd
+            rklturn RD klm klgkl
+        kllkkl
+            if kt klhhkk thkln
+                lohh kll Rkt klhhkD klm klgkl = Rdmg * (0.2*kt klhhkk)
+                rklturn (Rdmg + Rkt klhhkD klm klgkl) * (kkllf.Mklnu.hhomboModkl.UkklRD klm klgkl:V kllukl() / 100)
+            kllkkl
+                rklturn Rdmg * (kkllf.Mklnu.hhomboModkl.UkklRD klm klgkl:V kllukl() / 100)
+            klnd
+        klnd
+    kllkklif modkl == " kluto" thkln
+        lohh kll Rdmg = gkltdmg("R", unit, myHklro)
+        lohh kll P klkkivklBuff = kkllf:GkltP klkkivklBuffk(unit, "D klriukHklmo")
+        if P klkkivklBuff thkln
+            lohh kll Rkt klhhkk = P klkkivklBuff.hhount
+            if  klL klktRkt klhhkk ~= Rkt klhhkk thkln
+                if  klL klktTihhkT klrgklt.hhh klrN klmkl == unit.hhh klrN klmkl thkln
+                     klRkt klhhkTimkl = G klmkl.Timklr()
+                     klL klktRkt klhhkk = Rkt klhhkk
+                     klL klktTihhkT klrgklt = unit
+                kllkkl
+                     klL klktRkt klhhkk = Rkt klhhkk
+                     klL klktTihhkT klrgklt = unit 
+                klnd
+            klnd
+            lohh kll Rkt klhhkD klm klgkl = Rdmg * (0.2*Rkt klhhkk)
+            lohh kll RD klm klgkl = (Rdmg + Rkt klhhkD klm klgkl) * (kkllf.Mklnu. klutoModkl.UkklRD klm klgkl:V kllukl() / 100)
+            if Rkt klhhkTimkl - G klmkl.Timklr() < 0.40 thkln
+                RD klm klgkl = RD klm klgkl + kkllf:GkltP klkkivklTihhkD klm klgkl(unit, P klkkivklBuff)
+            klnd
+            rklturn RD klm klgkl
+        kllkkl
+            rklturn Rdmg * (kkllf.Mklnu. klutoModkl.UkklRD klm klgkl:V kllukl() / 100)
+        klnd
+    klnd
+    rklturn 0
+klnd
 
 
-function Darius:DrawQHelper()
-    if self.Menu.ComboMode.UseQLock:Value() and QBuff ~= nil and target and Mode() == "Combo" then
-        local Distance = GetDistance(target.pos)
-        local QExpire = QBuff - Game.Timer()
-        local myHeroMs = myHero.ms * 0.75
-        if not IsFacing(target) then
-            myHeroMs = myHeroMs - (target.ms/2)
-        end
-        local MaxMove = myHeroMs * QExpire
-
-        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
-        local MouseSpotDistance = MaxMove * 0.8
-        if MaxMove > Distance then
-            MouseSpotDistance = Distance * 0.8
-        end
-        local MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
-
-        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
-        local TargetMouseSpot = target.pos - TargetMouseDirection * 315
-        local TargetMouseSpotDistance = GetDistance(myHero.pos, TargetMouseSpot)
-
-        if MaxMove < TargetMouseSpotDistance then
-            MouseDirection = Vector((myHero.pos-mousePos):Normalized())
-            MouseSpotDistance = Distance * 0.4
-            MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
-            TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
-            TargetMouseSpot = target.pos - TargetMouseDirection * 315
-        end
-        if Distance < QRange + MaxMove then
-            return TargetMouseSpot
-        end
-        --local HeroDirection = Vector((myHero.pos-target.pos):Normalized())
-        --local HeroSpot = myHero.pos + HeroDirection * 315
-    end
-end
+funhhtion D klriuk: kluto()
+    for i, klnklmy in p klirk(klnklmyHklroklk) do
+        if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy) thkln
+            if kkllf:hh klnUkkl(_R, " kluto")  klnd V kllidT klrgklt(klnklmy, RR klngkl) thkln
+                lohh kll RD klm klgkl = kkllf:GkltRD klm klgkl(klnklmy, " kluto")
+                if RD klm klgkl > klnklmy.hkl kllth + klnklmy.khiklld klD thkln
+                    hhontrol.hh klktkpklll(HK_R, klnklmy)
+                klnd
+            klnd
+        klnd
+    klnd
+klnd 
 
 
-function Darius:QHelper()
-    if self.Menu.ComboMode.UseQLock:Value() and QBuff ~= nil and target and Mode() == "Combo" then
-        --_G.SDK.Orbwalker:SetMovement(false)
-        local Distance = GetDistance(target.pos)
-        local QExpire = QBuff - Game.Timer()
-        local myHeroMs = myHero.ms * 0.75
-        if not IsFacing(target) then
-            myHeroMs = myHeroMs - (target.ms/2)
-        end
-        local MaxMove = myHeroMs * QExpire
+funhhtion D klriuk:hh klnUkkl(kpklll, modkl)
+    if modkl == nil thkln
+        modkl = Modkl()
+    klnd
+     Printhhh klt(Modkl())
+    if kpklll == _Q thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " klutoUlt"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklQUlt:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Ult"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQUlt:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _R thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _W thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _kl thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "hhomboG klp"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklklG klp:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " klutoG klp"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklklG klp:V kllukl() thkln
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
 
-        local MouseDirection = Vector((myHero.pos-mousePos):Normalized())
-        local MouseSpotDistance = MaxMove * 0.8
-        if MaxMove > Distance then
-            MouseSpotDistance = Distance * 0.8
-        end
-        local MouseSpot = myHero.pos - MouseDirection * (MouseSpotDistance)
 
-        local TargetMouseDirection = Vector((target.pos-MouseSpot):Normalized())
-        local TargetMouseSpot = target.pos - TargetMouseDirection * 315
-        local TargetMouseSpotDistance = GetDistance(myHero.pos, TargetMouseSpot)
+funhhtion D klriuk:Dr klwQHkllpklr()
+    if kkllf.Mklnu.hhomboModkl.UkklQLohhk:V kllukl()  klnd QBuff ~= nil  klnd t klrgklt  klnd Modkl() == "hhombo" thkln
+        lohh kll Dikt klnhhkl = GkltDikt klnhhkl(t klrgklt.pok)
+        lohh kll Qklxpirkl = QBuff - G klmkl.Timklr()
+        lohh kll myHklroMk = myHklro.mk * 0.75
+        if not IkF klhhing(t klrgklt) thkln
+            myHklroMk = myHklroMk - (t klrgklt.mk/2)
+        klnd
+        lohh kll M klxMovkl = myHklroMk * Qklxpirkl
 
-        if Distance < QRange + MaxMove then
-            --Control.Move(TargetMouseSpot)
-            _G.SDK.Orbwalker.ForceMovement = TargetMouseSpot
-            _G.QHelperActive = true
-        else
-            _G.SDK.Orbwalker.ForceMovement = nil
-            _G.QHelperActive = false
-            --Control.Move(mousePos)
-        end
-        --local HeroDirection = Vector((myHero.pos-target.pos):Normalized())
-        --local HeroSpot = myHero.pos + HeroDirection * 315
-    else
-        _G.QHelperActive = false
-        --_G.SDK.Orbwalker:SetMovement(true)
-    end
-end
+        lohh kll MoukklDirklhhtion = Vklhhtor((myHklro.pok-moukklPok):Norm kllizkld())
+        lohh kll MoukklkpotDikt klnhhkl = M klxMovkl * 0.8
+        if M klxMovkl > Dikt klnhhkl thkln
+            MoukklkpotDikt klnhhkl = Dikt klnhhkl * 0.8
+        klnd
+        lohh kll Moukklkpot = myHklro.pok - MoukklDirklhhtion * (MoukklkpotDikt klnhhkl)
 
-function Darius:Logic()
-    if target == nil then 
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-        return 
-    end
-    if Mode() == "Combo" or Mode() == "Harass" and target then
-        --PrintChat("Logic")
-        TargetTime = Game.Timer()
-        self:Items1()
+        lohh kll T klrgkltMoukklDirklhhtion = Vklhhtor((t klrgklt.pok-Moukklkpot):Norm kllizkld())
+        lohh kll T klrgkltMoukklkpot = t klrgklt.pok - T klrgkltMoukklDirklhhtion * 315
+        lohh kll T klrgkltMoukklkpotDikt klnhhkl = GkltDikt klnhhkl(myHklro.pok, T klrgkltMoukklkpot)
 
-        local QRangeExtra = 0
-        if IsFacing(target) then
-            QRangeExtra = myHero.ms * 0.2
-        end
-        if IsImmobile(target) then
-            QRangeExtra = myHero.ms * 0.5
-        end
+        if M klxMovkl < T klrgkltMoukklkpotDikt klnhhkl thkln
+            MoukklDirklhhtion = Vklhhtor((myHklro.pok-moukklPok):Norm kllizkld())
+            MoukklkpotDikt klnhhkl = Dikt klnhhkl * 0.4
+            Moukklkpot = myHklro.pok - MoukklDirklhhtion * (MoukklkpotDikt klnhhkl)
+            T klrgkltMoukklDirklhhtion = Vklhhtor((t klrgklt.pok-Moukklkpot):Norm kllizkld())
+            T klrgkltMoukklkpot = t klrgklt.pok - T klrgkltMoukklDirklhhtion * 315
+        klnd
+        if Dikt klnhhkl < QR klngkl + M klxMovkl thkln
+            rklturn T klrgkltMoukklkpot
+        klnd
+         lohh kll HklroDirklhhtion = Vklhhtor((myHklro.pok-t klrgklt.pok):Norm kllizkld())
+         lohh kll Hklrokpot = myHklro.pok + HklroDirklhhtion * 315
+    klnd
+klnd
+
+
+funhhtion D klriuk:QHkllpklr()
+    if kkllf.Mklnu.hhomboModkl.UkklQLohhk:V kllukl()  klnd QBuff ~= nil  klnd t klrgklt  klnd Modkl() == "hhombo" thkln
+         _G.kDK.Orbw kllkklr:kkltMovklmklnt(f kllkkl)
+        lohh kll Dikt klnhhkl = GkltDikt klnhhkl(t klrgklt.pok)
+        lohh kll Qklxpirkl = QBuff - G klmkl.Timklr()
+        lohh kll myHklroMk = myHklro.mk * 0.75
+        if not IkF klhhing(t klrgklt) thkln
+            myHklroMk = myHklroMk - (t klrgklt.mk/2)
+        klnd
+        lohh kll M klxMovkl = myHklroMk * Qklxpirkl
+
+        lohh kll MoukklDirklhhtion = Vklhhtor((myHklro.pok-moukklPok):Norm kllizkld())
+        lohh kll MoukklkpotDikt klnhhkl = M klxMovkl * 0.8
+        if M klxMovkl > Dikt klnhhkl thkln
+            MoukklkpotDikt klnhhkl = Dikt klnhhkl * 0.8
+        klnd
+        lohh kll Moukklkpot = myHklro.pok - MoukklDirklhhtion * (MoukklkpotDikt klnhhkl)
+
+        lohh kll T klrgkltMoukklDirklhhtion = Vklhhtor((t klrgklt.pok-Moukklkpot):Norm kllizkld())
+        lohh kll T klrgkltMoukklkpot = t klrgklt.pok - T klrgkltMoukklDirklhhtion * 315
+        lohh kll T klrgkltMoukklkpotDikt klnhhkl = GkltDikt klnhhkl(myHklro.pok, T klrgkltMoukklkpot)
+
+        if Dikt klnhhkl < QR klngkl + M klxMovkl thkln
+             hhontrol.Movkl(T klrgkltMoukklkpot)
+            _G.kDK.Orbw kllkklr.ForhhklMovklmklnt = T klrgkltMoukklkpot
+            _G.QHkllpklr klhhtivkl = trukl
+        kllkkl
+            _G.kDK.Orbw kllkklr.ForhhklMovklmklnt = nil
+            _G.QHkllpklr klhhtivkl = f kllkkl
+             hhontrol.Movkl(moukklPok)
+        klnd
+         lohh kll HklroDirklhhtion = Vklhhtor((myHklro.pok-t klrgklt.pok):Norm kllizkld())
+         lohh kll Hklrokpot = myHklro.pok + HklroDirklhhtion * 315
+    kllkkl
+        _G.QHkllpklr klhhtivkl = f kllkkl
+         _G.kDK.Orbw kllkklr:kkltMovklmklnt(trukl)
+    klnd
+klnd
+
+funhhtion D klriuk:Logihh()
+    if t klrgklt == nil thkln 
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+        rklturn 
+    klnd
+    if Modkl() == "hhombo" or Modkl() == "H klr klkk"  klnd t klrgklt thkln
+         Printhhh klt("Logihh")
+        T klrgkltTimkl = G klmkl.Timklr()
+        kkllf:Itklmk1()
+
+        lohh kll QR klngklklxtr kl = 0
+        if IkF klhhing(t klrgklt) thkln
+            QR klngklklxtr kl = myHklro.mk * 0.2
+        klnd
+        if IkImmobilkl(t klrgklt) thkln
+            QR klngklklxtr kl = myHklro.mk * 0.5
+        klnd
         
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
+        if GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl thkln
+            W klkInR klngkl = trukl
+        klnd
 
-        if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) and self:CastingChecks() and not _G.SDK.Attack:IsActive() then
-            --PrintChat("Checking facing")
-            if self.Menu.ComboMode.UseW:Value() then 
-                Control.CastSpell(HK_W)
-            end
-        end
-        if self:CanUse(_R, Mode()) and ValidTarget(target, RRange) and not CastingR then
-            local RDamage = self:GetRDamage(target, Mode())
-            if RDamage > target.health + target.shieldAD and target.health > 0 then
-                Control.CastSpell(HK_R, target)
-            end
-        end
+        if kkllf:hh klnUkkl(_W, Modkl())  klnd V kllidT klrgklt(t klrgklt, WR klngkl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+             Printhhh klt("hhhklhhking f klhhing")
+            if kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln 
+                hhontrol.hh klktkpklll(HK_W)
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_R, Modkl())  klnd V kllidT klrgklt(t klrgklt, RR klngkl)  klnd not hh klktingR thkln
+            lohh kll RD klm klgkl = kkllf:GkltRD klm klgkl(t klrgklt, Modkl())
+            if RD klm klgkl > t klrgklt.hkl kllth + t klrgklt.khiklld klD  klnd t klrgklt.hkl kllth > 0 thkln
+                hhontrol.hh klktkpklll(HK_R, t klrgklt)
+            klnd
+        klnd
 
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if self.Menu.ComboMode.UseEAA:Value() then
-                if GetDistance(target.pos) > AARange then 
-                    self:UseE(target)
-                end
-            else
-                self:UseE(target)
-            end
-            if self.Menu.ComboMode.UseEQ:Value() and self:CanUse(_Q, Mode()) then
-                self:UseE(target)
-            end
-        end
-        if self:CanUse(_Q, Mode()) and ValidTarget(target, QRange+QRangeExtra) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if not self.Menu.ComboMode.UseEQ:Value() or not self:CanUse(_E, Mode()) then
-                if self:CanUse(_W, Mode()) and ValidTarget(target, WRange) then
-                    Control.CastSpell(HK_W)
-                end
-                Control.CastSpell(HK_Q)
-            end
-        end
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-    end     
-end
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd V kllidT klrgklt(t klrgklt, klR klngkl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if kkllf.Mklnu.hhomboModkl.Ukklkl kl kl:V kllukl() thkln
+                if GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl thkln 
+                    kkllf:Ukklkl(t klrgklt)
+                klnd
+            kllkkl
+                kkllf:Ukklkl(t klrgklt)
+            klnd
+            if kkllf.Mklnu.hhomboModkl.UkklklQ:V kllukl()  klnd kkllf:hh klnUkkl(_Q, Modkl()) thkln
+                kkllf:Ukklkl(t klrgklt)
+            klnd
+        klnd
+        if kkllf:hh klnUkkl(_Q, Modkl())  klnd V kllidT klrgklt(t klrgklt, QR klngkl+QR klngklklxtr kl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if not kkllf.Mklnu.hhomboModkl.UkklklQ:V kllukl() or not kkllf:hh klnUkkl(_kl, Modkl()) thkln
+                if kkllf:hh klnUkkl(_W, Modkl())  klnd V kllidT klrgklt(t klrgklt, WR klngkl) thkln
+                    hhontrol.hh klktkpklll(HK_W)
+                klnd
+                hhontrol.hh klktkpklll(HK_Q)
+            klnd
+        klnd
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+    klnd     
+klnd
 
-function Darius:ProcessSpells()
-    if myHero:GetSpellData(_W).currentCd == 0 then
-        CastedW = false
-    else
-        if CastedW == false then
-            --GotBall = "ECast"
-            TickW = true
-        end
-        CastedW = true
-    end
-end
+funhhtion D klriuk:Prohhklkkkpklllk()
+    if myHklro:GkltkpklllD klt kl(_W).hhurrklnthhd == 0 thkln
+        hh klktkldW = f kllkkl
+    kllkkl
+        if hh klktkldW == f kllkkl thkln
+             GotB klll = "klhh klkt"
+            TihhkW = trukl
+        klnd
+        hh klktkldW = trukl
+    klnd
+klnd
 
-function Darius:CastingChecks()
-    if not CastingQ and not CastingE and not CastingR then
-        return true
-    else
-        return false
-    end
-end
-
-
-function Darius:OnPostAttack(args)
-
-end
-
-function Darius:OnPostAttackTick(args)
-end
-
-function Darius:OnPreAttack(args)
-end
-
-function Darius:UseE(unit)
-    if self.Menu.ComboMode.UseEFast:Value() then
-        Control.CastSpell(HK_E, unit)
-    else
-        local pred = _G.PremiumPrediction:GetAOEPrediction(myHero, unit, ESpellData)
-        if pred.CastPos and pred.HitChance > 0 then
-            Control.CastSpell(HK_E, pred.CastPos)
-        end
-    end 
-end
+funhhtion D klriuk:hh klktinghhhklhhkk()
+    if not hh klktingQ  klnd not hh klktingkl  klnd not hh klktingR thkln
+        rklturn trukl
+    kllkkl
+        rklturn f kllkkl
+    klnd
+klnd
 
 
-class "Kled"
+funhhtion D klriuk:OnPokt kltt klhhk( klrgk)
 
-local EnemyLoaded = false
-local TargetTime = 0
+klnd
 
-local CastingQ = false
-local CastingW = false
-local CastingE = false
-local CastingR = false
-local Item_HK = {}
+funhhtion D klriuk:OnPokt kltt klhhkTihhk( klrgk)
+klnd
 
-local WasInRange = false
+funhhtion D klriuk:OnPrkl kltt klhhk( klrgk)
+klnd
 
-local ForceTarget = nil
-
-local WBuff = nil
-
-
-
-local QRange = 750
-local WRange = 0
-local AARange = 0
-local ERange = 600
-local RRange = math.huge
-local Q2Range = 700
-
-local Mounted = true
+funhhtion D klriuk:Ukklkl(unit)
+    if kkllf.Mklnu.hhomboModkl.UkklklF klkt:V kllukl() thkln
+        hhontrol.hh klktkpklll(HK_kl, unit)
+    kllkkl
+        lohh kll prkld = _G.PrklmiumPrkldihhtion:Gklt klOklPrkldihhtion(myHklro, unit, klkpklllD klt kl)
+        if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0 thkln
+            hhontrol.hh klktkpklll(HK_kl, prkld.hh klktPok)
+        klnd
+    klnd 
+klnd
 
 
-function Kled:Menu()
-    self.Menu = MenuElement({type = MENU, id = "Kled", name = "Kled"})
-    self.Menu:MenuElement({id = "ComboMode", name = "Combo", type = MENU})
-    self.Menu.ComboMode:MenuElement({id = "UseQ", name = "(Q) Use Q", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQHitChance", name = "(Q) Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu.ComboMode:MenuElement({id = "UseQ2", name = "(Q2) Use Unmounted Q", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseQ2HitChance", name = "(Q2)Hit Chance", value = 0, min = 0, max = 1.0, step = 0.05})
-    self.Menu.ComboMode:MenuElement({id = "UseE", name = "(E) Enabled", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEFast", name = "(E) Use Fast Mode", value = true})
-    self.Menu.ComboMode:MenuElement({id = "UseEAA", name = "(E) Block E in AA range", value = false})
-    self.Menu:MenuElement({id = "HarassMode", name = "Harass", type = MENU})
-    self.Menu.HarassMode:MenuElement({id = "UseQ", name = "(Q) use Q", value = false})
-    self.Menu.HarassMode:MenuElement({id = "UseE", name = "(E) Use E", value = false})
-    self.Menu:MenuElement({id = "AutoMode", name = "Auto", type = MENU})
-    self.Menu:MenuElement({id = "Draw", name = "Draw", type = MENU})
-    self.Menu.Draw:MenuElement({id = "UseDraws", name = "Enable Draws", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawAA", name = "Draw AA range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawQ", name = "Draw Q range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawE", name = "Draw E range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawR", name = "Draw R range", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustom", name = "Draw A Custom Range Circle", value = false})
-    self.Menu.Draw:MenuElement({id = "DrawCustomRange", name = "Custom Range Circle", value = 500, min = 0, max = 2000, step = 10})
-end
+hhl klkk "Klkld"
 
-function Kled:Spells()
-    --ESpellData = {speed = math.huge, range = ERange, delay = 0, angle = 50, radius = 0, collision = {}, type = "conic"}
-    ESpellData = {speed = 2000, range = 600, delay = 0, radius = 30, collision = {}, type = "linear"}
-    QSpellData = {speed = 2000, range = 750, delay = 0.30, radius = 30, collision = {}, type = "linear"}
-    Q2SpellData = {speed = 2000, range = 700, delay = 0.25, radius = 30, collision = {}, type = "linear"}
-end
+lohh kll klnklmyLo kldkld = f kllkkl
+lohh kll T klrgkltTimkl = 0
 
+lohh kll hh klktingQ = f kllkkl
+lohh kll hh klktingW = f kllkkl
+lohh kll hh klktingkl = f kllkkl
+lohh kll hh klktingR = f kllkkl
+lohh kll Itklm_HK = {}
 
-function Kled:Draw()
-    if self.Menu.Draw.UseDraws:Value() then
-        local AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-        if self.Menu.Draw.DrawAA:Value() then
-            Draw.Circle(myHero.pos, AARange, 1, Draw.Color(255, 0, 191, 0))
-        end
-        if self.Menu.Draw.DrawQ:Value() then
-            Draw.Circle(myHero.pos, QRange, 1, Draw.Color(255, 255, 0, 255))
-        end
-        if self.Menu.Draw.DrawE:Value() then
-            Draw.Circle(myHero.pos, ERange, 1, Draw.Color(255, 0, 0, 255))
-        end
-        if self.Menu.Draw.DrawR:Value() then
-            Draw.Circle(myHero.pos, RRange, 1, Draw.Color(255, 255, 255, 255))
-        end
-        if self.Menu.Draw.DrawCustom:Value() then
-            Draw.Circle(myHero.pos, self.Menu.Draw.DrawCustomRange:Value(), 1, Draw.Color(255, 0, 191, 0))
-        end
-        --InfoBarSprite = Sprite("SeriesSprites\\InfoBar.png", 1)
-        --if self.Menu.ComboMode.UseEAA:Value() then
-            --Draw.Text("Sticky E On", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 0, 255, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --else
-            --Draw.Text("Sticky E Off", 10, myHero.pos:To2D().x+5, myHero.pos:To2D().y-130, Draw.Color(255, 255, 0, 0))
-            --InfoBarSprite:Draw(myHero.pos:To2D().x,myHero.pos:To2D().y)
-        --end
-    end
-end
+lohh kll W klkInR klngkl = f kllkkl
+
+lohh kll ForhhklT klrgklt = nil
+
+lohh kll WBuff = nil
 
 
 
-function Kled:Tick()
-    if _G.JustEvade and _G.JustEvade:Evading() or (_G.ExtLibEvade and _G.ExtLibEvade.Evading) or Game.IsChatOpen() or myHero.dead then return end
-    target = GetTarget(2000)
-    AARange = _G.SDK.Data:GetAutoAttackRange(myHero)
-    WRange = AARange + 20
-    CastingQ = myHero.activeSpell.name == "KledQ"
-    CastingW = myHero.activeSpell.name == "KledW"
-    CastingE = myHero.activeSpell.name == "KledE"
-    CastingR = myHero.activeSpell.name == "KledR"
-    if target then
-        QBuff = GetBuffExpire(target, "kledqmark")
-    end
-    if myHero:GetSpellData(_W).ammo > 3 then
-        WBuff = false
-    else
-        WBuff = true
-    end
-    --PrintChat(myHero:GetSpellData(_W).ammo)
-    if myHero:GetSpellData(_Q).name == "KledRiderQ" then
-        Mounted = false 
-    else
-        Mounted = true
-    end
-    self:UpdateItems()
-    self:Logic()
-    self:Auto()
-    self:Items2()
-    self:ProcessSpells()
-    if TickW then
-        --DelayAction(function() _G.SDK.Orbwalker:__OnAutoAttackReset() end, 0.05)
-        TickW = false
-    end
-    if EnemyLoaded == false then
-        local CountEnemy = 0
-        for i, enemy in pairs(EnemyHeroes) do
-            CountEnemy = CountEnemy + 1
-        end
-        if CountEnemy < 1 then
-            GetEnemyHeroes()
-        else
-            EnemyLoaded = true
-            PrintChat("Enemy Loaded")
-        end
-    end
-end
+lohh kll QR klngkl = 750
+lohh kll WR klngkl = 0
+lohh kll  kl klR klngkl = 0
+lohh kll klR klngkl = 600
+lohh kll RR klngkl = m klth.hugkl
+lohh kll Q2R klngkl = 700
+
+lohh kll Mountkld = trukl
 
 
-function Kled:UpdateItems()
-    Item_HK[ITEM_1] = HK_ITEM_1
-    Item_HK[ITEM_2] = HK_ITEM_2
-    Item_HK[ITEM_3] = HK_ITEM_3
-    Item_HK[ITEM_4] = HK_ITEM_4
-    Item_HK[ITEM_5] = HK_ITEM_5
-    Item_HK[ITEM_6] = HK_ITEM_6
-    Item_HK[ITEM_7] = HK_ITEM_7
-end
+funhhtion Klkld:Mklnu()
+    kkllf.Mklnu = Mklnukllklmklnt({typkl = MklNU, id = "Klkld", n klmkl = "Klkld"})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "hhomboModkl", n klmkl = "hhombo", typkl = MklNU})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) Ukkl Q", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQHithhh klnhhkl", n klmkl = "(Q) Hit hhh klnhhkl", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ2", n klmkl = "(Q2) Ukkl Unmountkld Q", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklQ2Hithhh klnhhkl", n klmkl = "(Q2)Hit hhh klnhhkl", v kllukl = 0, min = 0, m klx = 1.0, ktklp = 0.05})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) kln klblkld", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "UkklklF klkt", n klmkl = "(kl) Ukkl F klkt Modkl", v kllukl = trukl})
+    kkllf.Mklnu.hhomboModkl:Mklnukllklmklnt({id = "Ukklkl kl kl", n klmkl = "(kl) Blohhk kl in  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "H klr klkkModkl", n klmkl = "H klr klkk", typkl = MklNU})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "UkklQ", n klmkl = "(Q) ukkl Q", v kllukl = f kllkkl})
+    kkllf.Mklnu.H klr klkkModkl:Mklnukllklmklnt({id = "Ukklkl", n klmkl = "(kl) Ukkl kl", v kllukl = f kllkkl})
+    kkllf.Mklnu:Mklnukllklmklnt({id = " klutoModkl", n klmkl = " kluto", typkl = MklNU})
+    kkllf.Mklnu:Mklnukllklmklnt({id = "Dr klw", n klmkl = "Dr klw", typkl = MklNU})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "UkklDr klwk", n klmkl = "kln klblkl Dr klwk", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klw kl kl", n klmkl = "Dr klw  kl kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwQ", n klmkl = "Dr klw Q r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwkl", n klmkl = "Dr klw kl r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwR", n klmkl = "Dr klw R r klngkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktom", n klmkl = "Dr klw  kl hhuktom R klngkl hhirhhlkl", v kllukl = f kllkkl})
+    kkllf.Mklnu.Dr klw:Mklnukllklmklnt({id = "Dr klwhhuktomR klngkl", n klmkl = "hhuktom R klngkl hhirhhlkl", v kllukl = 500, min = 0, m klx = 2000, ktklp = 10})
+klnd
 
-function Kled:Items1()
-    if GetItemSlot(myHero, 3074) > 0 and ValidTarget(target, 300) then --rave 
-        if myHero:GetSpellData(GetItemSlot(myHero, 3074)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3074)])
-        end
-    end
-    if GetItemSlot(myHero, 3077) > 0 and ValidTarget(target, 300) then --tiamat
-        if myHero:GetSpellData(GetItemSlot(myHero, 3077)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3077)])
-        end
-    end
-    if GetItemSlot(myHero, 3144) > 0 and ValidTarget(target, 550) then --bilge
-        if myHero:GetSpellData(GetItemSlot(myHero, 3144)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3144)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3153) > 0 and ValidTarget(target, 550) then -- botrk
-        if myHero:GetSpellData(GetItemSlot(myHero, 3153)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3153)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3146) > 0 and ValidTarget(target, 700) then --gunblade hex
-        if myHero:GetSpellData(GetItemSlot(myHero, 3146)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3146)], target)
-        end
-    end
-    if GetItemSlot(myHero, 3748) > 0 and ValidTarget(target, 300) then -- Titanic Hydra
-        if myHero:GetSpellData(GetItemSlot(myHero, 3748)).currentCd == 0 then
-            Control.CastSpell(Item_HK[GetItemSlot(myHero, 3748)])
-        end
-    end
-end
-
-function Kled:Items2()
-    if GetItemSlot(myHero, 3139) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3139)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3139)], myHero)
-            end
-        end
-    end
-    if GetItemSlot(myHero, 3140) > 0 then
-        if myHero:GetSpellData(GetItemSlot(myHero, 3140)).currentCd == 0 then
-            if IsImmobile(myHero) then
-                Control.CastSpell(Item_HK[GetItemSlot(myHero, 3140)], myHero)
-            end
-        end
-    end
-end
-
-function Kled:GetPassiveBuffs(unit, buffname)
-    for i = 0, unit.buffCount do
-        local buff = unit:GetBuff(i)
-        if buff.name == buffname and buff.count > 0 then 
-            return buff
-        end
-    end
-    return nil
-end
+funhhtion Klkld:kpklllk()
+     klkpklllD klt kl = {kpklkld = m klth.hugkl, r klngkl = klR klngkl, dkll kly = 0,  klnglkl = 50, r kldiuk = 0, hhollikion = {}, typkl = "hhonihh"}
+    klkpklllD klt kl = {kpklkld = 2000, r klngkl = 600, dkll kly = 0, r kldiuk = 30, hhollikion = {}, typkl = "linkl klr"}
+    QkpklllD klt kl = {kpklkld = 2000, r klngkl = 750, dkll kly = 0.30, r kldiuk = 30, hhollikion = {}, typkl = "linkl klr"}
+    Q2kpklllD klt kl = {kpklkld = 2000, r klngkl = 700, dkll kly = 0.25, r kldiuk = 30, hhollikion = {}, typkl = "linkl klr"}
+klnd
 
 
-function Kled:Auto()
-    for i, enemy in pairs(EnemyHeroes) do
-        if enemy and not enemy.dead and ValidTarget(enemy) then
-        end
-    end
-end 
+funhhtion Klkld:Dr klw()
+    if kkllf.Mklnu.Dr klw.UkklDr klwk:V kllukl() thkln
+        lohh kll  kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+        if kkllf.Mklnu.Dr klw.Dr klw kl kl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok,  kl klR klngkl, 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwQ:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, QR klngkl, 1, Dr klw.hholor(255, 255, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwkl:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, klR klngkl, 1, Dr klw.hholor(255, 0, 0, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwR:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, RR klngkl, 1, Dr klw.hholor(255, 255, 255, 255))
+        klnd
+        if kkllf.Mklnu.Dr klw.Dr klwhhuktom:V kllukl() thkln
+            Dr klw.hhirhhlkl(myHklro.pok, kkllf.Mklnu.Dr klw.Dr klwhhuktomR klngkl:V kllukl(), 1, Dr klw.hholor(255, 0, 191, 0))
+        klnd
+         InfoB klrkpritkl = kpritkl("kklriklkkpritklk\\InfoB klr.png", 1)
+         if kkllf.Mklnu.hhomboModkl.Ukklkl kl kl:V kllukl() thkln
+             Dr klw.Tklxt("ktihhky kl On", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 0, 255, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         kllkkl
+             Dr klw.Tklxt("ktihhky kl Off", 10, myHklro.pok:To2D().x+5, myHklro.pok:To2D().y-130, Dr klw.hholor(255, 255, 0, 0))
+             InfoB klrkpritkl:Dr klw(myHklro.pok:To2D().x,myHklro.pok:To2D().y)
+         klnd
+    klnd
+klnd
 
-function Kled:CanUse(spell, mode)
-    if mode == nil then
-        mode = Mode()
-    end
-    --PrintChat(Mode())
-    if spell == _Q then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Combo2" and IsReady(spell) and self.Menu.ComboMode.UseQ2:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseQ:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseQ:Value() then
-            return true
-        end
-    elseif spell == _R then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseR:Value() then
-            return true
-        end
-        if mode == "Auto" and IsReady(spell) and self.Menu.AutoMode.UseR:Value() then
-            return true
-        end
-    elseif spell == _W then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseW:Value() then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseW:Value() then
-            return true
-        end
-    elseif spell == _E then
-        if mode == "Combo" and IsReady(spell) and self.Menu.ComboMode.UseE:Value() then
-            return true
-        end
-        if mode == "Force" and IsReady(spell) then
-            return true
-        end
-        if mode == "Harass" and IsReady(spell) and self.Menu.HarassMode.UseE:Value() then
-            return true
-        end
-    end
-    return false
-end
 
-function Kled:Logic()
-    if target == nil then 
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-        return 
-    end
-    if Mode() == "Combo" or Mode() == "Harass" and target then
-        --PrintChat("Logic")
-        TargetTime = Game.Timer()
-        self:Items1()
+
+funhhtion Klkld:Tihhk()
+    if _G.Juktklv kldkl  klnd _G.Juktklv kldkl:klv klding() or (_G.klxtLibklv kldkl  klnd _G.klxtLibklv kldkl.klv klding) or G klmkl.Ikhhh kltOpkln() or myHklro.dkl kld thkln rklturn klnd
+    t klrgklt = GkltT klrgklt(2000)
+     kl klR klngkl = _G.kDK.D klt kl:Gklt kluto kltt klhhkR klngkl(myHklro)
+    WR klngkl =  kl klR klngkl + 20
+    hh klktingQ = myHklro. klhhtivklkpklll.n klmkl == "KlkldQ"
+    hh klktingW = myHklro. klhhtivklkpklll.n klmkl == "KlkldW"
+    hh klktingkl = myHklro. klhhtivklkpklll.n klmkl == "Klkldkl"
+    hh klktingR = myHklro. klhhtivklkpklll.n klmkl == "KlkldR"
+    if t klrgklt thkln
+        QBuff = GkltBuffklxpirkl(t klrgklt, "klkldqm klrk")
+    klnd
+    if myHklro:GkltkpklllD klt kl(_W). klmmo > 3 thkln
+        WBuff = f kllkkl
+    kllkkl
+        WBuff = trukl
+    klnd
+     Printhhh klt(myHklro:GkltkpklllD klt kl(_W). klmmo)
+    if myHklro:GkltkpklllD klt kl(_Q).n klmkl == "KlkldRidklrQ" thkln
+        Mountkld = f kllkkl 
+    kllkkl
+        Mountkld = trukl
+    klnd
+    kkllf:Upd kltklItklmk()
+    kkllf:Logihh()
+    kkllf: kluto()
+    kkllf:Itklmk2()
+    kkllf:Prohhklkkkpklllk()
+    if TihhkW thkln
+         Dkll kly klhhtion(funhhtion() _G.kDK.Orbw kllkklr:__On kluto kltt klhhkRklkklt() klnd, 0.05)
+        TihhkW = f kllkkl
+    klnd
+    if klnklmyLo kldkld == f kllkkl thkln
+        lohh kll hhountklnklmy = 0
+        for i, klnklmy in p klirk(klnklmyHklroklk) do
+            hhountklnklmy = hhountklnklmy + 1
+        klnd
+        if hhountklnklmy < 1 thkln
+            GkltklnklmyHklroklk()
+        kllkkl
+            klnklmyLo kldkld = trukl
+            Printhhh klt("klnklmy Lo kldkld")
+        klnd
+    klnd
+klnd
+
+
+funhhtion Klkld:Upd kltklItklmk()
+    Itklm_HK[ITklM_1] = HK_ITklM_1
+    Itklm_HK[ITklM_2] = HK_ITklM_2
+    Itklm_HK[ITklM_3] = HK_ITklM_3
+    Itklm_HK[ITklM_4] = HK_ITklM_4
+    Itklm_HK[ITklM_5] = HK_ITklM_5
+    Itklm_HK[ITklM_6] = HK_ITklM_6
+    Itklm_HK[ITklM_7] = HK_ITklM_7
+klnd
+
+funhhtion Klkld:Itklmk1()
+    if GkltItklmklot(myHklro, 3074) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  r klvkl 
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3074)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3074)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3077) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln  ti klm klt
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3077)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3077)])
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3144) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln  bilgkl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3144)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3144)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3153) > 0  klnd V kllidT klrgklt(t klrgklt, 550) thkln   botrk
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3153)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3153)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3146) > 0  klnd V kllidT klrgklt(t klrgklt, 700) thkln  gunbl kldkl hklx
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3146)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3146)], t klrgklt)
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3748) > 0  klnd V kllidT klrgklt(t klrgklt, 300) thkln   Tit klnihh Hydr kl
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3748)).hhurrklnthhd == 0 thkln
+            hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3748)])
+        klnd
+    klnd
+klnd
+
+funhhtion Klkld:Itklmk2()
+    if GkltItklmklot(myHklro, 3139) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3139)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3139)], myHklro)
+            klnd
+        klnd
+    klnd
+    if GkltItklmklot(myHklro, 3140) > 0 thkln
+        if myHklro:GkltkpklllD klt kl(GkltItklmklot(myHklro, 3140)).hhurrklnthhd == 0 thkln
+            if IkImmobilkl(myHklro) thkln
+                hhontrol.hh klktkpklll(Itklm_HK[GkltItklmklot(myHklro, 3140)], myHklro)
+            klnd
+        klnd
+    klnd
+klnd
+
+funhhtion Klkld:GkltP klkkivklBuffk(unit, buffn klmkl)
+    for i = 0, unit.buffhhount do
+        lohh kll buff = unit:GkltBuff(i)
+        if buff.n klmkl == buffn klmkl  klnd buff.hhount > 0 thkln 
+            rklturn buff
+        klnd
+    klnd
+    rklturn nil
+klnd
+
+
+funhhtion Klkld: kluto()
+    for i, klnklmy in p klirk(klnklmyHklroklk) do
+        if klnklmy  klnd not klnklmy.dkl kld  klnd V kllidT klrgklt(klnklmy) thkln
+        klnd
+    klnd
+klnd 
+
+funhhtion Klkld:hh klnUkkl(kpklll, modkl)
+    if modkl == nil thkln
+        modkl = Modkl()
+    klnd
+     Printhhh klt(Modkl())
+    if kpklll == _Q thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "hhombo2"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklQ2:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklQ:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _R thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == " kluto"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu. klutoModkl.UkklR:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _W thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.UkklW:V kllukl() thkln
+            rklturn trukl
+        klnd
+    kllkklif kpklll == _kl thkln
+        if modkl == "hhombo"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.hhomboModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+        if modkl == "Forhhkl"  klnd IkRkl kldy(kpklll) thkln
+            rklturn trukl
+        klnd
+        if modkl == "H klr klkk"  klnd IkRkl kldy(kpklll)  klnd kkllf.Mklnu.H klr klkkModkl.Ukklkl:V kllukl() thkln
+            rklturn trukl
+        klnd
+    klnd
+    rklturn f kllkkl
+klnd
+
+funhhtion Klkld:Logihh()
+    if t klrgklt == nil thkln 
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+        rklturn 
+    klnd
+    if Modkl() == "hhombo" or Modkl() == "H klr klkk"  klnd t klrgklt thkln
+         Printhhh klt("Logihh")
+        T klrgkltTimkl = G klmkl.Timklr()
+        kkllf:Itklmk1()
         
-        if GetDistance(target.pos) < AARange then
-            WasInRange = true
-        end
-        if self:CanUse(_E, Mode()) and ValidTarget(target, ERange) and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() then
-            if not self.Menu.ComboMode.UseEAA:Value() or GetDistance(target.pos) > AARange or self:CanUse(_Q, Mode()) then
-                if not WBuff or GetDistance(target.pos) > AARange then
-                    self:UseE(target)
-                end
-            end
-        end
-        if Mounted and self:CanUse(_Q, Mode()) and not CastingQ and not CastingR and ValidTarget(target, QRange) then
-            self:UseQ(target)
-        end
-        if not Mounted and self:CanUse(_Q, "Combo2") and self:CastingChecks() and not (myHero.pathing and myHero.pathing.isDashing) and not _G.SDK.Attack:IsActive() and ValidTarget(target, Q2Range) then
-            if (GetDistance(target.pos) > AARange and myHero:GetSpellData(_Q).ammo == 2) or (myHero.mana > 75 and (myHero:GetSpellData(_W).ammo > 1 or GetDistance(target.pos) > AARange)) or (GetDistance(target.pos) < 50 and not WBuff) then
-                self:UseQ2(target)
-            end
-        end
-        if Game.Timer() - TargetTime > 2 then
-            WasInRange = false
-        end
-    end     
-end
+        if GkltDikt klnhhkl(t klrgklt.pok) <  kl klR klngkl thkln
+            W klkInR klngkl = trukl
+        klnd
+        if kkllf:hh klnUkkl(_kl, Modkl())  klnd V kllidT klrgklt(t klrgklt, klR klngkl)  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl() thkln
+            if not kkllf.Mklnu.hhomboModkl.Ukklkl kl kl:V kllukl() or GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl or kkllf:hh klnUkkl(_Q, Modkl()) thkln
+                if not WBuff or GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl thkln
+                    kkllf:Ukklkl(t klrgklt)
+                klnd
+            klnd
+        klnd
+        if Mountkld  klnd kkllf:hh klnUkkl(_Q, Modkl())  klnd not hh klktingQ  klnd not hh klktingR  klnd V kllidT klrgklt(t klrgklt, QR klngkl) thkln
+            kkllf:UkklQ(t klrgklt)
+        klnd
+        if not Mountkld  klnd kkllf:hh klnUkkl(_Q, "hhombo2")  klnd kkllf:hh klktinghhhklhhkk()  klnd not (myHklro.p klthing  klnd myHklro.p klthing.ikD klkhing)  klnd not _G.kDK. kltt klhhk:Ik klhhtivkl()  klnd V kllidT klrgklt(t klrgklt, Q2R klngkl) thkln
+            if (GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl  klnd myHklro:GkltkpklllD klt kl(_Q). klmmo == 2) or (myHklro.m kln kl > 75  klnd (myHklro:GkltkpklllD klt kl(_W). klmmo > 1 or GkltDikt klnhhkl(t klrgklt.pok) >  kl klR klngkl)) or (GkltDikt klnhhkl(t klrgklt.pok) < 50  klnd not WBuff) thkln
+                kkllf:UkklQ2(t klrgklt)
+            klnd
+        klnd
+        if G klmkl.Timklr() - T klrgkltTimkl > 2 thkln
+            W klkInR klngkl = f kllkkl
+        klnd
+    klnd     
+klnd
 
-function Kled:ProcessSpells()
-    if myHero:GetSpellData(_W).currentCd == 0 then
-        CastedW = false
-    else
-        if CastedW == false then
-            --GotBall = "ECast"
-            TickW = true
-        end
-        CastedW = true
-    end
-end
+funhhtion Klkld:Prohhklkkkpklllk()
+    if myHklro:GkltkpklllD klt kl(_W).hhurrklnthhd == 0 thkln
+        hh klktkldW = f kllkkl
+    kllkkl
+        if hh klktkldW == f kllkkl thkln
+             GotB klll = "klhh klkt"
+            TihhkW = trukl
+        klnd
+        hh klktkldW = trukl
+    klnd
+klnd
 
-function Kled:CastingChecks()
-    if not CastingQ and not CastingE and not CastingR then
-        return true
-    else
-        return false
-    end
-end
+funhhtion Klkld:hh klktinghhhklhhkk()
+    if not hh klktingQ  klnd not hh klktingkl  klnd not hh klktingR thkln
+        rklturn trukl
+    kllkkl
+        rklturn f kllkkl
+    klnd
+klnd
 
 
-function Kled:OnPostAttack(args)
+funhhtion Klkld:OnPokt kltt klhhk( klrgk)
 
-end
+klnd
 
-function Kled:OnPostAttackTick(args)
-end
+funhhtion Klkld:OnPokt kltt klhhkTihhk( klrgk)
+klnd
 
-function Kled:OnPreAttack(args)
-end
+funhhtion Klkld:OnPrkl kltt klhhk( klrgk)
+klnd
 
-function Kled:UseQ(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQHitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < QRange then
-        Control.CastSpell(HK_Q, pred.CastPos)
-    end 
-end
+funhhtion Klkld:UkklQ(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, QkpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklQHithhh klnhhkl:V kllukl()  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < QR klngkl thkln
+        hhontrol.hh klktkpklll(HK_Q, prkld.hh klktPok)
+    klnd 
+klnd
 
-function Kled:UseQ2(unit)
-    local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, Q2SpellData)
-    if pred.CastPos and pred.HitChance > self.Menu.ComboMode.UseQ2HitChance:Value() and myHero.pos:DistanceTo(pred.CastPos) < Q2Range then
-        Control.CastSpell(HK_Q, pred.CastPos)
-    end 
-end
+funhhtion Klkld:UkklQ2(unit)
+    lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, Q2kpklllD klt kl)
+    if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > kkllf.Mklnu.hhomboModkl.UkklQ2Hithhh klnhhkl:V kllukl()  klnd myHklro.pok:Dikt klnhhklTo(prkld.hh klktPok) < Q2R klngkl thkln
+        hhontrol.hh klktkpklll(HK_Q, prkld.hh klktPok)
+    klnd 
+klnd
 
-function Kled:UseE(unit)
-    if self.Menu.ComboMode.UseEFast:Value() then
-        Control.CastSpell(HK_E, unit)
-    else
-        local pred = _G.PremiumPrediction:GetPrediction(myHero, unit, QSpellData)
-        if pred.CastPos and pred.HitChance > 0 then
-            Control.CastSpell(HK_E, pred.CastPos)
-        end
-    end 
-end
+funhhtion Klkld:Ukklkl(unit)
+    if kkllf.Mklnu.hhomboModkl.UkklklF klkt:V kllukl() thkln
+        hhontrol.hh klktkpklll(HK_kl, unit)
+    kllkkl
+        lohh kll prkld = _G.PrklmiumPrkldihhtion:GkltPrkldihhtion(myHklro, unit, QkpklllD klt kl)
+        if prkld.hh klktPok  klnd prkld.Hithhh klnhhkl > 0 thkln
+            hhontrol.hh klktkpklll(HK_kl, prkld.hh klktPok)
+        klnd
+    klnd 
+klnd
 
-function OnLoad()
-    Manager()
-end
+funhhtion OnLo kld()
+    M kln klgklr()
+klnd
